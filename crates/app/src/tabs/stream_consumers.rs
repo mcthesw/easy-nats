@@ -62,7 +62,7 @@ fn consumer_card(
     consumer: &serde_json::Value,
     backend: &BackendHandle,
 ) {
-    let name = consumer["name"].as_str().unwrap_or("(unnamed)");
+    let name = consumer["name"].as_str().unwrap_or(S::CONSUMER_UNNAMED);
     let config = &consumer["config"];
     let consumer_type = if config["deliver_subject"].as_str().is_some() {
         S::CONSUMER_TYPE_PUSH

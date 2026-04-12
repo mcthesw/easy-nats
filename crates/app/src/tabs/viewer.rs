@@ -56,7 +56,8 @@ pub(crate) fn render_tab(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: 
             );
         }
         TabKind::ObjectStoreBucket { bucket_name, .. } => {
-            ui.label(format!("Object Store: {bucket_name} — coming soon"));
+            ui.heading(format!("Object Store: {bucket_name}"));
+            ui.label(ui_strings::OBJECT_STORE_WIP);
         }
     }
 }

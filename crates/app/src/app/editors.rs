@@ -205,8 +205,8 @@ pub(crate) enum StorageSelection {
 impl StorageSelection {
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::File => "File",
-            Self::Memory => "Memory",
+            Self::File => crate::ui_strings::STORAGE_FILE,
+            Self::Memory => crate::ui_strings::STORAGE_MEMORY,
         }
     }
 }
@@ -222,9 +222,9 @@ pub(crate) enum RetentionSelection {
 impl RetentionSelection {
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::Limits => "Limits",
-            Self::Interest => "Interest",
-            Self::WorkQueue => "WorkQueue",
+            Self::Limits => crate::ui_strings::RETENTION_LIMITS,
+            Self::Interest => crate::ui_strings::RETENTION_INTEREST,
+            Self::WorkQueue => crate::ui_strings::RETENTION_WORK_QUEUE,
         }
     }
 }

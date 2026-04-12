@@ -198,6 +198,26 @@ pub const KV_DELETE_ENTRY: &str = "Delete Entry";
 pub const KV_PURGE_ENTRY: &str = "Purge Entry";
 pub const KV_HISTORY: &str = "History";
 pub const KV_LOADING_HISTORY: &str = "Loading history...";
+
+// ─── Object Store ───
+pub const OBJECT_STORE_WIP: &str = "🚧 Object Store is under construction.";
+
+// ─── Storage / Retention Labels ───
+pub const STORAGE_FILE: &str = "File";
+pub const STORAGE_MEMORY: &str = "Memory";
+pub const RETENTION_LIMITS: &str = "Limits";
+pub const RETENTION_INTEREST: &str = "Interest";
+pub const RETENTION_WORK_QUEUE: &str = "WorkQueue";
+
+// ─── Toast / Result Messages ───
+pub const TOAST_STREAM_DELETED: &str = "Stream deleted";
+pub const TOAST_MESSAGE_DELETED: &str = "Message deleted";
+
+// ─── Misc ───
+pub const STREAM_REFRESH: &str = "Refresh";
+pub const STREAM_INVALID_BASE64: &str = "Invalid base64 payload";
+pub const STREAM_NO_PAYLOAD: &str = "No payload";
+pub const CONSUMER_UNNAMED: &str = "(unnamed)";
 pub const KV_NO_HISTORY: &str = "No history loaded yet.";
 pub const KV_NONE: &str = "—";
 pub const KV_EMPTY_VALUE: &str = "<empty>";

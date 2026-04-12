@@ -264,11 +264,11 @@ fn stream_message_detail(
                 match base64::engine::general_purpose::STANDARD.decode(payload_b64) {
                     Ok(data) => format::render_payload(ui, &data, *payload_format),
                     Err(_) => {
-                        ui.label("Invalid base64 payload");
+                        ui.label(S::STREAM_INVALID_BASE64);
                     }
                 }
             } else {
-                ui.label("No payload");
+                ui.label(S::STREAM_NO_PAYLOAD);
             }
         });
 }

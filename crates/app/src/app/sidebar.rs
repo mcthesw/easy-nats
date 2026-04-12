@@ -141,7 +141,9 @@ fn render_resource_tree(
         render_kv_section(app, ui, id, name, action);
         egui::CollapsingHeader::new(S::SECTION_OBJECT_STORE)
             .id_salt(format!("objstore_{id}"))
-            .show(ui, |_ui| {});
+            .show(ui, |ui| {
+                ui.weak(S::OBJECT_STORE_WIP);
+            });
     });
 }
 
@@ -189,7 +191,11 @@ fn render_streams_section(
                 {
                     *action = Some(SidebarAction::OpenStreamCreate(id));
                 }
-                if ui.small_button("↻").on_hover_text("Refresh").clicked() {
+                if ui
+                    .small_button("↻")
+                    .on_hover_text(S::STREAM_REFRESH)
+                    .clicked()
+                {
                     app.backend
                         .send(BackendCommand::ListStreams { connection_id: id });
                 }
