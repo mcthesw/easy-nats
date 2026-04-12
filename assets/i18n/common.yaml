@@ -72,6 +72,9 @@ welcome_new_conn:
 object_store_wip:
   en: "🚧 Object Store is under construction."
   zh: "🚧 对象存储正在施工中。"
+coming_soon:
+  en: "Coming Soon"
+  zh: "即将推出"
 
 # Tab context menu
 close_others:

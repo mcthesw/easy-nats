@@ -163,6 +163,13 @@ fn render_resource_tree(
             .show(ui, |ui| {
                 ui.weak(t("common.object_store_wip"));
             });
+        ui.add_enabled_ui(false, |ui| {
+            egui::CollapsingHeader::new(t("sidebar.section_metrics"))
+                .id_salt(format!("metrics_{id}"))
+                .show(ui, |ui| {
+                    ui.weak(t("common.coming_soon"));
+                });
+        });
     });
 }
 

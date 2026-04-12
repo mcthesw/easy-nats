@@ -19,6 +19,9 @@ section_kv:
 section_object_store:
   en: "Object Store"
   zh: "对象存储"
+section_metrics:
+  en: "Metrics"
+  zh: "监控指标"
 
 # Resource openers
 open_publisher:
