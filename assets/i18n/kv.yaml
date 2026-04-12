@@ -107,3 +107,6 @@ select_key_hint:
 back_to_detail:
   en: "← Back"
   zh: "← 返回"
+format_json:
+  en: "Format JSON"
+  zh: "格式化 JSON"

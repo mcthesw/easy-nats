@@ -41,3 +41,6 @@ response_headers:
 waiting:
   en: "Waiting for response..."
   zh: "等待响应中..."
+format_json:
+  en: "Format JSON"
+  zh: "格式化 JSON"
