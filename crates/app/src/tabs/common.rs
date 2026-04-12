@@ -5,6 +5,8 @@ use eframe::egui;
 
 use crate::i18n::t;
 
+use super::types::AutoRefresh;
+
 /// Draws a horizontal draggable separator. Returns the vertical delta to apply to split_ratio.
 pub(crate) fn draggable_separator(ui: &mut egui::Ui, _id_salt: &str) -> f32 {
     let available_width = ui.available_width();
@@ -78,5 +80,22 @@ pub(crate) fn kv_empty_preview(payload: &[u8], max_len: usize) -> String {
         t("kv.empty_value").to_string()
     } else {
         preview
+    }
+}
+
+/// Render auto-refresh toggle + interval selector inline.
+pub(crate) fn auto_refresh_ui(ui: &mut egui::Ui, id_salt: &str, ar: &mut AutoRefresh) {
+    ui.checkbox(&mut ar.enabled, t("common.auto_refresh"));
+    if ar.enabled {
+        egui::ComboBox::from_id_salt(id_salt)
+            .width(55.0)
+            .selected_text(format!("{}s", ar.interval_secs))
+            .show_ui(ui, |ui| {
+                for &secs in AutoRefresh::INTERVALS {
+                    ui.selectable_value(&mut ar.interval_secs, secs, format!("{secs}s"));
+                }
+            });
+        let elapsed = ar.last_refresh.elapsed().as_secs();
+        ui.weak(format!("{elapsed}s ago"));
     }
 }

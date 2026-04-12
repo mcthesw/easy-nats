@@ -80,3 +80,7 @@ close_all:
 close_to_right:
   en: "Close to the Right"
   zh: "关闭右侧"
+
+auto_refresh:
+  en: "Auto-refresh"
+  zh: "自动刷新"

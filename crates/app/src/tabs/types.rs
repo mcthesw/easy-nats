@@ -1,11 +1,43 @@
 use std::collections::VecDeque;
-use std::time::SystemTime;
+use std::time::{Instant, SystemTime};
 
 use eframe::egui;
 use egui_dock::TabViewer;
 
 use crate::format::PayloadFormat;
 use crate::i18n::t;
+
+/// Auto-refresh configuration for periodic data reloading.
+#[derive(Debug)]
+pub struct AutoRefresh {
+    pub enabled: bool,
+    pub interval_secs: u64,
+    pub last_refresh: Instant,
+}
+
+impl Default for AutoRefresh {
+    fn default() -> Self {
+        Self {
+            enabled: false,
+            interval_secs: 5,
+            last_refresh: Instant::now(),
+        }
+    }
+}
+
+impl AutoRefresh {
+    pub const INTERVALS: &[u64] = &[1, 5, 10, 30];
+
+    /// Returns true if the interval has elapsed and refresh is needed.
+    pub fn should_refresh(&self) -> bool {
+        self.enabled && self.last_refresh.elapsed().as_secs() >= self.interval_secs
+    }
+
+    /// Mark that a refresh just happened.
+    pub fn mark_refreshed(&mut self) {
+        self.last_refresh = Instant::now();
+    }
+}
 
 #[derive(Debug, Clone)]
 pub enum TabAction {
@@ -130,8 +162,8 @@ pub struct StreamState {
     pub purge_subject: String,
     pub consumers: Vec<serde_json::Value>,
     pub consumers_fetching: bool,
-    /// Ratio of message-list height to total available height (0.0–1.0).
     pub split_ratio: f32,
+    pub auto_refresh: AutoRefresh,
 }
 
 impl Default for StreamState {
@@ -149,6 +181,7 @@ impl Default for StreamState {
             consumers: Vec::new(),
             consumers_fetching: false,
             split_ratio: 0.5,
+            auto_refresh: AutoRefresh::default(),
         }
     }
 }
@@ -169,8 +202,8 @@ pub struct KvBucketState {
     pub editor_format: PayloadFormat,
     pub history: Vec<serde_json::Value>,
     pub history_format: PayloadFormat,
-    /// When true, right panel shows history instead of detail.
     pub show_history: bool,
+    pub auto_refresh: AutoRefresh,
 }
 
 impl Default for KvBucketState {
@@ -191,6 +224,7 @@ impl Default for KvBucketState {
             history: Vec::new(),
             history_format: PayloadFormat::Auto,
             show_history: false,
+            auto_refresh: AutoRefresh::default(),
         }
     }
 }

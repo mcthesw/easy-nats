@@ -4,7 +4,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 use crate::format;
 use crate::i18n::t;
 
-use super::common::{decode_base64_payload, format_bytes, kv_empty_preview};
+use super::common::{auto_refresh_ui, decode_base64_payload, format_bytes, kv_empty_preview};
 use super::types::{KvBucketState, TabAction};
 
 pub fn kv_bucket_ui(
@@ -78,6 +78,23 @@ fn render_key_list(
             state.loading_entries = true;
         }
     });
+
+    ui.horizontal(|ui| {
+        auto_refresh_ui(ui, "kv_auto_refresh", &mut state.auto_refresh);
+    });
+
+    // Auto-refresh timer
+    if state.auto_refresh.should_refresh() {
+        backend.send(BackendCommand::ListKvKeys {
+            connection_id,
+            bucket: bucket_name.to_string(),
+        });
+        state.loading_entries = true;
+        state.auto_refresh.mark_refreshed();
+        ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
+    } else if state.auto_refresh.enabled {
+        ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
+    }
 
     if state.loading_entries {
         ui.horizontal(|ui| {

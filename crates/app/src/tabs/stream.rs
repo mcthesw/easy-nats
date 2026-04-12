@@ -5,7 +5,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
 
-use super::common::{draggable_separator, format_bytes};
+use super::common::{auto_refresh_ui, draggable_separator, format_bytes};
 use super::stream_consumers::render_consumers;
 use super::types::{StreamState, TabAction};
 
@@ -17,6 +17,23 @@ pub fn stream_ui(
     backend: &BackendHandle,
     actions: &mut Vec<TabAction>,
 ) {
+    // Auto-refresh toggle
+    ui.horizontal(|ui| {
+        auto_refresh_ui(ui, "stream_auto_refresh", &mut state.auto_refresh);
+    });
+
+    // Auto-refresh timer: refresh consumers list
+    if state.auto_refresh.should_refresh() {
+        backend.send(BackendCommand::ListConsumers {
+            connection_id,
+            stream: stream_name.to_string(),
+        });
+        state.auto_refresh.mark_refreshed();
+        ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
+    } else if state.auto_refresh.enabled {
+        ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
+    }
+
     if let Some(info) = &state.info {
         egui::CollapsingHeader::new(t("stream.info"))
             .id_salt("stream_info")
