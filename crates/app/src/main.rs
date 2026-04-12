@@ -44,7 +44,8 @@ mod app {
     use std::collections::HashMap;
 
     use crate::tabs::{
-        AppTabViewer, PublisherState, ReceivedMessage, ResponseData, SubscriberState, TabKind,
+        AppTabViewer, PublisherState, ReceivedMessage, ResponseData, StreamState, SubscriberState,
+        TabKind,
     };
     use crate::toast::{ToastLevel, Toasts};
     use crate::ui_strings as S;
@@ -55,6 +56,8 @@ mod app {
         conn_statuses: HashMap<u64, ConnectionStatusKind>,
         selected_conn: Option<u64>,
         editor: ConnectionEditor,
+        stream_editor: StreamCreateEditor,
+        stream_lists: HashMap<u64, Vec<serde_json::Value>>,
         dock_state: DockState<TabKind>,
         toasts: Toasts,
         dark_mode: bool,
@@ -111,6 +114,72 @@ mod app {
         }
     }
 
+    struct StreamCreateEditor {
+        visible: bool,
+        connection_id: u64,
+        name: String,
+        subjects: String,
+        storage: StorageSelection,
+        retention: RetentionSelection,
+        max_messages: String,
+        max_bytes: String,
+        max_age_secs: String,
+        num_replicas: String,
+        description: String,
+    }
+
+    impl Default for StreamCreateEditor {
+        fn default() -> Self {
+            Self {
+                visible: false,
+                connection_id: 0,
+                name: String::new(),
+                subjects: String::new(),
+                storage: StorageSelection::File,
+                retention: RetentionSelection::Limits,
+                max_messages: String::new(),
+                max_bytes: String::new(),
+                max_age_secs: String::new(),
+                num_replicas: "1".to_string(),
+                description: String::new(),
+            }
+        }
+    }
+
+    #[derive(Default, Debug, Clone, Copy, PartialEq)]
+    enum StorageSelection {
+        #[default]
+        File,
+        Memory,
+    }
+
+    impl StorageSelection {
+        fn label(self) -> &'static str {
+            match self {
+                Self::File => "File",
+                Self::Memory => "Memory",
+            }
+        }
+    }
+
+    #[derive(Default, Debug, Clone, Copy, PartialEq)]
+    enum RetentionSelection {
+        #[default]
+        Limits,
+        Interest,
+        WorkQueue,
+    }
+
+    impl RetentionSelection {
+        fn label(self) -> &'static str {
+            match self {
+                Self::Limits => "Limits",
+                Self::Interest => "Interest",
+                Self::WorkQueue => "WorkQueue",
+            }
+        }
+    }
+
     impl EasyNatsApp {
         pub fn new(dark_mode: bool) -> Self {
             let config = AppConfig::load();
@@ -121,6 +190,8 @@ mod app {
                 conn_statuses: HashMap::new(),
                 selected_conn: None,
                 editor: ConnectionEditor::default(),
+                stream_editor: StreamCreateEditor::default(),
+                stream_lists: HashMap::new(),
                 dock_state,
                 toasts: Toasts::default(),
                 dark_mode,
@@ -145,6 +216,12 @@ mod app {
                                     ToastLevel::Success,
                                     format!("Connected to {}", self.conn_name(connection_id)),
                                 );
+                                // Auto-discover JetStream streams
+                                self.backend
+                                    .send(BackendCommand::ListStreams { connection_id });
+                            }
+                            ConnectionStatusKind::Disconnected => {
+                                self.stream_lists.remove(&connection_id);
                             }
                             ConnectionStatusKind::Error(msg) => {
                                 self.toasts.push(
@@ -159,18 +236,84 @@ mod app {
                     BackendEvent::OperationResult {
                         connection_id,
                         operation,
-                        ..
-                    } => {
-                        if operation == "publish" {
+                        data,
+                    } => match operation.as_str() {
+                        "publish" => {
                             self.toasts.push(
                                 ToastLevel::Success,
                                 format!("Published to {}", self.conn_name(connection_id)),
                             );
-                        } else {
+                        }
+                        "list_streams" => {
+                            if let Some(arr) = data.as_array() {
+                                let infos = arr.clone();
+                                // Update open Stream tabs with fresh info
+                                for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+                                    if let TabKind::Stream {
+                                        connection_id: cid,
+                                        stream_name,
+                                        state,
+                                        ..
+                                    } = tab
+                                        && *cid == connection_id
+                                    {
+                                        state.info = infos
+                                            .iter()
+                                            .find(|i| {
+                                                i["config"]["name"].as_str()
+                                                    == Some(stream_name.as_str())
+                                            })
+                                            .cloned();
+                                    }
+                                }
+                                self.stream_lists.insert(connection_id, infos);
+                            }
+                        }
+                        "create_stream" | "update_stream" => {
+                            self.toasts
+                                .push(ToastLevel::Success, format!("{operation} succeeded"));
+                            self.backend
+                                .send(BackendCommand::ListStreams { connection_id });
+                        }
+                        "delete_stream" => {
+                            self.toasts
+                                .push(ToastLevel::Success, "Stream deleted".to_string());
+                            self.backend
+                                .send(BackendCommand::ListStreams { connection_id });
+                        }
+                        "purge_stream" => {
+                            let purged = data["purged"].as_u64().unwrap_or(0);
+                            self.toasts
+                                .push(ToastLevel::Success, format!("Purged {purged} messages"));
+                        }
+                        "get_stream_messages" => {
+                            let stream_name = data["stream"].as_str().unwrap_or("").to_string();
+                            let messages = data["messages"].as_array().cloned().unwrap_or_default();
+                            for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+                                if let TabKind::Stream {
+                                    connection_id: cid,
+                                    stream_name: sname,
+                                    state,
+                                    ..
+                                } = tab
+                                    && *cid == connection_id
+                                    && *sname == stream_name
+                                {
+                                    state.messages = messages.clone();
+                                    state.fetching = false;
+                                    state.selected_msg = None;
+                                }
+                            }
+                        }
+                        "delete_stream_message" => {
+                            self.toasts
+                                .push(ToastLevel::Success, "Message deleted".to_string());
+                        }
+                        _ => {
                             self.toasts
                                 .push(ToastLevel::Success, format!("{operation} succeeded"));
                         }
-                    }
+                    },
                     BackendEvent::RequestResponse {
                         connection_id,
                         payload,
@@ -427,6 +570,57 @@ mod app {
             }
             self.dock_state.push_to_focused_leaf(tab);
         }
+
+        fn save_stream_editor(&mut self) {
+            let subjects: Vec<String> = self
+                .stream_editor
+                .subjects
+                .split(',')
+                .map(|s| s.trim().to_string())
+                .filter(|s| !s.is_empty())
+                .collect();
+
+            let storage = match self.stream_editor.storage {
+                StorageSelection::File => "file",
+                StorageSelection::Memory => "memory",
+            };
+
+            let retention = match self.stream_editor.retention {
+                RetentionSelection::Limits => "limits",
+                RetentionSelection::Interest => "interest",
+                RetentionSelection::WorkQueue => "workqueue",
+            };
+
+            let mut config = serde_json::json!({
+                "name": self.stream_editor.name.trim(),
+                "subjects": subjects,
+                "storage": storage,
+                "retention": retention,
+            });
+
+            if let Ok(v) = self.stream_editor.max_messages.parse::<i64>() {
+                config["max_msgs"] = serde_json::json!(v);
+            }
+            if let Ok(v) = self.stream_editor.max_bytes.parse::<i64>() {
+                config["max_bytes"] = serde_json::json!(v);
+            }
+            if let Ok(secs) = self.stream_editor.max_age_secs.parse::<u64>() {
+                config["max_age"] = serde_json::json!(secs * 1_000_000_000);
+            }
+            if let Ok(v) = self.stream_editor.num_replicas.parse::<usize>() {
+                config["num_replicas"] = serde_json::json!(v);
+            }
+            if !self.stream_editor.description.trim().is_empty() {
+                config["description"] = serde_json::json!(self.stream_editor.description.trim());
+            }
+
+            self.backend.send(BackendCommand::CreateStream {
+                connection_id: self.stream_editor.connection_id,
+                config,
+            });
+
+            self.stream_editor.visible = false;
+        }
     }
 
     /// Check if two tabs represent the same resource.
@@ -631,6 +825,104 @@ mod app {
                 self.editor.delete_confirm = None;
             }
 
+            // Stream create editor
+            let mut stream_create_save = false;
+            if self.stream_editor.visible {
+                let mut open = true;
+                egui::Window::new(S::STREAM_CREATE_TITLE)
+                    .open(&mut open)
+                    .resizable(false)
+                    .show(ui.ctx(), |ui| {
+                        egui::Grid::new("stream_create_grid")
+                            .num_columns(2)
+                            .spacing([8.0, 4.0])
+                            .show(ui, |ui| {
+                                ui.label(S::STREAM_NAME);
+                                ui.text_edit_singleline(&mut self.stream_editor.name);
+                                ui.end_row();
+
+                                ui.label(S::STREAM_SUBJECTS);
+                                ui.text_edit_singleline(&mut self.stream_editor.subjects);
+                                ui.end_row();
+
+                                ui.label(S::STREAM_STORAGE);
+                                egui::ComboBox::from_id_salt("stream_storage")
+                                    .selected_text(self.stream_editor.storage.label())
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(
+                                            &mut self.stream_editor.storage,
+                                            StorageSelection::File,
+                                            "File",
+                                        );
+                                        ui.selectable_value(
+                                            &mut self.stream_editor.storage,
+                                            StorageSelection::Memory,
+                                            "Memory",
+                                        );
+                                    });
+                                ui.end_row();
+
+                                ui.label(S::STREAM_RETENTION);
+                                egui::ComboBox::from_id_salt("stream_retention")
+                                    .selected_text(self.stream_editor.retention.label())
+                                    .show_ui(ui, |ui| {
+                                        ui.selectable_value(
+                                            &mut self.stream_editor.retention,
+                                            RetentionSelection::Limits,
+                                            "Limits",
+                                        );
+                                        ui.selectable_value(
+                                            &mut self.stream_editor.retention,
+                                            RetentionSelection::Interest,
+                                            "Interest",
+                                        );
+                                        ui.selectable_value(
+                                            &mut self.stream_editor.retention,
+                                            RetentionSelection::WorkQueue,
+                                            "WorkQueue",
+                                        );
+                                    });
+                                ui.end_row();
+
+                                ui.label(S::STREAM_MAX_MSGS);
+                                ui.text_edit_singleline(&mut self.stream_editor.max_messages);
+                                ui.end_row();
+
+                                ui.label(S::STREAM_MAX_BYTES);
+                                ui.text_edit_singleline(&mut self.stream_editor.max_bytes);
+                                ui.end_row();
+
+                                ui.label(S::STREAM_MAX_AGE);
+                                ui.text_edit_singleline(&mut self.stream_editor.max_age_secs);
+                                ui.end_row();
+
+                                ui.label(S::STREAM_REPLICAS);
+                                ui.text_edit_singleline(&mut self.stream_editor.num_replicas);
+                                ui.end_row();
+
+                                ui.label(S::STREAM_DESCRIPTION);
+                                ui.text_edit_singleline(&mut self.stream_editor.description);
+                                ui.end_row();
+                            });
+                        ui.add_space(8.0);
+                        ui.horizontal(|ui| {
+                            let valid = !self.stream_editor.name.trim().is_empty();
+                            if ui.add_enabled(valid, egui::Button::new(S::SAVE)).clicked() {
+                                stream_create_save = true;
+                            }
+                            if ui.button(S::CANCEL).clicked() {
+                                self.stream_editor.visible = false;
+                            }
+                        });
+                    });
+                if !open {
+                    self.stream_editor.visible = false;
+                }
+            }
+            if stream_create_save {
+                self.save_stream_editor();
+            }
+
             // ─── Sidebar: connections + resource tree ───
             egui::Panel::left("sidebar_panel")
                 .default_size(220.0)
@@ -734,33 +1026,74 @@ mod app {
                                                 .selectable_label(false, S::OPEN_PUBLISHER)
                                                 .clicked()
                                             {
-                                                action = Some(SidebarAction::OpenTab(
+                                                action = Some(SidebarAction::OpenTab(Box::new(
                                                     TabKind::Publisher {
                                                         connection_id: *id,
                                                         connection_name: name.clone(),
                                                         state: PublisherState::default(),
                                                     },
-                                                ));
+                                                )));
                                             }
                                             if ui
                                                 .selectable_label(false, S::OPEN_SUBSCRIBER)
                                                 .clicked()
                                             {
-                                                action = Some(SidebarAction::OpenTab(
+                                                action = Some(SidebarAction::OpenTab(Box::new(
                                                     TabKind::Subscriber {
                                                         connection_id: *id,
                                                         connection_name: name.clone(),
                                                         state: SubscriberState::default(),
                                                     },
-                                                ));
+                                                )));
                                             }
                                         });
 
                                     // Streams section
                                     egui::CollapsingHeader::new(S::SECTION_STREAMS)
                                         .id_salt(format!("streams_{id}"))
-                                        .show(ui, |_ui| {
-                                            // Streams will be listed here once discovered
+                                        .show(ui, |ui| {
+                                            ui.horizontal(|ui| {
+                                                if ui
+                                                    .small_button("＋")
+                                                    .on_hover_text(S::STREAM_CREATE_TITLE)
+                                                    .clicked()
+                                                {
+                                                    action =
+                                                        Some(SidebarAction::OpenStreamCreate(*id));
+                                                }
+                                                if ui
+                                                    .small_button("↻")
+                                                    .on_hover_text("Refresh")
+                                                    .clicked()
+                                                {
+                                                    self.backend.send(
+                                                        BackendCommand::ListStreams {
+                                                            connection_id: *id,
+                                                        },
+                                                    );
+                                                }
+                                            });
+                                            if let Some(infos) = self.stream_lists.get(id) {
+                                                for info in infos {
+                                                    if let Some(sn) =
+                                                        info["config"]["name"].as_str()
+                                                        && ui.selectable_label(false, sn).clicked()
+                                                    {
+                                                        let state = StreamState {
+                                                            info: Some(info.clone()),
+                                                            ..Default::default()
+                                                        };
+                                                        action = Some(SidebarAction::OpenTab(
+                                                            Box::new(TabKind::Stream {
+                                                                connection_id: *id,
+                                                                connection_name: name.clone(),
+                                                                stream_name: sn.to_string(),
+                                                                state,
+                                                            }),
+                                                        ));
+                                                    }
+                                                }
+                                            }
                                         });
 
                                     // KV section
@@ -786,7 +1119,14 @@ mod app {
                         Some(SidebarAction::Select(id)) => self.selected_conn = Some(id),
                         Some(SidebarAction::Connect(id)) => self.connect(id),
                         Some(SidebarAction::Disconnect(id)) => self.disconnect(id),
-                        Some(SidebarAction::OpenTab(tab)) => self.open_tab(tab),
+                        Some(SidebarAction::OpenTab(tab)) => self.open_tab(*tab),
+                        Some(SidebarAction::OpenStreamCreate(connection_id)) => {
+                            self.stream_editor = StreamCreateEditor {
+                                visible: true,
+                                connection_id,
+                                ..Default::default()
+                            };
+                        }
                         None => {}
                     }
 
@@ -827,6 +1167,7 @@ mod app {
         Select(u64),
         Connect(u64),
         Disconnect(u64),
-        OpenTab(TabKind),
+        OpenTab(Box<TabKind>),
+        OpenStreamCreate(u64),
     }
 }

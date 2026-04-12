@@ -3,6 +3,7 @@ use std::collections::hash_map::Entry;
 use std::time::SystemTime;
 
 use async_nats::Client;
+use base64::Engine;
 use bytes::Bytes;
 use futures_util::StreamExt;
 use tokio::sync::mpsc;
@@ -241,70 +242,353 @@ pub async fn run_worker(
                     });
                 }
             }
-            // JetStream commands
-            BackendCommand::ListStreams { connection_id }
-            | BackendCommand::ListKvBuckets { connection_id }
-            | BackendCommand::ListObjectStoreBuckets { connection_id } => {
+            // ── JetStream Stream commands ──
+            BackendCommand::ListStreams { connection_id } => {
+                if let Some(client) = clients.get(&connection_id) {
+                    let js = async_nats::jetstream::new(client.clone());
+                    let mut stream_iter = js.streams();
+                    let mut list = Vec::new();
+                    while let Some(result) = stream_iter.next().await {
+                        match result {
+                            Ok(info) => {
+                                list.push(stream_info_to_json(&info));
+                            }
+                            Err(e) => {
+                                tracing::warn!(%e, "Error iterating streams");
+                                break;
+                            }
+                        }
+                    }
+                    let _ = evt_tx.send(BackendEvent::OperationResult {
+                        connection_id,
+                        operation: "list_streams".to_string(),
+                        data: serde_json::Value::Array(list),
+                    });
+                } else {
+                    let _ = evt_tx.send(BackendEvent::Error {
+                        connection_id: Some(connection_id),
+                        operation: "list_streams".to_string(),
+                        message: "Not connected".to_string(),
+                    });
+                }
+            }
+            BackendCommand::CreateStream {
+                connection_id,
+                config,
+            } => {
+                if let Some(client) = clients.get(&connection_id) {
+                    let js = async_nats::jetstream::new(client.clone());
+                    match serde_json::from_value::<async_nats::jetstream::stream::Config>(config) {
+                        Ok(stream_config) => match js.create_stream(stream_config).await {
+                            Ok(stream) => {
+                                let data = stream_info_to_json(stream.cached_info());
+                                let _ = evt_tx.send(BackendEvent::OperationResult {
+                                    connection_id,
+                                    operation: "create_stream".to_string(),
+                                    data,
+                                });
+                            }
+                            Err(e) => {
+                                let _ = evt_tx.send(BackendEvent::Error {
+                                    connection_id: Some(connection_id),
+                                    operation: "create_stream".to_string(),
+                                    message: e.to_string(),
+                                });
+                            }
+                        },
+                        Err(e) => {
+                            let _ = evt_tx.send(BackendEvent::Error {
+                                connection_id: Some(connection_id),
+                                operation: "create_stream".to_string(),
+                                message: format!("Invalid stream config: {e}"),
+                            });
+                        }
+                    }
+                } else {
+                    let _ = evt_tx.send(BackendEvent::Error {
+                        connection_id: Some(connection_id),
+                        operation: "create_stream".to_string(),
+                        message: "Not connected".to_string(),
+                    });
+                }
+            }
+            BackendCommand::UpdateStream {
+                connection_id,
+                config,
+            } => {
+                if let Some(client) = clients.get(&connection_id) {
+                    let js = async_nats::jetstream::new(client.clone());
+                    match serde_json::from_value::<async_nats::jetstream::stream::Config>(config) {
+                        Ok(stream_config) => match js.update_stream(stream_config).await {
+                            Ok(info) => {
+                                let data = stream_info_to_json(&info);
+                                let _ = evt_tx.send(BackendEvent::OperationResult {
+                                    connection_id,
+                                    operation: "update_stream".to_string(),
+                                    data,
+                                });
+                            }
+                            Err(e) => {
+                                let _ = evt_tx.send(BackendEvent::Error {
+                                    connection_id: Some(connection_id),
+                                    operation: "update_stream".to_string(),
+                                    message: e.to_string(),
+                                });
+                            }
+                        },
+                        Err(e) => {
+                            let _ = evt_tx.send(BackendEvent::Error {
+                                connection_id: Some(connection_id),
+                                operation: "update_stream".to_string(),
+                                message: format!("Invalid stream config: {e}"),
+                            });
+                        }
+                    }
+                } else {
+                    let _ = evt_tx.send(BackendEvent::Error {
+                        connection_id: Some(connection_id),
+                        operation: "update_stream".to_string(),
+                        message: "Not connected".to_string(),
+                    });
+                }
+            }
+            BackendCommand::DeleteStream {
+                connection_id,
+                name,
+            } => {
+                if let Some(client) = clients.get(&connection_id) {
+                    let js = async_nats::jetstream::new(client.clone());
+                    match js.delete_stream(&name).await {
+                        Ok(_status) => {
+                            let _ = evt_tx.send(BackendEvent::OperationResult {
+                                connection_id,
+                                operation: "delete_stream".to_string(),
+                                data: serde_json::json!({ "name": name }),
+                            });
+                        }
+                        Err(e) => {
+                            let _ = evt_tx.send(BackendEvent::Error {
+                                connection_id: Some(connection_id),
+                                operation: "delete_stream".to_string(),
+                                message: e.to_string(),
+                            });
+                        }
+                    }
+                } else {
+                    let _ = evt_tx.send(BackendEvent::Error {
+                        connection_id: Some(connection_id),
+                        operation: "delete_stream".to_string(),
+                        message: "Not connected".to_string(),
+                    });
+                }
+            }
+            BackendCommand::PurgeStream {
+                connection_id,
+                name,
+                filter,
+            } => {
+                if let Some(client) = clients.get(&connection_id) {
+                    let js = async_nats::jetstream::new(client.clone());
+                    match js.get_stream(&name).await {
+                        Ok(stream) => {
+                            let result = if let Some(ref filter_subject) = filter {
+                                stream.purge().filter(filter_subject.as_str()).await
+                            } else {
+                                stream.purge().await
+                            };
+                            match result {
+                                Ok(resp) => {
+                                    let _ = evt_tx.send(BackendEvent::OperationResult {
+                                        connection_id,
+                                        operation: "purge_stream".to_string(),
+                                        data: serde_json::json!({
+                                            "name": name,
+                                            "purged": resp.purged,
+                                        }),
+                                    });
+                                }
+                                Err(e) => {
+                                    let _ = evt_tx.send(BackendEvent::Error {
+                                        connection_id: Some(connection_id),
+                                        operation: "purge_stream".to_string(),
+                                        message: e.to_string(),
+                                    });
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            let _ = evt_tx.send(BackendEvent::Error {
+                                connection_id: Some(connection_id),
+                                operation: "purge_stream".to_string(),
+                                message: e.to_string(),
+                            });
+                        }
+                    }
+                } else {
+                    let _ = evt_tx.send(BackendEvent::Error {
+                        connection_id: Some(connection_id),
+                        operation: "purge_stream".to_string(),
+                        message: "Not connected".to_string(),
+                    });
+                }
+            }
+            BackendCommand::GetStreamMessages {
+                connection_id,
+                stream: stream_name,
+                start_sequence,
+                subject_filter,
+                batch_size,
+            } => {
+                if let Some(client) = clients.get(&connection_id) {
+                    let js = async_nats::jetstream::new(client.clone());
+                    match js.get_stream(&stream_name).await {
+                        Ok(stream) => {
+                            let info = stream.cached_info();
+                            let first = start_sequence.unwrap_or(info.state.first_sequence);
+                            let last = info.state.last_sequence;
+                            let mut messages = Vec::new();
+
+                            if let Some(ref filter) = subject_filter {
+                                let mut seq = first;
+                                while (messages.len() as u64) < batch_size {
+                                    match stream.get_first_raw_message_by_subject(filter, seq).await
+                                    {
+                                        Ok(raw) => {
+                                            messages.push(raw_message_to_json(&raw));
+                                            seq = raw.sequence + 1;
+                                        }
+                                        Err(_) => break,
+                                    }
+                                }
+                            } else {
+                                let mut seq = first;
+                                while seq <= last && (messages.len() as u64) < batch_size {
+                                    if let Ok(raw) = stream.get_raw_message(seq).await {
+                                        messages.push(raw_message_to_json(&raw));
+                                    }
+                                    seq += 1;
+                                }
+                            }
+
+                            let _ = evt_tx.send(BackendEvent::OperationResult {
+                                connection_id,
+                                operation: "get_stream_messages".to_string(),
+                                data: serde_json::json!({
+                                    "stream": stream_name,
+                                    "messages": messages,
+                                }),
+                            });
+                        }
+                        Err(e) => {
+                            let _ = evt_tx.send(BackendEvent::Error {
+                                connection_id: Some(connection_id),
+                                operation: "get_stream_messages".to_string(),
+                                message: e.to_string(),
+                            });
+                        }
+                    }
+                } else {
+                    let _ = evt_tx.send(BackendEvent::Error {
+                        connection_id: Some(connection_id),
+                        operation: "get_stream_messages".to_string(),
+                        message: "Not connected".to_string(),
+                    });
+                }
+            }
+            BackendCommand::DeleteStreamMessage {
+                connection_id,
+                stream: stream_name,
+                sequence,
+            } => {
+                if let Some(client) = clients.get(&connection_id) {
+                    let js = async_nats::jetstream::new(client.clone());
+                    match js.get_stream(&stream_name).await {
+                        Ok(stream) => match stream.delete_message(sequence).await {
+                            Ok(_) => {
+                                let _ = evt_tx.send(BackendEvent::OperationResult {
+                                    connection_id,
+                                    operation: "delete_stream_message".to_string(),
+                                    data: serde_json::json!({
+                                        "stream": stream_name,
+                                        "sequence": sequence,
+                                    }),
+                                });
+                            }
+                            Err(e) => {
+                                let _ = evt_tx.send(BackendEvent::Error {
+                                    connection_id: Some(connection_id),
+                                    operation: "delete_stream_message".to_string(),
+                                    message: e.to_string(),
+                                });
+                            }
+                        },
+                        Err(e) => {
+                            let _ = evt_tx.send(BackendEvent::Error {
+                                connection_id: Some(connection_id),
+                                operation: "delete_stream_message".to_string(),
+                                message: e.to_string(),
+                            });
+                        }
+                    }
+                } else {
+                    let _ = evt_tx.send(BackendEvent::Error {
+                        connection_id: Some(connection_id),
+                        operation: "delete_stream_message".to_string(),
+                        message: "Not connected".to_string(),
+                    });
+                }
+            }
+            // ── JetStream Consumer commands (not yet implemented) ──
+            BackendCommand::ListConsumers { connection_id, .. }
+            | BackendCommand::CreateConsumer { connection_id, .. } => {
                 let _ = evt_tx.send(BackendEvent::Error {
                     connection_id: Some(connection_id),
-                    operation: "list".to_string(),
+                    operation: "consumer".to_string(),
                     message: "Not yet implemented".to_string(),
                 });
             }
-            BackendCommand::CreateStream { connection_id, .. }
-            | BackendCommand::UpdateStream { connection_id, .. }
-            | BackendCommand::CreateKvBucket { connection_id, .. }
-            | BackendCommand::CreateObjectStoreBucket { connection_id, .. } => {
+            BackendCommand::DeleteConsumer { connection_id, .. } => {
                 let _ = evt_tx.send(BackendEvent::Error {
                     connection_id: Some(connection_id),
-                    operation: "create".to_string(),
+                    operation: "delete_consumer".to_string(),
                     message: "Not yet implemented".to_string(),
                 });
             }
-            BackendCommand::DeleteStream { connection_id, .. }
-            | BackendCommand::DeleteKvBucket { connection_id, .. }
-            | BackendCommand::DeleteObjectStoreBucket { connection_id, .. }
-            | BackendCommand::DeleteConsumer { connection_id, .. }
-            | BackendCommand::DeleteObject { connection_id, .. } => {
+            // ── KV Store commands (not yet implemented) ──
+            BackendCommand::ListKvBuckets { connection_id } => {
                 let _ = evt_tx.send(BackendEvent::Error {
                     connection_id: Some(connection_id),
-                    operation: "delete".to_string(),
+                    operation: "list_kv_buckets".to_string(),
                     message: "Not yet implemented".to_string(),
                 });
             }
-            BackendCommand::PurgeStream { connection_id, .. }
-            | BackendCommand::PurgeKvEntry { connection_id, .. } => {
+            BackendCommand::CreateKvBucket { connection_id, .. } => {
                 let _ = evt_tx.send(BackendEvent::Error {
                     connection_id: Some(connection_id),
-                    operation: "purge".to_string(),
+                    operation: "create_kv_bucket".to_string(),
                     message: "Not yet implemented".to_string(),
                 });
             }
-            BackendCommand::GetStreamMessages { connection_id, .. }
-            | BackendCommand::ListConsumers { connection_id, .. }
-            | BackendCommand::CreateConsumer { connection_id, .. }
-            | BackendCommand::ListKvKeys { connection_id, .. }
+            BackendCommand::DeleteKvBucket { connection_id, .. } => {
+                let _ = evt_tx.send(BackendEvent::Error {
+                    connection_id: Some(connection_id),
+                    operation: "delete_kv_bucket".to_string(),
+                    message: "Not yet implemented".to_string(),
+                });
+            }
+            BackendCommand::ListKvKeys { connection_id, .. }
             | BackendCommand::GetKvEntry { connection_id, .. }
-            | BackendCommand::GetKvHistory { connection_id, .. }
-            | BackendCommand::ListObjects { connection_id, .. }
-            | BackendCommand::DownloadObject { connection_id, .. } => {
+            | BackendCommand::GetKvHistory { connection_id, .. } => {
                 let _ = evt_tx.send(BackendEvent::Error {
                     connection_id: Some(connection_id),
-                    operation: "query".to_string(),
-                    message: "Not yet implemented".to_string(),
-                });
-            }
-            BackendCommand::DeleteStreamMessage { connection_id, .. } => {
-                let _ = evt_tx.send(BackendEvent::Error {
-                    connection_id: Some(connection_id),
-                    operation: "delete_message".to_string(),
+                    operation: "kv_query".to_string(),
                     message: "Not yet implemented".to_string(),
                 });
             }
             BackendCommand::PutKvEntry { connection_id, .. } => {
                 let _ = evt_tx.send(BackendEvent::Error {
                     connection_id: Some(connection_id),
-                    operation: "put".to_string(),
+                    operation: "put_kv".to_string(),
                     message: "Not yet implemented".to_string(),
                 });
             }
@@ -315,10 +599,54 @@ pub async fn run_worker(
                     message: "Not yet implemented".to_string(),
                 });
             }
+            BackendCommand::PurgeKvEntry { connection_id, .. } => {
+                let _ = evt_tx.send(BackendEvent::Error {
+                    connection_id: Some(connection_id),
+                    operation: "purge_kv_entry".to_string(),
+                    message: "Not yet implemented".to_string(),
+                });
+            }
+            // ── Object Store commands (not yet implemented) ──
+            BackendCommand::ListObjectStoreBuckets { connection_id } => {
+                let _ = evt_tx.send(BackendEvent::Error {
+                    connection_id: Some(connection_id),
+                    operation: "list_object_store_buckets".to_string(),
+                    message: "Not yet implemented".to_string(),
+                });
+            }
+            BackendCommand::CreateObjectStoreBucket { connection_id, .. } => {
+                let _ = evt_tx.send(BackendEvent::Error {
+                    connection_id: Some(connection_id),
+                    operation: "create_object_store_bucket".to_string(),
+                    message: "Not yet implemented".to_string(),
+                });
+            }
+            BackendCommand::DeleteObjectStoreBucket { connection_id, .. } => {
+                let _ = evt_tx.send(BackendEvent::Error {
+                    connection_id: Some(connection_id),
+                    operation: "delete_object_store_bucket".to_string(),
+                    message: "Not yet implemented".to_string(),
+                });
+            }
+            BackendCommand::ListObjects { connection_id, .. }
+            | BackendCommand::DownloadObject { connection_id, .. } => {
+                let _ = evt_tx.send(BackendEvent::Error {
+                    connection_id: Some(connection_id),
+                    operation: "object_store_query".to_string(),
+                    message: "Not yet implemented".to_string(),
+                });
+            }
+            BackendCommand::DeleteObject { connection_id, .. } => {
+                let _ = evt_tx.send(BackendEvent::Error {
+                    connection_id: Some(connection_id),
+                    operation: "delete_object".to_string(),
+                    message: "Not yet implemented".to_string(),
+                });
+            }
             BackendCommand::UploadObject { connection_id, .. } => {
                 let _ = evt_tx.send(BackendEvent::Error {
                     connection_id: Some(connection_id),
-                    operation: "upload".to_string(),
+                    operation: "upload_object".to_string(),
                     message: "Not yet implemented".to_string(),
                 });
             }
@@ -326,6 +654,38 @@ pub async fn run_worker(
     }
 
     tracing::info!("Backend worker stopped");
+}
+
+/// Convert a JetStream stream message to a JSON value for transport to the UI.
+fn raw_message_to_json(msg: &async_nats::jetstream::message::StreamMessage) -> serde_json::Value {
+    let payload_b64 = base64::engine::general_purpose::STANDARD.encode(&msg.payload);
+    let mut headers = Vec::new();
+    for (name, values) in msg.headers.iter() {
+        for value in values.iter() {
+            headers.push(serde_json::json!([name.to_string(), value.to_string()]));
+        }
+    }
+    serde_json::json!({
+        "sequence": msg.sequence,
+        "subject": msg.subject.to_string(),
+        "payload_base64": payload_b64,
+        "headers": headers,
+    })
+}
+
+/// Serialize stream Info to JSON (Info does not implement Serialize).
+fn stream_info_to_json(info: &async_nats::jetstream::stream::Info) -> serde_json::Value {
+    let config_json = serde_json::to_value(&info.config).unwrap_or_default();
+    serde_json::json!({
+        "config": config_json,
+        "state": {
+            "messages": info.state.messages,
+            "bytes": info.state.bytes,
+            "first_sequence": info.state.first_sequence,
+            "last_sequence": info.state.last_sequence,
+            "consumer_count": info.state.consumer_count,
+        },
+    })
 }
 
 /// Convert a list of key-value pairs into an async-nats HeaderMap.

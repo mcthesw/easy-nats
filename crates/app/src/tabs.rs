@@ -1,6 +1,7 @@
 use std::collections::VecDeque;
 use std::time::SystemTime;
 
+use base64::Engine;
 use eframe::egui;
 use egui::WidgetText;
 use egui_dock::TabViewer;
@@ -95,6 +96,36 @@ impl SubscriberState {
     }
 }
 
+/// State for a Stream tab.
+#[derive(Debug)]
+pub struct StreamState {
+    pub info: Option<serde_json::Value>,
+    pub messages: Vec<serde_json::Value>,
+    pub selected_msg: Option<usize>,
+    pub payload_format: PayloadFormat,
+    pub start_seq: String,
+    pub subject_filter: String,
+    pub batch_size: String,
+    pub fetching: bool,
+    pub purge_subject: String,
+}
+
+impl Default for StreamState {
+    fn default() -> Self {
+        Self {
+            info: None,
+            messages: Vec::new(),
+            selected_msg: None,
+            payload_format: PayloadFormat::Auto,
+            start_seq: String::new(),
+            subject_filter: String::new(),
+            batch_size: "50".to_string(),
+            fetching: false,
+            purge_subject: String::new(),
+        }
+    }
+}
+
 /// Represents tabs in the dock area.
 #[derive(Debug)]
 #[allow(dead_code)]
@@ -114,6 +145,7 @@ pub enum TabKind {
         connection_id: u64,
         connection_name: String,
         stream_name: String,
+        state: StreamState,
     },
     KvBucket {
         connection_id: u64,
@@ -191,8 +223,14 @@ impl TabViewer for AppTabViewer<'_> {
                 let conn_id = *connection_id;
                 subscriber_ui(ui, conn_id, state, self.backend);
             }
-            TabKind::Stream { stream_name, .. } => {
-                ui.label(format!("Stream: {stream_name} — coming soon"));
+            TabKind::Stream {
+                connection_id,
+                stream_name,
+                state,
+                ..
+            } => {
+                let conn_id = *connection_id;
+                stream_ui(ui, conn_id, stream_name, state, self.backend);
             }
             TabKind::KvBucket { bucket_name, .. } => {
                 ui.label(format!("KV Bucket: {bucket_name} — coming soon"));
@@ -531,6 +569,275 @@ fn payload_preview(payload: &[u8], max_len: usize) -> String {
         s.to_string()
     } else {
         format!("{}…", &s[..max_len])
+    }
+}
+
+// ─── Stream tab UI ───
+
+fn stream_ui(
+    ui: &mut egui::Ui,
+    connection_id: u64,
+    stream_name: &str,
+    state: &mut StreamState,
+    backend: &BackendHandle,
+) {
+    // Stream info panel
+    if let Some(info) = &state.info {
+        egui::CollapsingHeader::new(S::STREAM_INFO)
+            .id_salt("stream_info")
+            .default_open(true)
+            .show(ui, |ui| {
+                stream_info_panel(ui, info);
+            });
+        ui.separator();
+    }
+
+    // Message browser controls
+    ui.horizontal(|ui| {
+        ui.label(S::STREAM_START_SEQ);
+        ui.add(egui::TextEdit::singleline(&mut state.start_seq).desired_width(80.0));
+        ui.label(S::STREAM_SUBJECT_FILTER);
+        ui.add(egui::TextEdit::singleline(&mut state.subject_filter).desired_width(120.0));
+        ui.label(S::STREAM_BATCH_SIZE);
+        ui.add(egui::TextEdit::singleline(&mut state.batch_size).desired_width(60.0));
+        if ui
+            .add_enabled(!state.fetching, egui::Button::new(S::STREAM_FETCH))
+            .clicked()
+        {
+            let start = state.start_seq.parse().ok();
+            let filter = if state.subject_filter.is_empty() {
+                None
+            } else {
+                Some(state.subject_filter.clone())
+            };
+            let batch = state.batch_size.parse::<u64>().unwrap_or(50);
+            backend.send(BackendCommand::GetStreamMessages {
+                connection_id,
+                stream: stream_name.to_string(),
+                start_sequence: start,
+                subject_filter: filter,
+                batch_size: batch,
+            });
+            state.fetching = true;
+        }
+    });
+
+    if state.fetching {
+        ui.spinner();
+    }
+
+    ui.add_space(4.0);
+
+    // Message list
+    let available = ui.available_height();
+    let list_height = (available * 0.45).max(100.0);
+
+    ui.label(S::STREAM_MESSAGES);
+    egui::ScrollArea::vertical()
+        .id_salt("stream_msg_list")
+        .max_height(list_height)
+        .show(ui, |ui| {
+            if state.messages.is_empty() {
+                ui.label(S::STREAM_NO_MESSAGES);
+            } else {
+                for (idx, msg) in state.messages.iter().enumerate() {
+                    let seq = msg["sequence"].as_u64().unwrap_or(0);
+                    let subject = msg["subject"].as_str().unwrap_or("");
+                    let label = format!("#{seq} — {subject}");
+                    let selected = state.selected_msg == Some(idx);
+                    if ui.selectable_label(selected, label).clicked() {
+                        state.selected_msg = Some(idx);
+                    }
+                }
+            }
+        });
+
+    ui.separator();
+
+    // Message detail
+    if let Some(idx) = state.selected_msg {
+        if let Some(msg) = state.messages.get(idx) {
+            stream_message_detail(ui, msg, &mut state.payload_format);
+        }
+    } else {
+        ui.label(S::STREAM_SELECT_MSG);
+    }
+
+    ui.separator();
+
+    // Purge controls
+    egui::CollapsingHeader::new(S::STREAM_PURGE)
+        .id_salt("stream_purge")
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                ui.label(S::STREAM_PURGE_SUBJECT);
+                ui.text_edit_singleline(&mut state.purge_subject);
+            });
+            ui.horizontal(|ui| {
+                if ui.button(S::STREAM_PURGE_FILTERED).clicked() && !state.purge_subject.is_empty()
+                {
+                    backend.send(BackendCommand::PurgeStream {
+                        connection_id,
+                        name: stream_name.to_string(),
+                        filter: Some(state.purge_subject.clone()),
+                    });
+                }
+                if ui.button(S::STREAM_PURGE_ALL).clicked() {
+                    backend.send(BackendCommand::PurgeStream {
+                        connection_id,
+                        name: stream_name.to_string(),
+                        filter: None,
+                    });
+                }
+            });
+            // Delete individual message
+            if let Some(idx) = state.selected_msg
+                && let Some(msg) = state.messages.get(idx)
+                && let Some(seq) = msg["sequence"].as_u64()
+                && ui
+                    .button(format!("{} #{seq}", S::STREAM_DELETE_MSG))
+                    .clicked()
+            {
+                backend.send(BackendCommand::DeleteStreamMessage {
+                    connection_id,
+                    stream: stream_name.to_string(),
+                    sequence: seq,
+                });
+            }
+        });
+}
+
+fn stream_info_panel(ui: &mut egui::Ui, info: &serde_json::Value) {
+    egui::Grid::new("stream_info_grid")
+        .num_columns(2)
+        .spacing([8.0, 4.0])
+        .show(ui, |ui| {
+            if let Some(config) = info.get("config") {
+                if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
+                    ui.label(S::STREAM_NAME);
+                    ui.label(name);
+                    ui.end_row();
+                }
+                if let Some(subjects) = config.get("subjects").and_then(|v| v.as_array()) {
+                    ui.label(S::STREAM_SUBJECTS);
+                    let subj_str: String = subjects
+                        .iter()
+                        .filter_map(|s| s.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ");
+                    ui.label(subj_str);
+                    ui.end_row();
+                }
+                if let Some(storage) = config.get("storage").and_then(|v| v.as_str()) {
+                    ui.label(S::STREAM_STORAGE);
+                    ui.label(storage);
+                    ui.end_row();
+                }
+                if let Some(retention) = config.get("retention").and_then(|v| v.as_str()) {
+                    ui.label(S::STREAM_RETENTION);
+                    ui.label(retention);
+                    ui.end_row();
+                }
+            }
+            if let Some(st) = info.get("state") {
+                if let Some(msgs) = st.get("messages").and_then(|v| v.as_u64()) {
+                    ui.label(S::STREAM_MSG_COUNT);
+                    ui.label(msgs.to_string());
+                    ui.end_row();
+                }
+                if let Some(bytes) = st.get("bytes").and_then(|v| v.as_u64()) {
+                    ui.label(S::STREAM_BYTES);
+                    ui.label(format_bytes(bytes));
+                    ui.end_row();
+                }
+                if let Some(consumers) = st.get("consumer_count").and_then(|v| v.as_u64()) {
+                    ui.label(S::STREAM_CONSUMERS);
+                    ui.label(consumers.to_string());
+                    ui.end_row();
+                }
+            }
+        });
+}
+
+fn stream_message_detail(
+    ui: &mut egui::Ui,
+    msg: &serde_json::Value,
+    payload_format: &mut PayloadFormat,
+) {
+    ui.horizontal(|ui| {
+        ui.label(S::STREAM_MSG_DETAIL);
+        format::format_selector(ui, "stream_msg_fmt", payload_format);
+    });
+
+    egui::Grid::new("stream_msg_detail_grid")
+        .num_columns(2)
+        .spacing([8.0, 4.0])
+        .show(ui, |ui| {
+            if let Some(seq) = msg["sequence"].as_u64() {
+                ui.label(S::STREAM_MSG_SEQUENCE);
+                ui.label(seq.to_string());
+                ui.end_row();
+            }
+            if let Some(subject) = msg["subject"].as_str() {
+                ui.label(S::STREAM_MSG_SUBJECT);
+                ui.label(subject);
+                ui.end_row();
+            }
+        });
+
+    // Headers
+    if let Some(headers) = msg["headers"].as_array()
+        && !headers.is_empty()
+    {
+        ui.add_space(4.0);
+        ui.label(S::STREAM_MSG_HEADERS);
+        egui::Grid::new("stream_msg_headers")
+            .num_columns(2)
+            .striped(true)
+            .show(ui, |ui| {
+                for h in headers {
+                    if let Some(arr) = h.as_array()
+                        && arr.len() == 2
+                    {
+                        let k = arr[0].as_str().unwrap_or("");
+                        let v = arr[1].as_str().unwrap_or("");
+                        ui.label(k);
+                        ui.label(v);
+                        ui.end_row();
+                    }
+                }
+            });
+    }
+
+    // Payload
+    ui.add_space(4.0);
+    ui.label(S::STREAM_MSG_PAYLOAD);
+    egui::ScrollArea::vertical()
+        .id_salt("stream_msg_payload")
+        .max_height(200.0)
+        .show(ui, |ui| {
+            if let Some(payload_b64) = msg["payload_base64"].as_str() {
+                match base64::engine::general_purpose::STANDARD.decode(payload_b64) {
+                    Ok(data) => format::render_payload(ui, &data, *payload_format),
+                    Err(_) => {
+                        ui.label("Invalid base64 payload");
+                    }
+                }
+            } else {
+                ui.label("No payload");
+            }
+        });
+}
+
+fn format_bytes(bytes: u64) -> String {
+    if bytes < 1024 {
+        format!("{bytes} B")
+    } else if bytes < 1024 * 1024 {
+        format!("{:.1} KB", bytes as f64 / 1024.0)
+    } else if bytes < 1024 * 1024 * 1024 {
+        format!("{:.1} MB", bytes as f64 / (1024.0 * 1024.0))
+    } else {
+        format!("{:.1} GB", bytes as f64 / (1024.0 * 1024.0 * 1024.0))
     }
 }
 
