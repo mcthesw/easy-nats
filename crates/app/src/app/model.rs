@@ -27,6 +27,7 @@ pub struct EasyNatsApp {
     pub(crate) toasts: Toasts,
     pub(crate) dark_mode: bool,
     pub(crate) kv_bucket_delete_confirm: Option<(u64, String)>,
+    pub(crate) next_tab_instance: u32,
 }
 
 impl EasyNatsApp {
@@ -47,6 +48,7 @@ impl EasyNatsApp {
             toasts: Toasts::default(),
             dark_mode,
             kv_bucket_delete_confirm: None,
+            next_tab_instance: 1,
         }
     }
 

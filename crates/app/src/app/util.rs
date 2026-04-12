@@ -13,22 +13,9 @@ pub(crate) fn decode_kv_value(entry: &serde_json::Value) -> String {
 pub(crate) fn same_tab(a: &TabKind, b: &TabKind) -> bool {
     match (a, b) {
         (TabKind::Welcome, TabKind::Welcome) => true,
-        (
-            TabKind::Publisher {
-                connection_id: a, ..
-            },
-            TabKind::Publisher {
-                connection_id: b, ..
-            },
-        ) => a == b,
-        (
-            TabKind::Subscriber {
-                connection_id: a, ..
-            },
-            TabKind::Subscriber {
-                connection_id: b, ..
-            },
-        ) => a == b,
+        // Publisher and Subscriber tabs are always unique instances
+        (TabKind::Publisher { .. }, TabKind::Publisher { .. }) => false,
+        (TabKind::Subscriber { .. }, TabKind::Subscriber { .. }) => false,
         (
             TabKind::Stream {
                 connection_id: a1,

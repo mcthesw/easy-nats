@@ -155,7 +155,7 @@ fn render_resource_tree(
     action: &mut Option<SidebarAction>,
 ) {
     ui.indent(format!("tree_{id}"), |ui| {
-        render_pubsub_section(ui, id, name, action);
+        render_pubsub_section(app, ui, id, name, action);
         render_streams_section(app, ui, id, name, action);
         render_kv_section(app, ui, id, name, action);
         egui::CollapsingHeader::new(t("sidebar.section_object_store"))
@@ -167,6 +167,7 @@ fn render_resource_tree(
 }
 
 fn render_pubsub_section(
+    app: &mut EasyNatsApp,
     ui: &mut egui::Ui,
     id: u64,
     name: &str,
@@ -176,16 +177,22 @@ fn render_pubsub_section(
         .id_salt(format!("pubsub_{id}"))
         .show(ui, |ui| {
             if ui.selectable_label(false, t("sidebar.open_publisher")).clicked() {
+                let instance_id = app.next_tab_instance;
+                app.next_tab_instance += 1;
                 *action = Some(SidebarAction::OpenTab(Box::new(TabKind::Publisher {
                     connection_id: id,
                     connection_name: name.to_string(),
+                    instance_id,
                     state: PublisherState::default(),
                 })));
             }
             if ui.selectable_label(false, t("sidebar.open_subscriber")).clicked() {
+                let instance_id = app.next_tab_instance;
+                app.next_tab_instance += 1;
                 *action = Some(SidebarAction::OpenTab(Box::new(TabKind::Subscriber {
                     connection_id: id,
                     connection_name: name.to_string(),
+                    instance_id,
                     state: SubscriberState::default(),
                 })));
             }

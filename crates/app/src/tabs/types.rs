@@ -185,11 +185,13 @@ pub enum TabKind {
     Publisher {
         connection_id: u64,
         connection_name: String,
+        instance_id: u32,
         state: PublisherState,
     },
     Subscriber {
         connection_id: u64,
         connection_name: String,
+        instance_id: u32,
         state: SubscriberState,
     },
     Stream {
@@ -217,14 +219,18 @@ impl TabKind {
         match self {
             TabKind::Welcome => t("common.tab_welcome").to_string(),
             TabKind::Publisher {
-                connection_name, ..
+                connection_name,
+                instance_id,
+                ..
             } => {
-                format!("{} ({})", t("common.tab_publisher"), connection_name)
+                format!("{} #{} ({})", t("common.tab_publisher"), instance_id, connection_name)
             }
             TabKind::Subscriber {
-                connection_name, ..
+                connection_name,
+                instance_id,
+                ..
             } => {
-                format!("{} ({})", t("common.tab_subscriber"), connection_name)
+                format!("{} #{} ({})", t("common.tab_subscriber"), instance_id, connection_name)
             }
             TabKind::Stream {
                 connection_name,
