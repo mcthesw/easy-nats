@@ -88,7 +88,7 @@ impl EasyNatsApp {
                             ..
                         } = tab
                             && *cid == connection_id
-                            && state.subscribed
+                            && state.has_active_subscription()
                         {
                             state.push_message(ReceivedMessage {
                                 subject: subject.clone(),

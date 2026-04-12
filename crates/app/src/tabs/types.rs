@@ -60,29 +60,42 @@ pub struct ReceivedMessage {
 }
 
 #[derive(Debug)]
-pub struct SubscriberState {
+pub struct SubjectSubscription {
     pub subject: String,
-    pub subscribed: bool,
+    pub active: bool,
+}
+
+#[derive(Debug)]
+pub struct SubscriberState {
+    pub subject_input: String,
+    pub subscriptions: Vec<SubjectSubscription>,
     pub messages: VecDeque<ReceivedMessage>,
     pub max_messages: usize,
     pub selected_idx: Option<usize>,
     pub payload_format: PayloadFormat,
+    /// When set, only display messages matching this subject.
+    pub subject_filter: Option<String>,
 }
 
 impl Default for SubscriberState {
     fn default() -> Self {
         Self {
-            subject: String::new(),
-            subscribed: false,
+            subject_input: String::new(),
+            subscriptions: Vec::new(),
             messages: VecDeque::new(),
             max_messages: 1000,
             selected_idx: None,
             payload_format: PayloadFormat::Auto,
+            subject_filter: None,
         }
     }
 }
 
 impl SubscriberState {
+    pub fn has_active_subscription(&self) -> bool {
+        self.subscriptions.iter().any(|s| s.active)
+    }
+
     pub fn push_message(&mut self, msg: ReceivedMessage) {
         if self.messages.len() >= self.max_messages {
             self.messages.pop_front();

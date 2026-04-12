@@ -8,6 +8,18 @@ subscribe:
 unsubscribe:
   en: "Unsubscribe"
   zh: "取消订阅"
+add:
+  en: "Add"
+  zh: "添加"
+unsubscribe_all:
+  en: "Unsubscribe All"
+  zh: "全部取消"
+subscriptions:
+  en: "Subscriptions"
+  zh: "订阅列表"
+filter_all:
+  en: "All"
+  zh: "全部"
 msg_count:
   en: "Messages:"
   zh: "消息数:"

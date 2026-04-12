@@ -5,7 +5,7 @@ use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
 
 use super::common::{format_timestamp, payload_preview};
-use super::types::{ReceivedMessage, SubscriberState};
+use super::types::{ReceivedMessage, SubjectSubscription, SubscriberState};
 
 pub fn subscriber_ui(
     ui: &mut egui::Ui,
@@ -13,36 +13,87 @@ pub fn subscriber_ui(
     state: &mut SubscriberState,
     backend: &BackendHandle,
 ) {
+    render_subscription_controls(ui, connection_id, state, backend);
+    ui.separator();
+    render_message_list(ui, state);
+    ui.add_space(4.0);
+    ui.separator();
+    let selected_msg = state.selected_idx.and_then(|idx| {
+        filtered_messages(state).get(idx).cloned().cloned()
+    });
+    if let Some(msg) = &selected_msg {
+        message_detail_ui(ui, msg, &mut state.payload_format);
+    } else {
+        ui.label(t("subscriber.select_msg"));
+    }
+}
+
+fn render_subscription_controls(
+    ui: &mut egui::Ui,
+    connection_id: u64,
+    state: &mut SubscriberState,
+    backend: &BackendHandle,
+) {
+    // Add new subscription input
     ui.horizontal(|ui| {
         ui.label(t("subscriber.subject"));
-        ui.add_enabled(
-            !state.subscribed,
-            egui::TextEdit::singleline(&mut state.subject),
-        );
-        let can_toggle = !state.subject.trim().is_empty();
-        if state.subscribed {
-            if ui
-                .add_enabled(true, egui::Button::new(t("subscriber.unsubscribe")))
-                .clicked()
-            {
-                backend.send(BackendCommand::Unsubscribe {
-                    connection_id,
-                    subject: state.subject.clone(),
-                });
-                state.subscribed = false;
-            }
-        } else if ui
-            .add_enabled(can_toggle, egui::Button::new(t("subscriber.subscribe")))
+        ui.text_edit_singleline(&mut state.subject_input);
+        let can_add = !state.subject_input.trim().is_empty();
+        if ui
+            .add_enabled(can_add, egui::Button::new(t("subscriber.add")))
             .clicked()
         {
-            backend.send(BackendCommand::Subscribe {
-                connection_id,
-                subject: state.subject.clone(),
-            });
-            state.subscribed = true;
+            let subject = state.subject_input.trim().to_string();
+            // Avoid duplicate subscriptions
+            if !state.subscriptions.iter().any(|s| s.subject == subject) {
+                backend.send(BackendCommand::Subscribe {
+                    connection_id,
+                    subject: subject.clone(),
+                });
+                state.subscriptions.push(SubjectSubscription {
+                    subject,
+                    active: true,
+                });
+            }
+            state.subject_input.clear();
         }
     });
 
+    // Active subscriptions list
+    if !state.subscriptions.is_empty() {
+        ui.add_space(2.0);
+        ui.label(t("subscriber.subscriptions"));
+        let mut to_remove = Vec::new();
+        for (i, sub) in state.subscriptions.iter().enumerate() {
+            ui.horizontal(|ui| {
+                let color = if sub.active {
+                    egui::Color32::GREEN
+                } else {
+                    egui::Color32::GRAY
+                };
+                ui.colored_label(color, "●");
+                ui.label(&sub.subject);
+                if sub.active
+                    && ui
+                        .small_button(t("subscriber.unsubscribe"))
+                        .clicked()
+                {
+                    to_remove.push(i);
+                }
+            });
+        }
+        for i in to_remove.into_iter().rev() {
+            let sub = &state.subscriptions[i];
+            backend.send(BackendCommand::Unsubscribe {
+                connection_id,
+                subject: sub.subject.clone(),
+            });
+            state.subscriptions.remove(i);
+        }
+    }
+}
+
+fn render_message_list(ui: &mut egui::Ui, state: &mut SubscriberState) {
     ui.horizontal(|ui| {
         ui.label(format!(
             "{} {} / {}",
@@ -50,6 +101,34 @@ pub fn subscriber_ui(
             state.messages.len(),
             state.max_messages
         ));
+
+        // Subject filter dropdown
+        if state.subscriptions.len() > 1 {
+            let filter_label = state
+                .subject_filter
+                .as_deref()
+                .unwrap_or(t("subscriber.filter_all"));
+            egui::ComboBox::from_id_salt("sub_subject_filter")
+                .selected_text(filter_label)
+                .show_ui(ui, |ui| {
+                    if ui
+                        .selectable_value(&mut state.subject_filter, None, t("subscriber.filter_all"))
+                        .changed()
+                    {
+                        state.selected_idx = None;
+                    }
+                    for sub in &state.subscriptions {
+                        let val = Some(sub.subject.clone());
+                        if ui
+                            .selectable_value(&mut state.subject_filter, val, &sub.subject)
+                            .changed()
+                        {
+                            state.selected_idx = None;
+                        }
+                    }
+                });
+        }
+
         if ui.small_button(t("subscriber.clear")).clicked() {
             state.messages.clear();
             state.selected_idx = None;
@@ -57,42 +136,54 @@ pub fn subscriber_ui(
     });
 
     ui.add_space(4.0);
-    ui.separator();
     let list_height = (ui.available_height() * 0.5).max(100.0);
     ui.label(t("subscriber.messages"));
+
+    // Collect filtered message indices to avoid borrow conflicts
+    let filtered: Vec<(usize, String)> = {
+        let msgs = filtered_messages(state);
+        msgs.iter()
+            .enumerate()
+            .map(|(idx, msg)| {
+                let label = format!(
+                    "[{}] {} — {}",
+                    format_timestamp(msg.timestamp),
+                    msg.subject,
+                    payload_preview(&msg.payload, 80)
+                );
+                (idx, label)
+            })
+            .collect()
+    };
+
     egui::ScrollArea::vertical()
         .id_salt("sub_msg_list")
         .max_height(list_height)
         .stick_to_bottom(true)
         .show(ui, |ui| {
-            if state.messages.is_empty() {
+            if filtered.is_empty() {
                 ui.label(t("subscriber.no_messages"));
             } else {
-                for (idx, msg) in state.messages.iter().enumerate() {
-                    let label = format!(
-                        "[{}] {} — {}",
-                        format_timestamp(msg.timestamp),
-                        msg.subject,
-                        payload_preview(&msg.payload, 80)
-                    );
+                for (idx, label) in &filtered {
                     if ui
-                        .selectable_label(state.selected_idx == Some(idx), label)
+                        .selectable_label(state.selected_idx == Some(*idx), label.as_str())
                         .clicked()
                     {
-                        state.selected_idx = Some(idx);
+                        state.selected_idx = Some(*idx);
                     }
                 }
             }
         });
+}
 
-    ui.add_space(4.0);
-    ui.separator();
-    if let Some(idx) = state.selected_idx
-        && let Some(msg) = state.messages.get(idx)
-    {
-        message_detail_ui(ui, msg, &mut state.payload_format);
-    } else {
-        ui.label(t("subscriber.select_msg"));
+fn filtered_messages(state: &SubscriberState) -> Vec<&ReceivedMessage> {
+    match &state.subject_filter {
+        Some(filter) => state
+            .messages
+            .iter()
+            .filter(|m| m.subject == *filter)
+            .collect(),
+        None => state.messages.iter().collect(),
     }
 }
 
