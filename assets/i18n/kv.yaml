@@ -101,3 +101,9 @@ none:
 empty_value:
   en: "<empty>"
   zh: "<空>"
+select_key_hint:
+  en: "Select a key from the list or create a new entry."
+  zh: "从列表中选择一个键或创建新条目。"
+back_to_detail:
+  en: "← Back"
+  zh: "← 返回"

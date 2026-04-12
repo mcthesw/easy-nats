@@ -169,6 +169,8 @@ pub struct KvBucketState {
     pub editor_format: PayloadFormat,
     pub history: Vec<serde_json::Value>,
     pub history_format: PayloadFormat,
+    /// When true, right panel shows history instead of detail.
+    pub show_history: bool,
 }
 
 impl Default for KvBucketState {
@@ -188,6 +190,7 @@ impl Default for KvBucketState {
             editor_format: PayloadFormat::Auto,
             history: Vec::new(),
             history_format: PayloadFormat::Auto,
+            show_history: false,
         }
     }
 }

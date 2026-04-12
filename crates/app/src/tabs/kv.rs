@@ -28,16 +28,29 @@ pub fn kv_bucket_ui(
     if let Some(info) = &state.info {
         egui::CollapsingHeader::new(t("kv.bucket_info"))
             .id_salt(("kv_bucket_info", connection_id, bucket_name))
-            .default_open(true)
+            .default_open(false)
             .show(ui, |ui| kv_bucket_info_panel(ui, info));
-        ui.separator();
     }
+    ui.separator();
 
-    render_key_list(ui, connection_id, bucket_name, state, backend);
-    ui.separator();
-    render_value_editor(ui, connection_id, bucket_name, state, backend);
-    ui.separator();
-    render_history(ui, connection_id, bucket_name, state);
+    // Horizontal split: left key list, right detail/history
+    let panel_id = egui::Id::new(("kv_left_panel", connection_id, bucket_name));
+    egui::Panel::left(panel_id)
+        .resizable(true)
+        .default_size(260.0)
+        .size_range(160.0..=500.0)
+        .show_inside(ui, |ui| {
+            render_key_list(ui, connection_id, bucket_name, state, backend);
+        });
+
+    // Right panel: detail or history
+    egui::CentralPanel::default().show_inside(ui, |ui| {
+        if state.show_history {
+            render_history(ui, connection_id, bucket_name, state);
+        } else {
+            render_detail_panel(ui, connection_id, bucket_name, state, backend);
+        }
+    });
 }
 
 fn render_key_list(
@@ -48,10 +61,14 @@ fn render_key_list(
     backend: &BackendHandle,
 ) {
     ui.horizontal(|ui| {
-        ui.label(t("kv.key_filter"));
-        ui.text_edit_singleline(&mut state.key_filter);
+        ui.add(
+            egui::TextEdit::singleline(&mut state.key_filter)
+                .hint_text(t("kv.key_filter"))
+                .desired_width(ui.available_width() - 70.0),
+        );
         if ui
-            .add_enabled(!state.loading_entries, egui::Button::new(t("kv.refresh")))
+            .add_enabled(!state.loading_entries, egui::Button::new("↻"))
+            .on_hover_text(t("kv.refresh"))
             .clicked()
         {
             backend.send(BackendCommand::ListKvKeys {
@@ -59,9 +76,6 @@ fn render_key_list(
                 bucket: bucket_name.to_string(),
             });
             state.loading_entries = true;
-        }
-        if ui.button(t("kv.new_entry")).clicked() {
-            clear_kv_editor(state);
         }
     });
 
@@ -72,11 +86,14 @@ fn render_key_list(
         });
     }
 
+    if ui.small_button(t("kv.new_entry")).clicked() {
+        clear_kv_editor(state);
+    }
+
     ui.add_space(4.0);
-    ui.label(t("kv.keys"));
+
     egui::ScrollArea::vertical()
         .id_salt(("kv_keys", connection_id, bucket_name))
-        .max_height(180.0)
         .show(ui, |ui| {
             let filtered: Vec<serde_json::Value> = state
                 .entries
@@ -101,6 +118,7 @@ fn render_key_list(
                         .clicked()
                     {
                         state.selected_key = Some(key.to_string());
+                        state.show_history = false;
                         load_kv_entry_into_editor(state, entry);
                         backend.send(BackendCommand::GetKvEntry {
                             connection_id,
@@ -119,13 +137,21 @@ fn render_key_list(
         });
 }
 
-fn render_value_editor(
+fn render_detail_panel(
     ui: &mut egui::Ui,
     connection_id: u64,
     bucket_name: &str,
     state: &mut KvBucketState,
     backend: &BackendHandle,
 ) {
+    if state.selected_key.is_none() && state.entry_key.is_empty() {
+        ui.centered_and_justified(|ui| {
+            ui.label(t("kv.select_key_hint"));
+        });
+        return;
+    }
+
+    // Action toolbar
     ui.horizontal(|ui| {
         let can_save = !state.entry_key.trim().is_empty();
         if ui
@@ -162,8 +188,17 @@ fn render_value_editor(
             });
             state.loading_entries = true;
         }
+        if ui
+            .add_enabled(can_save, egui::Button::new(t("kv.history")))
+            .clicked()
+        {
+            state.show_history = true;
+        }
     });
 
+    ui.separator();
+
+    // Metadata
     egui::Grid::new(("kv_detail_grid", connection_id, bucket_name))
         .num_columns(2)
         .spacing([8.0, 4.0])
@@ -190,11 +225,16 @@ fn render_value_editor(
             ui.end_row();
         });
 
-    ui.add_space(4.0);
-    ui.label(t("kv.value_editor"));
+    ui.separator();
+
+    // Value editor
+    ui.horizontal(|ui| {
+        ui.label(t("kv.value_editor"));
+        format::format_selector(ui, "kv_value_fmt", &mut state.editor_format);
+    });
     egui::ScrollArea::vertical()
         .id_salt(("kv_value_editor", connection_id, bucket_name))
-        .max_height(120.0)
+        .max_height((ui.available_height() * 0.5).max(80.0))
         .show(ui, |ui| {
             ui.add(
                 egui::TextEdit::multiline(&mut state.entry_value)
@@ -204,13 +244,10 @@ fn render_value_editor(
             );
         });
 
-    ui.horizontal(|ui| {
-        ui.label(t("kv.value_preview"));
-        format::format_selector(ui, "kv_value_fmt", &mut state.editor_format);
-    });
+    ui.add_space(4.0);
+    ui.label(t("kv.value_preview"));
     egui::ScrollArea::vertical()
         .id_salt(("kv_value_preview", connection_id, bucket_name))
-        .max_height(160.0)
         .show(ui, |ui| {
             format::render_payload(ui, state.entry_value.as_bytes(), state.editor_format);
         });
@@ -223,9 +260,13 @@ fn render_history(
     state: &mut KvBucketState,
 ) {
     ui.horizontal(|ui| {
+        if ui.button(t("kv.back_to_detail")).clicked() {
+            state.show_history = false;
+        }
         ui.label(t("kv.history"));
         format::format_selector(ui, "kv_history_fmt", &mut state.history_format);
     });
+    ui.separator();
 
     if state.loading_history {
         ui.horizontal(|ui| {
