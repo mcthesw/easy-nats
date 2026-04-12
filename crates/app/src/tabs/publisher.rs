@@ -130,6 +130,7 @@ fn render_response(ui: &mut egui::Ui, state: &mut PublisherState) {
             ui.label(t("publisher.response_headers"));
             egui::Grid::new("resp_headers")
                 .num_columns(2)
+                .spacing([8.0, 4.0])
                 .striped(true)
                 .show(ui, |ui| {
                     for (k, v) in &resp.headers {

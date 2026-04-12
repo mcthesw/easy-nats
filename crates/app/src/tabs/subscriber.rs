@@ -69,7 +69,7 @@ fn render_subscription_controls(
 
     // Active subscriptions list
     if !state.subscriptions.is_empty() {
-        ui.add_space(2.0);
+        ui.add_space(4.0);
         ui.label(t("subscriber.subscriptions"));
         let mut to_remove = Vec::new();
         for (i, sub) in state.subscriptions.iter().enumerate() {

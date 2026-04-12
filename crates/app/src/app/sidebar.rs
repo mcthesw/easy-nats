@@ -294,6 +294,7 @@ fn render_kv_section(
 fn render_selected_connection_actions(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     if let Some(id) = app.selected_conn {
         ui.separator();
+        ui.add_space(4.0);
         let cfg_clone = app.config.connections.iter().find(|c| c.id == id).cloned();
         ui.horizontal(|ui| {
             if ui.small_button(t("common.edit")).clicked()
