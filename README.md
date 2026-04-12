@@ -2,6 +2,8 @@
 
 A cross-platform desktop GUI for [NATS](https://nats.io/) messaging, built with Rust.
 
+![main-menu](assets/imgs/main-menu.png)
+
 ## Features
 
 - **Connection Management** — Multiple server profiles with support for no-auth, token, user/password, NKey, credentials file, and TLS client certificates. Profiles are persisted across sessions.
@@ -25,24 +27,6 @@ cargo build --release
 
 The binary is output to `target/release/easy-nats` (or `easy-nats.exe` on Windows).
 
-## Run
-
-```bash
-# Optional: enable verbose logging
-RUST_LOG=info cargo run
-```
-
-On first launch, create a connection profile in the sidebar and connect to your NATS server.
-
-## Project Structure
-
-```
-crates/
-  app/           # eframe/egui desktop application
-  nats-backend/  # async-nats worker, runs on a Tokio background thread
-```
-
-Communication between UI and backend uses typed `BackendCommand` / `BackendEvent` channels — the UI never blocks on network I/O.
 
 ## License
 
