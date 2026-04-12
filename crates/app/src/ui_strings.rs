@@ -1,0 +1,69 @@
+// Centralized UI strings for all user-facing text.
+// Organized by feature area for future i18n readiness.
+
+// ─── Connections ───
+pub const CONNECTIONS_HEADING: &str = "Connections";
+pub const CONNECTION_NEW: &str = "New Connection";
+pub const CONNECTION_EDIT: &str = "Edit Connection";
+pub const CONNECTION_DELETE_CONFIRM_TITLE: &str = "Confirm Delete";
+pub const CONNECTION_DELETE_PROMPT: &str = "Delete connection";
+pub const CONNECT: &str = "Connect";
+pub const DISCONNECT: &str = "Disconnect";
+
+// ─── Editor Fields ───
+pub const FIELD_NAME: &str = "Name:";
+pub const FIELD_URL: &str = "URL:";
+pub const FIELD_AUTH: &str = "Auth:";
+pub const FIELD_TOKEN: &str = "Token:";
+pub const FIELD_USERNAME: &str = "Username:";
+pub const FIELD_PASSWORD: &str = "Password:";
+pub const FIELD_NKEY_SEED: &str = "NKey Seed:";
+pub const FIELD_CREDS_FILE: &str = "Creds File:";
+pub const FIELD_CERT_PATH: &str = "Cert Path:";
+pub const FIELD_KEY_PATH: &str = "Key Path:";
+pub const FIELD_TLS: &str = "TLS:";
+pub const REQUIRE_TLS: &str = "Require TLS";
+
+// ─── Auth Methods ───
+pub const AUTH_NONE: &str = "No Auth";
+pub const AUTH_TOKEN: &str = "Token";
+pub const AUTH_USER_PASSWORD: &str = "User / Password";
+pub const AUTH_NKEY: &str = "NKey";
+pub const AUTH_CREDENTIALS_FILE: &str = "Credentials File";
+pub const AUTH_TLS_CLIENT_CERT: &str = "TLS Client Certificate";
+
+// ─── Actions ───
+pub const SAVE: &str = "Save";
+pub const CANCEL: &str = "Cancel";
+pub const DELETE: &str = "Delete";
+pub const EDIT: &str = "Edit";
+
+// ─── Sidebar Resource Tree ───
+pub const SECTION_PUBSUB: &str = "Pub/Sub";
+pub const SECTION_STREAMS: &str = "Streams";
+pub const SECTION_KV: &str = "Key-Value";
+pub const SECTION_OBJECT_STORE: &str = "Object Store";
+pub const OPEN_PUBLISHER: &str = "Publisher";
+pub const OPEN_SUBSCRIBER: &str = "Subscriber";
+
+// ─── Tabs ───
+pub const TAB_WELCOME: &str = "Welcome";
+pub const TAB_PUBLISHER: &str = "Publisher";
+pub const TAB_SUBSCRIBER: &str = "Subscriber";
+#[allow(dead_code)]
+pub const TAB_STREAM: &str = "Stream";
+#[allow(dead_code)]
+pub const TAB_KV_BUCKET: &str = "KV Bucket";
+#[allow(dead_code)]
+pub const TAB_OBJECT_STORE_BUCKET: &str = "Object Store";
+
+// ─── Theme ───
+pub const THEME_DARK: &str = "🌙";
+pub const THEME_LIGHT: &str = "☀";
+
+// ─── Toast ───
+pub const TOAST_DISMISS: &str = "✕";
+
+// ─── Welcome ───
+pub const WELCOME_HEADING: &str = "Easy NATS";
+pub const WELCOME_BODY: &str = "Create or select a connection from the sidebar to get started.\nUse the resource tree to open publisher, subscriber, stream, KV, or object store tabs.";

@@ -1,5 +1,8 @@
+mod tabs;
+mod toast;
+mod ui_strings;
+
 fn main() {
-    // Initialize structured logging with RUST_LOG env filter
     tracing_subscriber::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::try_from_default_env()
@@ -11,7 +14,20 @@ fn main() {
     if let Err(e) = eframe::run_native(
         "Easy NATS",
         native_options,
-        Box::new(|_cc| Ok(Box::new(app::EasyNatsApp::new()))),
+        Box::new(|cc| {
+            // Detect system dark mode preference, default to dark
+            let dark = cc
+                .egui_ctx
+                .system_theme()
+                .map(|t| t == eframe::egui::Theme::Dark)
+                .unwrap_or(true);
+            if dark {
+                cc.egui_ctx.set_visuals(eframe::egui::Visuals::dark());
+            } else {
+                cc.egui_ctx.set_visuals(eframe::egui::Visuals::light());
+            }
+            Ok(Box::new(app::EasyNatsApp::new(dark)))
+        }),
     ) {
         tracing::error!("Failed to start application: {e}");
     }
@@ -19,27 +35,31 @@ fn main() {
 
 mod app {
     use eframe::egui;
+    use egui_dock::{DockArea, DockState};
     use nats_backend::{
         AppConfig, AuthMethod, BackendCommand, BackendEvent, BackendHandle, ConnectionConfig,
         ConnectionStatusKind,
     };
     use std::collections::HashMap;
 
+    use crate::tabs::{AppTabViewer, TabKind};
+    use crate::toast::{ToastLevel, Toasts};
+    use crate::ui_strings as S;
+
     pub struct EasyNatsApp {
         backend: BackendHandle,
         config: AppConfig,
-        /// Runtime connection statuses keyed by connection id.
         conn_statuses: HashMap<u64, ConnectionStatusKind>,
-        /// Currently selected connection id for detail view.
         selected_conn: Option<u64>,
-        /// State of the connection editor form.
         editor: ConnectionEditor,
+        dock_state: DockState<TabKind>,
+        toasts: Toasts,
+        dark_mode: bool,
     }
 
     #[derive(Default)]
     struct ConnectionEditor {
         visible: bool,
-        /// If editing an existing connection, holds its id.
         editing_id: Option<u64>,
         name: String,
         url: String,
@@ -52,7 +72,6 @@ mod app {
         cert_path: String,
         key_path: String,
         tls_enabled: bool,
-        /// Pending delete confirmation dialog.
         delete_confirm: Option<u64>,
     }
 
@@ -68,7 +87,7 @@ mod app {
     }
 
     impl AuthKindSelection {
-        const ALL: [AuthKindSelection; 6] = [
+        const ALL: [Self; 6] = [
             Self::None,
             Self::Token,
             Self::UserPassword,
@@ -79,25 +98,29 @@ mod app {
 
         fn label(self) -> &'static str {
             match self {
-                Self::None => "No Auth",
-                Self::Token => "Token",
-                Self::UserPassword => "User / Password",
-                Self::NKey => "NKey",
-                Self::CredentialsFile => "Credentials File",
-                Self::TlsClientCert => "TLS Client Certificate",
+                Self::None => S::AUTH_NONE,
+                Self::Token => S::AUTH_TOKEN,
+                Self::UserPassword => S::AUTH_USER_PASSWORD,
+                Self::NKey => S::AUTH_NKEY,
+                Self::CredentialsFile => S::AUTH_CREDENTIALS_FILE,
+                Self::TlsClientCert => S::AUTH_TLS_CLIENT_CERT,
             }
         }
     }
 
     impl EasyNatsApp {
-        pub fn new() -> Self {
+        pub fn new(dark_mode: bool) -> Self {
             let config = AppConfig::load();
+            let dock_state = DockState::new(vec![TabKind::Welcome]);
             Self {
                 backend: BackendHandle::spawn(),
                 config,
                 conn_statuses: HashMap::new(),
                 selected_conn: None,
                 editor: ConnectionEditor::default(),
+                dock_state,
+                toasts: Toasts::default(),
+                dark_mode,
             }
         }
 
@@ -113,7 +136,32 @@ mod app {
                         status,
                     } => {
                         tracing::info!(connection_id, ?status, "Connection status changed");
+                        match &status {
+                            ConnectionStatusKind::Connected => {
+                                self.toasts.push(
+                                    ToastLevel::Success,
+                                    format!("Connected to {}", self.conn_name(connection_id)),
+                                );
+                            }
+                            ConnectionStatusKind::Error(msg) => {
+                                self.toasts.push(
+                                    ToastLevel::Error,
+                                    format!("{}: {}", self.conn_name(connection_id), msg),
+                                );
+                            }
+                            _ => {}
+                        }
                         self.conn_statuses.insert(connection_id, status);
+                    }
+                    BackendEvent::OperationResult { operation, .. } => {
+                        self.toasts
+                            .push(ToastLevel::Success, format!("{operation} succeeded"));
+                    }
+                    BackendEvent::Error {
+                        operation, message, ..
+                    } => {
+                        self.toasts
+                            .push(ToastLevel::Error, format!("{operation}: {message}"));
                     }
                     other => {
                         tracing::debug!(?other, "Received backend event");
@@ -121,6 +169,15 @@ mod app {
                 }
             }
             ctx.request_repaint();
+        }
+
+        fn conn_name(&self, id: u64) -> String {
+            self.config
+                .connections
+                .iter()
+                .find(|c| c.id == id)
+                .map(|c| c.name.clone())
+                .unwrap_or_else(|| format!("#{id}"))
         }
 
         fn connect(&mut self, id: u64) {
@@ -252,7 +309,6 @@ mod app {
             };
 
             if let Some(id) = self.editor.editing_id {
-                // Update existing
                 if let Some(c) = self.config.connections.iter_mut().find(|c| c.id == id) {
                     c.name = self.editor.name.clone();
                     c.urls = vec![self.editor.url.clone()];
@@ -260,23 +316,20 @@ mod app {
                     c.tls_enabled = self.editor.tls_enabled;
                 }
             } else {
-                // Create new
                 let id = self.config.next_connection_id();
-                let cfg = ConnectionConfig {
+                self.config.connections.push(ConnectionConfig {
                     id,
                     name: self.editor.name.clone(),
                     urls: vec![self.editor.url.clone()],
                     auth,
                     tls_enabled: self.editor.tls_enabled,
-                };
-                self.config.connections.push(cfg);
+                });
             }
             self.config.save();
             self.editor.visible = false;
         }
 
         fn delete_connection(&mut self, id: u64) {
-            // Disconnect if connected
             self.disconnect(id);
             self.conn_statuses.remove(&id);
             self.config.connections.retain(|c| c.id != id);
@@ -284,6 +337,78 @@ mod app {
             if self.selected_conn == Some(id) {
                 self.selected_conn = None;
             }
+        }
+
+        /// Open a tab in the dock, avoiding duplicates.
+        fn open_tab(&mut self, tab: TabKind) {
+            if self
+                .dock_state
+                .find_tab_from(|existing| same_tab(existing, &tab))
+                .is_some()
+            {
+                return;
+            }
+            self.dock_state.push_to_focused_leaf(tab);
+        }
+    }
+
+    /// Check if two tabs represent the same resource.
+    fn same_tab(a: &TabKind, b: &TabKind) -> bool {
+        match (a, b) {
+            (TabKind::Welcome, TabKind::Welcome) => true,
+            (
+                TabKind::Publisher {
+                    connection_id: a, ..
+                },
+                TabKind::Publisher {
+                    connection_id: b, ..
+                },
+            ) => a == b,
+            (
+                TabKind::Subscriber {
+                    connection_id: a, ..
+                },
+                TabKind::Subscriber {
+                    connection_id: b, ..
+                },
+            ) => a == b,
+            (
+                TabKind::Stream {
+                    connection_id: a1,
+                    stream_name: s1,
+                    ..
+                },
+                TabKind::Stream {
+                    connection_id: a2,
+                    stream_name: s2,
+                    ..
+                },
+            ) => a1 == a2 && s1 == s2,
+            (
+                TabKind::KvBucket {
+                    connection_id: a1,
+                    bucket_name: b1,
+                    ..
+                },
+                TabKind::KvBucket {
+                    connection_id: a2,
+                    bucket_name: b2,
+                    ..
+                },
+            ) => a1 == a2 && b1 == b2,
+            (
+                TabKind::ObjectStoreBucket {
+                    connection_id: a1,
+                    bucket_name: b1,
+                    ..
+                },
+                TabKind::ObjectStoreBucket {
+                    connection_id: a2,
+                    bucket_name: b2,
+                    ..
+                },
+            ) => a1 == a2 && b1 == b2,
+            _ => false,
         }
     }
 
@@ -293,13 +418,13 @@ mod app {
         }
 
         fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
-            // Connection editor window
+            // ─── Floating windows (editor, delete confirm) ───
             let mut save_requested = false;
             if self.editor.visible {
                 let title = if self.editor.editing_id.is_some() {
-                    "Edit Connection"
+                    S::CONNECTION_EDIT
                 } else {
-                    "New Connection"
+                    S::CONNECTION_NEW
                 };
                 let mut open = true;
                 egui::Window::new(title)
@@ -310,15 +435,15 @@ mod app {
                             .num_columns(2)
                             .spacing([8.0, 4.0])
                             .show(ui, |ui| {
-                                ui.label("Name:");
+                                ui.label(S::FIELD_NAME);
                                 ui.text_edit_singleline(&mut self.editor.name);
                                 ui.end_row();
 
-                                ui.label("URL:");
+                                ui.label(S::FIELD_URL);
                                 ui.text_edit_singleline(&mut self.editor.url);
                                 ui.end_row();
 
-                                ui.label("Auth:");
+                                ui.label(S::FIELD_AUTH);
                                 egui::ComboBox::from_id_salt("auth_kind")
                                     .selected_text(self.editor.auth_kind.label())
                                     .show_ui(ui, |ui| {
@@ -335,15 +460,15 @@ mod app {
                                 match self.editor.auth_kind {
                                     AuthKindSelection::None => {}
                                     AuthKindSelection::Token => {
-                                        ui.label("Token:");
+                                        ui.label(S::FIELD_TOKEN);
                                         ui.text_edit_singleline(&mut self.editor.token);
                                         ui.end_row();
                                     }
                                     AuthKindSelection::UserPassword => {
-                                        ui.label("Username:");
+                                        ui.label(S::FIELD_USERNAME);
                                         ui.text_edit_singleline(&mut self.editor.username);
                                         ui.end_row();
-                                        ui.label("Password:");
+                                        ui.label(S::FIELD_PASSWORD);
                                         ui.add(
                                             egui::TextEdit::singleline(&mut self.editor.password)
                                                 .password(true),
@@ -351,7 +476,7 @@ mod app {
                                         ui.end_row();
                                     }
                                     AuthKindSelection::NKey => {
-                                        ui.label("NKey Seed:");
+                                        ui.label(S::FIELD_NKEY_SEED);
                                         ui.add(
                                             egui::TextEdit::singleline(&mut self.editor.nkey_seed)
                                                 .password(true),
@@ -359,35 +484,32 @@ mod app {
                                         ui.end_row();
                                     }
                                     AuthKindSelection::CredentialsFile => {
-                                        ui.label("Creds File:");
+                                        ui.label(S::FIELD_CREDS_FILE);
                                         ui.text_edit_singleline(&mut self.editor.creds_path);
                                         ui.end_row();
                                     }
                                     AuthKindSelection::TlsClientCert => {
-                                        ui.label("Cert Path:");
+                                        ui.label(S::FIELD_CERT_PATH);
                                         ui.text_edit_singleline(&mut self.editor.cert_path);
                                         ui.end_row();
-                                        ui.label("Key Path:");
+                                        ui.label(S::FIELD_KEY_PATH);
                                         ui.text_edit_singleline(&mut self.editor.key_path);
                                         ui.end_row();
                                     }
                                 }
 
-                                ui.label("TLS:");
-                                ui.checkbox(&mut self.editor.tls_enabled, "Require TLS");
+                                ui.label(S::FIELD_TLS);
+                                ui.checkbox(&mut self.editor.tls_enabled, S::REQUIRE_TLS);
                                 ui.end_row();
                             });
                         ui.add_space(8.0);
                         ui.horizontal(|ui| {
-                            let name_ok = !self.editor.name.trim().is_empty();
-                            let url_ok = !self.editor.url.trim().is_empty();
-                            if ui
-                                .add_enabled(name_ok && url_ok, egui::Button::new("Save"))
-                                .clicked()
-                            {
+                            let valid = !self.editor.name.trim().is_empty()
+                                && !self.editor.url.trim().is_empty();
+                            if ui.add_enabled(valid, egui::Button::new(S::SAVE)).clicked() {
                                 save_requested = true;
                             }
-                            if ui.button("Cancel").clicked() {
+                            if ui.button(S::CANCEL).clicked() {
                                 self.editor.visible = false;
                             }
                         });
@@ -400,27 +522,25 @@ mod app {
                 self.save_editor();
             }
 
-            // Delete confirmation modal
+            // Delete confirmation
             let mut do_delete: Option<u64> = None;
             if let Some(id) = self.editor.delete_confirm {
-                let conn_name = self
-                    .config
-                    .connections
-                    .iter()
-                    .find(|c| c.id == id)
-                    .map(|c| c.name.clone())
-                    .unwrap_or_default();
+                let conn_name = self.conn_name(id);
                 let mut still_open = true;
-                egui::Window::new("Confirm Delete")
+                egui::Window::new(S::CONNECTION_DELETE_CONFIRM_TITLE)
                     .open(&mut still_open)
                     .resizable(false)
                     .show(ui.ctx(), |ui| {
-                        ui.label(format!("Delete connection \"{}\"?", conn_name));
+                        ui.label(format!(
+                            "{} \"{}\"?",
+                            S::CONNECTION_DELETE_PROMPT,
+                            conn_name
+                        ));
                         ui.horizontal(|ui| {
-                            if ui.button("Delete").clicked() {
+                            if ui.button(S::DELETE).clicked() {
                                 do_delete = Some(id);
                             }
-                            if ui.button("Cancel").clicked() {
+                            if ui.button(S::CANCEL).clicked() {
                                 self.editor.delete_confirm = None;
                             }
                         });
@@ -434,19 +554,39 @@ mod app {
                 self.editor.delete_confirm = None;
             }
 
-            // ─── Sidebar ───
-            egui::Panel::left("connections_panel")
+            // ─── Sidebar: connections + resource tree ───
+            egui::Panel::left("sidebar_panel")
                 .default_size(220.0)
                 .show_inside(ui, |ui| {
+                    // Theme toggle at top
                     ui.horizontal(|ui| {
-                        ui.heading("Connections");
-                        if ui.button("＋").clicked() {
-                            self.open_new_editor();
-                        }
+                        ui.heading(S::CONNECTIONS_HEADING);
+                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                            let icon = if self.dark_mode {
+                                S::THEME_LIGHT
+                            } else {
+                                S::THEME_DARK
+                            };
+                            if ui.small_button(icon).clicked() {
+                                self.dark_mode = !self.dark_mode;
+                                if self.dark_mode {
+                                    ui.ctx().set_visuals(egui::Visuals::dark());
+                                } else {
+                                    ui.ctx().set_visuals(egui::Visuals::light());
+                                }
+                            }
+                            if ui
+                                .small_button("＋")
+                                .on_hover_text(S::CONNECTION_NEW)
+                                .clicked()
+                            {
+                                self.open_new_editor();
+                            }
+                        });
                     });
                     ui.separator();
 
-                    // Collect data first to avoid borrow issues
+                    // Connection list with resource tree per connected profile
                     let conn_data: Vec<(u64, String, ConnectionStatusKind)> = self
                         .config
                         .connections
@@ -462,85 +602,140 @@ mod app {
                         .collect();
 
                     let mut action: Option<SidebarAction> = None;
-                    for (id, name, status) in &conn_data {
-                        let selected = self.selected_conn == Some(*id);
-                        let status_icon = match status {
-                            ConnectionStatusKind::Connected => "🟢",
-                            ConnectionStatusKind::Connecting => "🟡",
-                            ConnectionStatusKind::Disconnected => "⚪",
-                            ConnectionStatusKind::Error(_) => "🔴",
-                        };
-                        ui.horizontal(|ui| {
-                            if ui
-                                .selectable_label(selected, format!("{} {}", status_icon, name))
-                                .clicked()
-                            {
-                                action = Some(SidebarAction::Select(*id));
-                            }
-                            ui.with_layout(
-                                egui::Layout::right_to_left(egui::Align::Center),
-                                |ui| match status {
-                                    ConnectionStatusKind::Connected => {
-                                        if ui
-                                            .small_button("⏏")
-                                            .on_hover_text("Disconnect")
-                                            .clicked()
-                                        {
-                                            action = Some(SidebarAction::Disconnect(*id));
-                                        }
-                                    }
-                                    ConnectionStatusKind::Connecting => {}
-                                    _ => {
-                                        if ui.small_button("▶").on_hover_text("Connect").clicked()
-                                        {
-                                            action = Some(SidebarAction::Connect(*id));
-                                        }
-                                    }
-                                },
-                            );
-                        });
-                    }
+                    egui::ScrollArea::vertical().show(ui, |ui| {
+                        for (id, name, status) in &conn_data {
+                            let selected = self.selected_conn == Some(*id);
+                            let status_icon = match status {
+                                ConnectionStatusKind::Connected => "🟢",
+                                ConnectionStatusKind::Connecting => "🟡",
+                                ConnectionStatusKind::Disconnected => "⚪",
+                                ConnectionStatusKind::Error(_) => "🔴",
+                            };
 
-                    // Apply action
+                            // Connection row
+                            ui.horizontal(|ui| {
+                                if ui
+                                    .selectable_label(selected, format!("{status_icon} {name}"))
+                                    .clicked()
+                                {
+                                    action = Some(SidebarAction::Select(*id));
+                                }
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| match status {
+                                        ConnectionStatusKind::Connected => {
+                                            if ui
+                                                .small_button("⏏")
+                                                .on_hover_text(S::DISCONNECT)
+                                                .clicked()
+                                            {
+                                                action = Some(SidebarAction::Disconnect(*id));
+                                            }
+                                        }
+                                        ConnectionStatusKind::Connecting => {}
+                                        _ => {
+                                            if ui
+                                                .small_button("▶")
+                                                .on_hover_text(S::CONNECT)
+                                                .clicked()
+                                            {
+                                                action = Some(SidebarAction::Connect(*id));
+                                            }
+                                        }
+                                    },
+                                );
+                            });
+
+                            // Resource tree (only for connected profiles)
+                            if matches!(status, ConnectionStatusKind::Connected) {
+                                ui.indent(format!("tree_{id}"), |ui| {
+                                    // Pub/Sub section
+                                    egui::CollapsingHeader::new(S::SECTION_PUBSUB)
+                                        .id_salt(format!("pubsub_{id}"))
+                                        .show(ui, |ui| {
+                                            if ui
+                                                .selectable_label(false, S::OPEN_PUBLISHER)
+                                                .clicked()
+                                            {
+                                                action = Some(SidebarAction::OpenTab(
+                                                    TabKind::Publisher {
+                                                        connection_id: *id,
+                                                        connection_name: name.clone(),
+                                                    },
+                                                ));
+                                            }
+                                            if ui
+                                                .selectable_label(false, S::OPEN_SUBSCRIBER)
+                                                .clicked()
+                                            {
+                                                action = Some(SidebarAction::OpenTab(
+                                                    TabKind::Subscriber {
+                                                        connection_id: *id,
+                                                        connection_name: name.clone(),
+                                                    },
+                                                ));
+                                            }
+                                        });
+
+                                    // Streams section
+                                    egui::CollapsingHeader::new(S::SECTION_STREAMS)
+                                        .id_salt(format!("streams_{id}"))
+                                        .show(ui, |_ui| {
+                                            // Streams will be listed here once discovered
+                                        });
+
+                                    // KV section
+                                    egui::CollapsingHeader::new(S::SECTION_KV)
+                                        .id_salt(format!("kv_{id}"))
+                                        .show(ui, |_ui| {
+                                            // KV buckets will be listed here
+                                        });
+
+                                    // Object Store section
+                                    egui::CollapsingHeader::new(S::SECTION_OBJECT_STORE)
+                                        .id_salt(format!("objstore_{id}"))
+                                        .show(ui, |_ui| {
+                                            // Objects will be listed here
+                                        });
+                                });
+                            }
+                        }
+                    });
+
+                    // Apply actions
                     match action {
                         Some(SidebarAction::Select(id)) => self.selected_conn = Some(id),
                         Some(SidebarAction::Connect(id)) => self.connect(id),
                         Some(SidebarAction::Disconnect(id)) => self.disconnect(id),
+                        Some(SidebarAction::OpenTab(tab)) => self.open_tab(tab),
                         None => {}
                     }
-                });
 
-            // ─── Central Panel ───
-            egui::CentralPanel::default().show_inside(ui, |ui| {
-                if let Some(id) = self.selected_conn {
-                    let status = self
-                        .conn_statuses
-                        .get(&id)
-                        .cloned()
-                        .unwrap_or(ConnectionStatusKind::Disconnected);
-                    if let Some(cfg) = self.config.connections.iter().find(|c| c.id == id) {
-                        let name = cfg.name.clone();
-                        let urls = cfg.urls.join(", ");
-                        let cfg_clone = cfg.clone();
-                        ui.heading(&name);
-                        ui.label(format!("URL: {urls}"));
-                        ui.label(format!("Status: {status:?}"));
-                        ui.add_space(4.0);
+                    // Edit/delete for selected connection
+                    if let Some(id) = self.selected_conn {
+                        ui.separator();
+                        let cfg_clone =
+                            self.config.connections.iter().find(|c| c.id == id).cloned();
                         ui.horizontal(|ui| {
-                            if ui.button("Edit").clicked() {
-                                self.open_edit_editor(&cfg_clone);
+                            if ui.small_button(S::EDIT).clicked()
+                                && let Some(cfg) = &cfg_clone
+                            {
+                                self.open_edit_editor(cfg);
                             }
-                            if ui.button("Delete").clicked() {
+                            if ui.small_button(S::DELETE).clicked() {
                                 self.editor.delete_confirm = Some(id);
                             }
                         });
                     }
-                } else {
-                    ui.centered_and_justified(|ui| {
-                        ui.label("Select or create a connection to get started");
-                    });
-                }
-            });
+                });
+
+            // ─── Dock Area (central) ───
+            DockArea::new(&mut self.dock_state)
+                .style(egui_dock::Style::from_egui(ui.style().as_ref()))
+                .show_inside(ui, &mut AppTabViewer);
+
+            // ─── Toast overlay ───
+            self.toasts.show(ui.ctx());
         }
     }
 
@@ -548,5 +743,6 @@ mod app {
         Select(u64),
         Connect(u64),
         Disconnect(u64),
+        OpenTab(TabKind),
     }
 }
