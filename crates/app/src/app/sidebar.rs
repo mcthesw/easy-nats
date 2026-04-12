@@ -45,6 +45,8 @@ fn render_sidebar_header(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                 } else {
                     ui.ctx().set_visuals(egui::Visuals::light());
                 }
+                app.settings.dark_mode = app.dark_mode;
+                app.settings.save();
             }
 
             // Language selector
@@ -110,16 +112,17 @@ fn render_connection_row(
     action: &mut Option<SidebarAction>,
 ) {
     let selected = app.selected_conn == Some(id);
-    let status_icon = match status {
-        ConnectionStatusKind::Connected => "🟢",
-        ConnectionStatusKind::Connecting => "🟡",
-        ConnectionStatusKind::Disconnected => "⚪",
-        ConnectionStatusKind::Error(_) => "🔴",
+    let status_color = match status {
+        ConnectionStatusKind::Connected => egui::Color32::GREEN,
+        ConnectionStatusKind::Connecting => egui::Color32::YELLOW,
+        ConnectionStatusKind::Disconnected => egui::Color32::GRAY,
+        ConnectionStatusKind::Error(_) => egui::Color32::RED,
     };
 
     ui.horizontal(|ui| {
+        ui.colored_label(status_color, "●");
         if ui
-            .selectable_label(selected, format!("{status_icon} {name}"))
+            .selectable_label(selected, name)
             .clicked()
         {
             *action = Some(SidebarAction::Select(id));

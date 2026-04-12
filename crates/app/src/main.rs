@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 mod app;
 mod format;
 mod i18n;
@@ -16,7 +18,12 @@ fn main() {
     let app_settings = settings::AppSettings::load();
     i18n::init(app_settings.language);
 
-    let native_options = eframe::NativeOptions::default();
+    let native_options = eframe::NativeOptions {
+        viewport: eframe::egui::ViewportBuilder::default()
+            .with_inner_size([1400.0, 900.0])
+            .with_min_inner_size([900.0, 600.0]),
+        ..Default::default()
+    };
     if let Err(e) = eframe::run_native(
         "Easy NATS",
         native_options,

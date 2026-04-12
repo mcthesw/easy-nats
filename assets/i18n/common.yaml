@@ -14,11 +14,11 @@ edit:
 
 # Theme icons
 theme_dark:
-  en: "🌙"
-  zh: "🌙"
+  en: "Dark"
+  zh: "深色"
 theme_light:
-  en: "☀"
-  zh: "☀"
+  en: "Light"
+  zh: "浅色"
 
 # Storage / retention labels
 storage_file:
