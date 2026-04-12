@@ -98,6 +98,9 @@ refresh:
 invalid_base64:
   en: "Invalid base64 payload"
   zh: "无效的 base64 载荷"
+workqueue_hint:
+  en: "WorkQueue retention: messages are deleted once acknowledged. Only unacknowledged messages can be browsed."
+  zh: "工作队列保留策略：消息确认后即删除，仅可浏览未确认的消息。"
 no_payload:
   en: "No payload"
   zh: "无载荷"

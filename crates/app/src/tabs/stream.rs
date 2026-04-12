@@ -56,6 +56,20 @@ fn render_message_browser(
     state: &mut StreamState,
     backend: &BackendHandle,
 ) {
+    // WorkQueue retention warning
+    if let Some(info) = &state.info {
+        let retention = info["config"]["retention"]
+            .as_str()
+            .unwrap_or("")
+            .to_lowercase();
+        if retention.contains("work") {
+            ui.horizontal(|ui| {
+                ui.colored_label(egui::Color32::YELLOW, "⚠");
+                ui.label(t("stream.workqueue_hint"));
+            });
+        }
+    }
+
     ui.horizontal(|ui| {
         ui.label(t("stream.start_seq"));
         ui.add(egui::TextEdit::singleline(&mut state.start_seq).desired_width(80.0));
