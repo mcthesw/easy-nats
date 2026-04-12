@@ -42,7 +42,7 @@ mod app {
     };
     use std::collections::HashMap;
 
-    use crate::tabs::{AppTabViewer, TabKind};
+    use crate::tabs::{AppTabViewer, PublisherState, ResponseData, TabKind};
     use crate::toast::{ToastLevel, Toasts};
     use crate::ui_strings as S;
 
@@ -153,13 +153,63 @@ mod app {
                         }
                         self.conn_statuses.insert(connection_id, status);
                     }
-                    BackendEvent::OperationResult { operation, .. } => {
-                        self.toasts
-                            .push(ToastLevel::Success, format!("{operation} succeeded"));
+                    BackendEvent::OperationResult {
+                        connection_id,
+                        operation,
+                        ..
+                    } => {
+                        if operation == "publish" {
+                            self.toasts.push(
+                                ToastLevel::Success,
+                                format!("Published to {}", self.conn_name(connection_id)),
+                            );
+                        } else {
+                            self.toasts
+                                .push(ToastLevel::Success, format!("{operation} succeeded"));
+                        }
+                    }
+                    BackendEvent::RequestResponse {
+                        connection_id,
+                        payload,
+                        headers,
+                    } => {
+                        for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+                            if let TabKind::Publisher {
+                                connection_id: cid,
+                                state,
+                                ..
+                            } = tab
+                                && *cid == connection_id
+                            {
+                                state.response = Some(ResponseData {
+                                    payload: payload.clone(),
+                                    headers: headers.clone(),
+                                });
+                                state.waiting = false;
+                            }
+                        }
                     }
                     BackendEvent::Error {
-                        operation, message, ..
+                        connection_id,
+                        operation,
+                        message,
                     } => {
+                        // Clear waiting state on publisher tabs if request failed
+                        if operation == "request"
+                            && let Some(cid) = connection_id
+                        {
+                            for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+                                if let TabKind::Publisher {
+                                    connection_id: tab_cid,
+                                    state,
+                                    ..
+                                } = tab
+                                    && *tab_cid == cid
+                                {
+                                    state.waiting = false;
+                                }
+                            }
+                        }
                         self.toasts
                             .push(ToastLevel::Error, format!("{operation}: {message}"));
                     }
@@ -661,6 +711,7 @@ mod app {
                                                     TabKind::Publisher {
                                                         connection_id: *id,
                                                         connection_name: name.clone(),
+                                                        state: PublisherState::default(),
                                                     },
                                                 ));
                                             }
@@ -732,7 +783,12 @@ mod app {
             // ─── Dock Area (central) ───
             DockArea::new(&mut self.dock_state)
                 .style(egui_dock::Style::from_egui(ui.style().as_ref()))
-                .show_inside(ui, &mut AppTabViewer);
+                .show_inside(
+                    ui,
+                    &mut AppTabViewer {
+                        backend: &self.backend,
+                    },
+                );
 
             // ─── Toast overlay ───
             self.toasts.show(ui.ctx());

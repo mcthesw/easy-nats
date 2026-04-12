@@ -6,6 +6,7 @@ license.workspace = true
 
 [dependencies]
 async-nats = { version = "0.47.0", features = ["nkeys"] }
+bytes = "1"
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 scc = "3.6.12"

@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use async_nats::Client;
+use bytes::Bytes;
 use tokio::sync::mpsc;
 
 use crate::command::BackendCommand;
@@ -54,13 +55,44 @@ pub async fn run_worker(
                     status: ConnectionStatusKind::Disconnected,
                 });
             }
-            BackendCommand::Publish { connection_id, .. } => {
-                // TODO: Implement publish
-                let _ = evt_tx.send(BackendEvent::Error {
-                    connection_id: Some(connection_id),
-                    operation: "publish".to_string(),
-                    message: "Not yet implemented".to_string(),
-                });
+            BackendCommand::Publish {
+                connection_id,
+                subject,
+                payload,
+                headers,
+            } => {
+                if let Some(client) = clients.get(&connection_id) {
+                    let payload = Bytes::from(payload);
+                    let result = if let Some(hdrs) = headers {
+                        client
+                            .publish_with_headers(subject, build_header_map(&hdrs), payload)
+                            .await
+                    } else {
+                        client.publish(subject, payload).await
+                    };
+                    match result {
+                        Ok(()) => {
+                            let _ = evt_tx.send(BackendEvent::OperationResult {
+                                connection_id,
+                                operation: "publish".to_string(),
+                                data: serde_json::Value::Null,
+                            });
+                        }
+                        Err(e) => {
+                            let _ = evt_tx.send(BackendEvent::Error {
+                                connection_id: Some(connection_id),
+                                operation: "publish".to_string(),
+                                message: e.to_string(),
+                            });
+                        }
+                    }
+                } else {
+                    let _ = evt_tx.send(BackendEvent::Error {
+                        connection_id: Some(connection_id),
+                        operation: "publish".to_string(),
+                        message: "Not connected".to_string(),
+                    });
+                }
             }
             BackendCommand::Subscribe { connection_id, .. } => {
                 // TODO: Implement subscribe
@@ -77,13 +109,56 @@ pub async fn run_worker(
                     message: "Not yet implemented".to_string(),
                 });
             }
-            BackendCommand::Request { connection_id, .. } => {
-                // TODO: Implement request-reply
-                let _ = evt_tx.send(BackendEvent::Error {
-                    connection_id: Some(connection_id),
-                    operation: "request".to_string(),
-                    message: "Not yet implemented".to_string(),
-                });
+            BackendCommand::Request {
+                connection_id,
+                subject,
+                payload,
+                headers,
+                timeout_ms,
+            } => {
+                if let Some(client) = clients.get(&connection_id) {
+                    let payload = Bytes::from(payload);
+                    let timeout = std::time::Duration::from_millis(timeout_ms);
+                    let result = tokio::time::timeout(timeout, async {
+                        if let Some(hdrs) = headers {
+                            client
+                                .request_with_headers(subject, build_header_map(&hdrs), payload)
+                                .await
+                        } else {
+                            client.request(subject, payload).await
+                        }
+                    })
+                    .await;
+                    match result {
+                        Ok(Ok(msg)) => {
+                            let _ = evt_tx.send(BackendEvent::RequestResponse {
+                                connection_id,
+                                payload: msg.payload.to_vec(),
+                                headers: extract_headers(&msg.headers),
+                            });
+                        }
+                        Ok(Err(e)) => {
+                            let _ = evt_tx.send(BackendEvent::Error {
+                                connection_id: Some(connection_id),
+                                operation: "request".to_string(),
+                                message: e.to_string(),
+                            });
+                        }
+                        Err(_) => {
+                            let _ = evt_tx.send(BackendEvent::Error {
+                                connection_id: Some(connection_id),
+                                operation: "request".to_string(),
+                                message: "Request timed out".to_string(),
+                            });
+                        }
+                    }
+                } else {
+                    let _ = evt_tx.send(BackendEvent::Error {
+                        connection_id: Some(connection_id),
+                        operation: "request".to_string(),
+                        message: "Not connected".to_string(),
+                    });
+                }
             }
             // JetStream commands
             BackendCommand::ListStreams { connection_id }
@@ -172,6 +247,29 @@ pub async fn run_worker(
     tracing::info!("Backend worker stopped");
 }
 
+/// Convert a list of key-value pairs into an async-nats HeaderMap.
+pub fn build_header_map(headers: &[(String, String)]) -> async_nats::HeaderMap {
+    let mut map = async_nats::HeaderMap::new();
+    for (k, v) in headers {
+        map.insert(k.as_str(), v.as_str());
+    }
+    map
+}
+
+/// Extract headers from an async-nats HeaderMap into a list of key-value pairs.
+pub fn extract_headers(headers: &Option<async_nats::HeaderMap>) -> Vec<(String, String)> {
+    let Some(map) = headers else {
+        return Vec::new();
+    };
+    let mut result = Vec::new();
+    for (name, values) in map.iter() {
+        for value in values.iter() {
+            result.push((name.to_string(), value.to_string()));
+        }
+    }
+    result
+}
+
 /// Build ConnectOptions from a ConnectionConfig and connect.
 async fn do_connect(
     config: &ConnectionConfig,
@@ -228,4 +326,57 @@ async fn do_connect(
 
     let client = opts.connect(&addrs[..]).await?;
     Ok(client)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_build_header_map_empty() {
+        let headers: Vec<(String, String)> = vec![];
+        let map = build_header_map(&headers);
+        assert_eq!(map.iter().count(), 0);
+    }
+
+    #[test]
+    fn test_build_header_map_single() {
+        let headers = vec![("X-Key".to_string(), "Value1".to_string())];
+        let map = build_header_map(&headers);
+        assert_eq!(map.get("X-Key").unwrap().to_string(), "Value1");
+    }
+
+    #[test]
+    fn test_build_header_map_multiple() {
+        let headers = vec![
+            ("Content-Type".to_string(), "application/json".to_string()),
+            ("X-Request-Id".to_string(), "abc-123".to_string()),
+        ];
+        let map = build_header_map(&headers);
+        assert_eq!(
+            map.get("Content-Type").unwrap().to_string(),
+            "application/json"
+        );
+        assert_eq!(map.get("X-Request-Id").unwrap().to_string(), "abc-123");
+    }
+
+    #[test]
+    fn test_extract_headers_none() {
+        let result = extract_headers(&None);
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn test_extract_headers_roundtrip() {
+        let original = vec![
+            ("X-Foo".to_string(), "bar".to_string()),
+            ("X-Baz".to_string(), "qux".to_string()),
+        ];
+        let map = build_header_map(&original);
+        let extracted = extract_headers(&Some(map));
+        assert_eq!(extracted.len(), 2);
+        // Headers may be in different order, so check presence
+        assert!(extracted.iter().any(|(k, v)| k == "X-Foo" && v == "bar"));
+        assert!(extracted.iter().any(|(k, v)| k == "X-Baz" && v == "qux"));
+    }
 }

@@ -2115,6 +2115,7 @@ name = "nats-backend"
 version = "0.1.0"
 dependencies = [
  "async-nats",
+ "bytes",
  "dirs",
  "scc",
  "serde",

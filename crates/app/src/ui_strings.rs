@@ -67,3 +67,19 @@ pub const TOAST_DISMISS: &str = "✕";
 // ─── Welcome ───
 pub const WELCOME_HEADING: &str = "Easy NATS";
 pub const WELCOME_BODY: &str = "Create or select a connection from the sidebar to get started.\nUse the resource tree to open publisher, subscriber, stream, KV, or object store tabs.";
+
+// ─── Publisher ───
+pub const PUBLISHER_SUBJECT: &str = "Subject:";
+pub const PUBLISHER_PAYLOAD: &str = "Payload";
+pub const PUBLISHER_HEADERS: &str = "Headers";
+pub const PUBLISHER_HEADER_KEY: &str = "Key";
+pub const PUBLISHER_HEADER_VALUE: &str = "Value";
+pub const PUBLISHER_ADD_HEADER: &str = "+ Header";
+pub const PUBLISHER_PUBLISH: &str = "Publish";
+pub const PUBLISHER_REQUEST: &str = "Request";
+pub const PUBLISHER_TIMEOUT: &str = "Timeout (ms):";
+pub const PUBLISHER_RESPONSE: &str = "Response";
+pub const PUBLISHER_NO_RESPONSE: &str = "No response yet. Use \"Request\" to send a request-reply.";
+pub const PUBLISHER_RESPONSE_PAYLOAD: &str = "Payload:";
+pub const PUBLISHER_RESPONSE_HEADERS: &str = "Headers:";
+pub const PUBLISHER_WAITING: &str = "Waiting for response...";
