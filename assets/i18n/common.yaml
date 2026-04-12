@@ -69,3 +69,14 @@ welcome_body:
 object_store_wip:
   en: "🚧 Object Store is under construction."
   zh: "🚧 对象存储正在施工中。"
+
+# Tab context menu
+close_others:
+  en: "Close Others"
+  zh: "关闭其他"
+close_all:
+  en: "Close All"
+  zh: "关闭全部"
+close_to_right:
+  en: "Close to the Right"
+  zh: "关闭右侧"

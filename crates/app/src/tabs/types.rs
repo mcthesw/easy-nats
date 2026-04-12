@@ -17,6 +17,13 @@ pub enum TabAction {
         connection_id: u64,
         bucket_name: String,
     },
+    CloseOtherTabs {
+        keep_title: String,
+    },
+    CloseAllTabs,
+    CloseTabsToRight {
+        of_title: String,
+    },
 }
 
 #[derive(Debug)]
@@ -277,6 +284,29 @@ impl TabViewer for AppTabViewer<'_> {
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         crate::tabs::viewer::render_tab(self, ui, tab);
+    }
+
+    fn context_menu(
+        &mut self,
+        ui: &mut egui::Ui,
+        tab: &mut Self::Tab,
+        _path: egui_dock::NodePath,
+    ) {
+        let title = tab.title();
+        if ui.button(t("common.close_others")).clicked() {
+            self.actions.push(TabAction::CloseOtherTabs {
+                keep_title: title.clone(),
+            });
+            ui.close();
+        }
+        if ui.button(t("common.close_all")).clicked() {
+            self.actions.push(TabAction::CloseAllTabs);
+            ui.close();
+        }
+        if ui.button(t("common.close_to_right")).clicked() {
+            self.actions.push(TabAction::CloseTabsToRight { of_title: title });
+            ui.close();
+        }
     }
 
     fn closeable(&mut self, tab: &mut Self::Tab) -> bool {

@@ -320,4 +320,55 @@ impl EasyNatsApp {
         });
         self.kv_bucket_editor.visible = false;
     }
+
+    pub(crate) fn close_other_tabs(&mut self, keep_title: &str) {
+        let to_remove: Vec<_> = self
+            .dock_state
+            .iter_all_tabs()
+            .filter(|(_, tab)| tab.title() != keep_title && !matches!(tab, TabKind::Welcome))
+            .map(|(surface, tab)| (surface, tab.title()))
+            .collect();
+        for (_, title) in to_remove {
+            if let Some(pos) = self.dock_state.find_tab_from(|t| t.title() == title) {
+                self.dock_state.remove_tab(pos);
+            }
+        }
+    }
+
+    pub(crate) fn close_all_tabs(&mut self) {
+        let to_remove: Vec<String> = self
+            .dock_state
+            .iter_all_tabs()
+            .filter(|(_, tab)| !matches!(tab, TabKind::Welcome))
+            .map(|(_, tab)| tab.title())
+            .collect();
+        for title in to_remove {
+            if let Some(pos) = self.dock_state.find_tab_from(|t| t.title() == title) {
+                self.dock_state.remove_tab(pos);
+            }
+        }
+    }
+
+    pub(crate) fn close_tabs_to_right(&mut self, of_title: &str) {
+        let all_titles: Vec<String> = self
+            .dock_state
+            .iter_all_tabs()
+            .map(|(_, tab)| tab.title())
+            .collect();
+        let mut found = false;
+        for title in all_titles {
+            if title == of_title {
+                found = true;
+                continue;
+            }
+            if found {
+                if let Some(pos) = self
+                    .dock_state
+                    .find_tab_from(|t| t.title() == title && !matches!(t, TabKind::Welcome))
+                {
+                    self.dock_state.remove_tab(pos);
+                }
+            }
+        }
+    }
 }

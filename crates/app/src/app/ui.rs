@@ -44,6 +44,15 @@ impl eframe::App for EasyNatsApp {
                 } => {
                     self.kv_bucket_delete_confirm = Some((connection_id, bucket_name));
                 }
+                TabAction::CloseOtherTabs { keep_title } => {
+                    self.close_other_tabs(&keep_title);
+                }
+                TabAction::CloseAllTabs => {
+                    self.close_all_tabs();
+                }
+                TabAction::CloseTabsToRight { of_title } => {
+                    self.close_tabs_to_right(&of_title);
+                }
             }
         }
 
