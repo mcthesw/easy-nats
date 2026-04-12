@@ -1,8 +1,12 @@
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
+use std::time::SystemTime;
 
 use async_nats::Client;
 use bytes::Bytes;
+use futures_util::StreamExt;
 use tokio::sync::mpsc;
+use tokio::task::JoinHandle;
 
 use crate::command::BackendCommand;
 use crate::connection::{AuthMethod, ConnectionConfig};
@@ -16,6 +20,8 @@ pub async fn run_worker(
     tracing::info!("Backend worker started");
 
     let mut clients: HashMap<u64, Client> = HashMap::new();
+    // Key: (connection_id, subject) → subscription task handle
+    let mut subscriptions: HashMap<(u64, String), JoinHandle<()>> = HashMap::new();
 
     while let Some(cmd) = cmd_rx.recv().await {
         tracing::debug!(?cmd, "Received command");
@@ -45,6 +51,15 @@ pub async fn run_worker(
                 }
             }
             BackendCommand::Disconnect { id } => {
+                // Abort all subscriptions for this connection
+                subscriptions.retain(|(cid, _), handle| {
+                    if *cid == id {
+                        handle.abort();
+                        false
+                    } else {
+                        true
+                    }
+                });
                 if let Some(client) = clients.remove(&id)
                     && let Err(e) = client.drain().await
                 {
@@ -94,20 +109,86 @@ pub async fn run_worker(
                     });
                 }
             }
-            BackendCommand::Subscribe { connection_id, .. } => {
-                // TODO: Implement subscribe
-                let _ = evt_tx.send(BackendEvent::Error {
-                    connection_id: Some(connection_id),
-                    operation: "subscribe".to_string(),
-                    message: "Not yet implemented".to_string(),
-                });
+            BackendCommand::Subscribe {
+                connection_id,
+                subject,
+            } => {
+                let key = (connection_id, subject.clone());
+                match subscriptions.entry(key) {
+                    Entry::Occupied(_) => {
+                        let _ = evt_tx.send(BackendEvent::Error {
+                            connection_id: Some(connection_id),
+                            operation: "subscribe".to_string(),
+                            message: format!("Already subscribed to {subject}"),
+                        });
+                    }
+                    Entry::Vacant(vacant) => {
+                        if let Some(client) = clients.get(&connection_id) {
+                            match client.subscribe(subject.clone()).await {
+                                Ok(mut subscriber) => {
+                                    let tx = evt_tx.clone();
+                                    let subj = subject.clone();
+                                    let handle = tokio::spawn(async move {
+                                        while let Some(msg) = subscriber.next().await {
+                                            let _ = tx.send(BackendEvent::MessageReceived {
+                                                connection_id,
+                                                subject: msg.subject.to_string(),
+                                                reply: msg.reply.map(|r| r.to_string()),
+                                                headers: extract_headers(&msg.headers),
+                                                payload: msg.payload.to_vec(),
+                                                timestamp: SystemTime::now(),
+                                            });
+                                        }
+                                        tracing::debug!(
+                                            connection_id,
+                                            subject = %subj,
+                                            "Subscription stream ended"
+                                        );
+                                    });
+                                    vacant.insert(handle);
+                                    let _ = evt_tx.send(BackendEvent::OperationResult {
+                                        connection_id,
+                                        operation: "subscribe".to_string(),
+                                        data: serde_json::json!({ "subject": subject }),
+                                    });
+                                }
+                                Err(e) => {
+                                    let _ = evt_tx.send(BackendEvent::Error {
+                                        connection_id: Some(connection_id),
+                                        operation: "subscribe".to_string(),
+                                        message: e.to_string(),
+                                    });
+                                }
+                            }
+                        } else {
+                            let _ = evt_tx.send(BackendEvent::Error {
+                                connection_id: Some(connection_id),
+                                operation: "subscribe".to_string(),
+                                message: "Not connected".to_string(),
+                            });
+                        }
+                    }
+                }
             }
-            BackendCommand::Unsubscribe { connection_id, .. } => {
-                let _ = evt_tx.send(BackendEvent::Error {
-                    connection_id: Some(connection_id),
-                    operation: "unsubscribe".to_string(),
-                    message: "Not yet implemented".to_string(),
-                });
+            BackendCommand::Unsubscribe {
+                connection_id,
+                subject,
+            } => {
+                let key = (connection_id, subject.clone());
+                if let Some(handle) = subscriptions.remove(&key) {
+                    handle.abort();
+                    let _ = evt_tx.send(BackendEvent::OperationResult {
+                        connection_id,
+                        operation: "unsubscribe".to_string(),
+                        data: serde_json::json!({ "subject": subject }),
+                    });
+                } else {
+                    let _ = evt_tx.send(BackendEvent::Error {
+                        connection_id: Some(connection_id),
+                        operation: "unsubscribe".to_string(),
+                        message: format!("Not subscribed to {subject}"),
+                    });
+                }
             }
             BackendCommand::Request {
                 connection_id,

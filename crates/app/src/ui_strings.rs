@@ -83,3 +83,20 @@ pub const PUBLISHER_NO_RESPONSE: &str = "No response yet. Use \"Request\" to sen
 pub const PUBLISHER_RESPONSE_PAYLOAD: &str = "Payload:";
 pub const PUBLISHER_RESPONSE_HEADERS: &str = "Headers:";
 pub const PUBLISHER_WAITING: &str = "Waiting for response...";
+
+// ─── Subscriber ───
+pub const SUBSCRIBER_SUBJECT: &str = "Subject:";
+pub const SUBSCRIBER_SUBSCRIBE: &str = "Subscribe";
+pub const SUBSCRIBER_UNSUBSCRIBE: &str = "Unsubscribe";
+pub const SUBSCRIBER_MSG_COUNT: &str = "Messages:";
+pub const SUBSCRIBER_CLEAR: &str = "Clear";
+pub const SUBSCRIBER_MESSAGES: &str = "Messages";
+pub const SUBSCRIBER_NO_MESSAGES: &str = "No messages received yet.";
+pub const SUBSCRIBER_SELECT_MSG: &str = "Select a message to view details.";
+pub const SUBSCRIBER_DETAIL: &str = "Message Detail";
+pub const SUBSCRIBER_DETAIL_SUBJECT: &str = "Subject:";
+pub const SUBSCRIBER_DETAIL_REPLY: &str = "Reply-To:";
+pub const SUBSCRIBER_DETAIL_TIMESTAMP: &str = "Timestamp:";
+pub const SUBSCRIBER_DETAIL_SIZE: &str = "Size:";
+pub const SUBSCRIBER_DETAIL_HEADERS: &str = "Headers:";
+pub const SUBSCRIBER_DETAIL_PAYLOAD: &str = "Payload:";

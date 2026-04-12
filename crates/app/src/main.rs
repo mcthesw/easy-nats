@@ -42,7 +42,9 @@ mod app {
     };
     use std::collections::HashMap;
 
-    use crate::tabs::{AppTabViewer, PublisherState, ResponseData, TabKind};
+    use crate::tabs::{
+        AppTabViewer, PublisherState, ReceivedMessage, ResponseData, SubscriberState, TabKind,
+    };
     use crate::toast::{ToastLevel, Toasts};
     use crate::ui_strings as S;
 
@@ -189,6 +191,33 @@ mod app {
                             }
                         }
                     }
+                    BackendEvent::MessageReceived {
+                        connection_id,
+                        subject,
+                        reply,
+                        headers,
+                        payload,
+                        timestamp,
+                    } => {
+                        for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+                            if let TabKind::Subscriber {
+                                connection_id: cid,
+                                state,
+                                ..
+                            } = tab
+                                && *cid == connection_id
+                                && state.subscribed
+                            {
+                                state.push_message(ReceivedMessage {
+                                    subject: subject.clone(),
+                                    reply: reply.clone(),
+                                    headers: headers.clone(),
+                                    payload: payload.clone(),
+                                    timestamp,
+                                });
+                            }
+                        }
+                    }
                     BackendEvent::Error {
                         connection_id,
                         operation,
@@ -212,9 +241,6 @@ mod app {
                         }
                         self.toasts
                             .push(ToastLevel::Error, format!("{operation}: {message}"));
-                    }
-                    other => {
-                        tracing::debug!(?other, "Received backend event");
                     }
                 }
             }
@@ -723,6 +749,7 @@ mod app {
                                                     TabKind::Subscriber {
                                                         connection_id: *id,
                                                         connection_name: name.clone(),
+                                                        state: SubscriberState::default(),
                                                     },
                                                 ));
                                             }
