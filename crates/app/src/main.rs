@@ -1,3 +1,4 @@
+mod format;
 mod tabs;
 mod toast;
 mod ui_strings;

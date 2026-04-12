@@ -6,6 +6,7 @@ use egui::WidgetText;
 use egui_dock::TabViewer;
 use nats_backend::{BackendCommand, BackendHandle};
 
+use crate::format::{self, PayloadFormat};
 use crate::ui_strings;
 use crate::ui_strings as S;
 
@@ -18,6 +19,7 @@ pub struct PublisherState {
     pub timeout_ms: String,
     pub response: Option<ResponseData>,
     pub waiting: bool,
+    pub response_format: PayloadFormat,
 }
 
 impl Default for PublisherState {
@@ -29,6 +31,7 @@ impl Default for PublisherState {
             timeout_ms: "5000".to_string(),
             response: None,
             waiting: false,
+            response_format: PayloadFormat::Auto,
         }
     }
 }
@@ -58,6 +61,7 @@ pub struct SubscriberState {
     pub messages: VecDeque<ReceivedMessage>,
     pub max_messages: usize,
     pub selected_idx: Option<usize>,
+    pub payload_format: PayloadFormat,
 }
 
 impl Default for SubscriberState {
@@ -68,6 +72,7 @@ impl Default for SubscriberState {
             messages: VecDeque::new(),
             max_messages: 1000,
             selected_idx: None,
+            payload_format: PayloadFormat::Auto,
         }
     }
 }
@@ -312,7 +317,10 @@ fn publisher_ui(
     ui.separator();
 
     // Response area
-    ui.label(S::PUBLISHER_RESPONSE);
+    ui.horizontal(|ui| {
+        ui.label(S::PUBLISHER_RESPONSE);
+        format::format_selector(ui, "pub_resp_fmt", &mut state.response_format);
+    });
     if state.waiting {
         ui.spinner();
         ui.label(S::PUBLISHER_WAITING);
@@ -332,17 +340,11 @@ fn publisher_ui(
             ui.add_space(4.0);
         }
         ui.label(S::PUBLISHER_RESPONSE_PAYLOAD);
-        let text = String::from_utf8_lossy(&resp.payload);
         egui::ScrollArea::vertical()
             .id_salt("resp_payload")
             .max_height(200.0)
             .show(ui, |ui| {
-                ui.add(
-                    egui::TextEdit::multiline(&mut text.to_string())
-                        .desired_width(f32::INFINITY)
-                        .desired_rows(4)
-                        .code_editor(),
-                );
+                format::render_payload(ui, &resp.payload, state.response_format);
             });
     } else {
         ui.label(S::PUBLISHER_NO_RESPONSE);
@@ -448,14 +450,17 @@ fn subscriber_ui(
     if let Some(idx) = state.selected_idx
         && let Some(msg) = state.messages.get(idx)
     {
-        message_detail_ui(ui, msg);
+        message_detail_ui(ui, msg, &mut state.payload_format);
     } else {
         ui.label(S::SUBSCRIBER_SELECT_MSG);
     }
 }
 
-fn message_detail_ui(ui: &mut egui::Ui, msg: &ReceivedMessage) {
-    ui.label(S::SUBSCRIBER_DETAIL);
+fn message_detail_ui(ui: &mut egui::Ui, msg: &ReceivedMessage, payload_format: &mut PayloadFormat) {
+    ui.horizontal(|ui| {
+        ui.label(S::SUBSCRIBER_DETAIL);
+        format::format_selector(ui, "sub_detail_fmt", payload_format);
+    });
     ui.add_space(2.0);
 
     egui::Grid::new("msg_detail_grid")
@@ -498,17 +503,11 @@ fn message_detail_ui(ui: &mut egui::Ui, msg: &ReceivedMessage) {
 
     ui.add_space(4.0);
     ui.label(S::SUBSCRIBER_DETAIL_PAYLOAD);
-    let text = String::from_utf8_lossy(&msg.payload);
     egui::ScrollArea::vertical()
         .id_salt("msg_detail_payload")
         .max_height(200.0)
         .show(ui, |ui| {
-            ui.add(
-                egui::TextEdit::multiline(&mut text.to_string())
-                    .desired_width(f32::INFINITY)
-                    .desired_rows(4)
-                    .code_editor(),
-            );
+            format::render_payload(ui, &msg.payload, *payload_format);
         });
 }
 

@@ -958,9 +958,11 @@ dependencies = [
 name = "easy-nats"
 version = "0.1.0"
 dependencies = [
+ "base64",
  "eframe",
  "egui_dock",
  "nats-backend",
+ "serde_json",
  "tracing",
  "tracing-subscriber",
 ]
