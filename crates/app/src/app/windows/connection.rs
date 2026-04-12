@@ -1,6 +1,6 @@
 use eframe::egui;
 
-use crate::ui_strings as S;
+use crate::i18n::t;
 
 use super::super::{
     editors::{AuthKindSelection, ConnectionEditor},
@@ -16,9 +16,9 @@ fn render_connection_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     let mut save_requested = false;
     if app.editor.visible {
         let title = if app.editor.editing_id.is_some() {
-            S::CONNECTION_EDIT
+            t("connection.connection_edit")
         } else {
-            S::CONNECTION_NEW
+            t("sidebar.connection_new")
         };
         let mut open = true;
         egui::Window::new(title)
@@ -30,10 +30,10 @@ fn render_connection_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                 ui.horizontal(|ui| {
                     let valid =
                         !app.editor.name.trim().is_empty() && !app.editor.url.trim().is_empty();
-                    if ui.add_enabled(valid, egui::Button::new(S::SAVE)).clicked() {
+                    if ui.add_enabled(valid, egui::Button::new(t("common.save"))).clicked() {
                         save_requested = true;
                     }
-                    if ui.button(S::CANCEL).clicked() {
+                    if ui.button(t("common.cancel")).clicked() {
                         app.editor.visible = false;
                     }
                 });
@@ -52,15 +52,15 @@ fn render_editor_grid(editor: &mut ConnectionEditor, ui: &mut egui::Ui) {
         .num_columns(2)
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
-            ui.label(S::FIELD_NAME);
+            ui.label(t("connection.field_name"));
             ui.text_edit_singleline(&mut editor.name);
             ui.end_row();
 
-            ui.label(S::FIELD_URL);
+            ui.label(t("connection.field_url"));
             ui.text_edit_singleline(&mut editor.url);
             ui.end_row();
 
-            ui.label(S::FIELD_AUTH);
+            ui.label(t("connection.field_auth"));
             egui::ComboBox::from_id_salt("auth_kind")
                 .selected_text(editor.auth_kind.label())
                 .show_ui(ui, |ui| {
@@ -72,8 +72,8 @@ fn render_editor_grid(editor: &mut ConnectionEditor, ui: &mut egui::Ui) {
 
             render_auth_fields(editor, ui);
 
-            ui.label(S::FIELD_TLS);
-            ui.checkbox(&mut editor.tls_enabled, S::REQUIRE_TLS);
+            ui.label(t("connection.field_tls"));
+            ui.checkbox(&mut editor.tls_enabled, t("connection.require_tls"));
             ui.end_row();
         });
 }
@@ -82,33 +82,33 @@ fn render_auth_fields(editor: &mut ConnectionEditor, ui: &mut egui::Ui) {
     match editor.auth_kind {
         AuthKindSelection::None => {}
         AuthKindSelection::Token => {
-            ui.label(S::FIELD_TOKEN);
+            ui.label(t("connection.field_token"));
             ui.text_edit_singleline(&mut editor.token);
             ui.end_row();
         }
         AuthKindSelection::UserPassword => {
-            ui.label(S::FIELD_USERNAME);
+            ui.label(t("connection.field_username"));
             ui.text_edit_singleline(&mut editor.username);
             ui.end_row();
-            ui.label(S::FIELD_PASSWORD);
+            ui.label(t("connection.field_password"));
             ui.add(egui::TextEdit::singleline(&mut editor.password).password(true));
             ui.end_row();
         }
         AuthKindSelection::NKey => {
-            ui.label(S::FIELD_NKEY_SEED);
+            ui.label(t("connection.field_nkey_seed"));
             ui.add(egui::TextEdit::singleline(&mut editor.nkey_seed).password(true));
             ui.end_row();
         }
         AuthKindSelection::CredentialsFile => {
-            ui.label(S::FIELD_CREDS_FILE);
+            ui.label(t("connection.field_creds_file"));
             ui.text_edit_singleline(&mut editor.creds_path);
             ui.end_row();
         }
         AuthKindSelection::TlsClientCert => {
-            ui.label(S::FIELD_CERT_PATH);
+            ui.label(t("connection.field_cert_path"));
             ui.text_edit_singleline(&mut editor.cert_path);
             ui.end_row();
-            ui.label(S::FIELD_KEY_PATH);
+            ui.label(t("connection.field_key_path"));
             ui.text_edit_singleline(&mut editor.key_path);
             ui.end_row();
         }
@@ -120,20 +120,20 @@ fn render_delete_confirmation(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     if let Some(id) = app.editor.delete_confirm {
         let conn_name = app.conn_name(id);
         let mut still_open = true;
-        egui::Window::new(S::CONNECTION_DELETE_CONFIRM_TITLE)
+        egui::Window::new(t("connection.connection_delete_confirm_title"))
             .open(&mut still_open)
             .resizable(false)
             .show(ui.ctx(), |ui| {
                 ui.label(format!(
                     "{} \"{}\"?",
-                    S::CONNECTION_DELETE_PROMPT,
+                    t("connection.connection_delete_prompt"),
                     conn_name
                 ));
                 ui.horizontal(|ui| {
-                    if ui.button(S::DELETE).clicked() {
+                    if ui.button(t("common.delete")).clicked() {
                         do_delete = Some(id);
                     }
-                    if ui.button(S::CANCEL).clicked() {
+                    if ui.button(t("common.cancel")).clicked() {
                         app.editor.delete_confirm = None;
                     }
                 });

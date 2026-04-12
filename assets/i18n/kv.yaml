@@ -1,0 +1,103 @@
+# KV store tab strings
+bucket_info:
+  en: "Bucket Info"
+  zh: "存储桶信息"
+create_bucket:
+  en: "Create KV Bucket"
+  zh: "创建 KV 存储桶"
+delete_bucket:
+  en: "Delete Bucket"
+  zh: "删除存储桶"
+delete_bucket_confirm_title:
+  en: "Confirm KV Bucket Delete"
+  zh: "确认删除 KV 存储桶"
+delete_bucket_confirm_prompt:
+  en: "Delete KV bucket"
+  zh: "删除 KV 存储桶"
+bucket:
+  en: "Bucket:"
+  zh: "存储桶:"
+values:
+  en: "Values:"
+  zh: "键值对数:"
+history_depth:
+  en: "History depth:"
+  zh: "历史深度:"
+max_age:
+  en: "Max age (sec):"
+  zh: "最大存活时间 (秒):"
+max_value_size:
+  en: "Max value size:"
+  zh: "最大值大小:"
+max_bytes:
+  en: "Max bytes:"
+  zh: "最大字节数:"
+storage:
+  en: "Storage:"
+  zh: "存储:"
+replicas:
+  en: "Replicas:"
+  zh: "副本数:"
+description:
+  en: "Description:"
+  zh: "描述:"
+bytes:
+  en: "Size:"
+  zh: "大小:"
+key_filter:
+  en: "Key filter:"
+  zh: "键过滤:"
+refresh:
+  en: "Refresh"
+  zh: "刷新"
+new_entry:
+  en: "New Entry"
+  zh: "新建条目"
+loading_keys:
+  en: "Loading keys..."
+  zh: "加载键列表中..."
+keys:
+  en: "Keys"
+  zh: "键"
+no_keys:
+  en: "No keys found in this bucket."
+  zh: "此存储桶中未找到键。"
+key:
+  en: "Key:"
+  zh: "键:"
+revision:
+  en: "Revision:"
+  zh: "修订版本:"
+operation:
+  en: "Operation:"
+  zh: "操作:"
+created:
+  en: "Created:"
+  zh: "创建时间:"
+value_editor:
+  en: "Value editor"
+  zh: "值编辑器"
+value_preview:
+  en: "Value preview"
+  zh: "值预览"
+delete_entry:
+  en: "Delete Entry"
+  zh: "删除条目"
+purge_entry:
+  en: "Purge Entry"
+  zh: "清除条目"
+history:
+  en: "History"
+  zh: "历史"
+loading_history:
+  en: "Loading history..."
+  zh: "加载历史中..."
+no_history:
+  en: "No history loaded yet."
+  zh: "尚未加载历史。"
+none:
+  en: "—"
+  zh: "—"
+empty_value:
+  en: "<empty>"
+  zh: "<空>"

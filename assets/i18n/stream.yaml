@@ -1,0 +1,103 @@
+# Stream tab strings
+info:
+  en: "Stream Info"
+  zh: "流信息"
+name:
+  en: "Name:"
+  zh: "名称:"
+subjects:
+  en: "Subjects:"
+  zh: "主题:"
+storage:
+  en: "Storage:"
+  zh: "存储:"
+retention:
+  en: "Retention:"
+  zh: "保留策略:"
+msg_count:
+  en: "Messages:"
+  zh: "消息数:"
+bytes:
+  en: "Size:"
+  zh: "大小:"
+consumers:
+  en: "Consumers:"
+  zh: "消费者:"
+messages:
+  en: "Messages"
+  zh: "消息"
+no_messages:
+  en: "No messages fetched. Click Fetch to load messages."
+  zh: "未获取消息。点击获取以加载消息。"
+select_msg:
+  en: "Select a message to view details."
+  zh: "选择一条消息以查看详情。"
+start_seq:
+  en: "Start seq:"
+  zh: "起始序号:"
+subject_filter:
+  en: "Subject:"
+  zh: "主题:"
+batch_size:
+  en: "Batch:"
+  zh: "批次:"
+fetch:
+  en: "Fetch"
+  zh: "获取"
+msg_detail:
+  en: "Message Detail"
+  zh: "消息详情"
+msg_sequence:
+  en: "Sequence:"
+  zh: "序号:"
+msg_subject:
+  en: "Subject:"
+  zh: "主题:"
+msg_headers:
+  en: "Headers:"
+  zh: "头部:"
+msg_payload:
+  en: "Payload:"
+  zh: "载荷:"
+purge:
+  en: "Purge"
+  zh: "清除"
+purge_subject:
+  en: "Subject filter:"
+  zh: "主题过滤:"
+purge_filtered:
+  en: "Purge Filtered"
+  zh: "清除筛选项"
+purge_all:
+  en: "Purge All"
+  zh: "全部清除"
+delete_msg:
+  en: "Delete message"
+  zh: "删除消息"
+create_title:
+  en: "Create Stream"
+  zh: "创建流"
+max_msgs:
+  en: "Max messages:"
+  zh: "最大消息数:"
+max_bytes:
+  en: "Max bytes:"
+  zh: "最大字节数:"
+max_age:
+  en: "Max age (sec):"
+  zh: "最大存活时间 (秒):"
+replicas:
+  en: "Replicas:"
+  zh: "副本数:"
+description:
+  en: "Description:"
+  zh: "描述:"
+refresh:
+  en: "Refresh"
+  zh: "刷新"
+invalid_base64:
+  en: "Invalid base64 payload"
+  zh: "无效的 base64 载荷"
+no_payload:
+  en: "No payload"
+  zh: "无载荷"

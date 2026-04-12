@@ -1,0 +1,71 @@
+# Common / shared UI strings
+save:
+  en: "Save"
+  zh: "保存"
+cancel:
+  en: "Cancel"
+  zh: "取消"
+delete:
+  en: "Delete"
+  zh: "删除"
+edit:
+  en: "Edit"
+  zh: "编辑"
+
+# Theme icons
+theme_dark:
+  en: "🌙"
+  zh: "🌙"
+theme_light:
+  en: "☀"
+  zh: "☀"
+
+# Storage / retention labels
+storage_file:
+  en: "File"
+  zh: "文件"
+storage_memory:
+  en: "Memory"
+  zh: "内存"
+retention_limits:
+  en: "Limits"
+  zh: "限制"
+retention_interest:
+  en: "Interest"
+  zh: "兴趣"
+retention_work_queue:
+  en: "WorkQueue"
+  zh: "工作队列"
+
+# Tab labels
+tab_welcome:
+  en: "Welcome"
+  zh: "欢迎"
+tab_publisher:
+  en: "Publisher"
+  zh: "发布者"
+tab_subscriber:
+  en: "Subscriber"
+  zh: "订阅者"
+tab_stream:
+  en: "Stream"
+  zh: "流"
+tab_kv_bucket:
+  en: "KV Bucket"
+  zh: "KV 存储桶"
+tab_object_store:
+  en: "Object Store"
+  zh: "对象存储"
+
+# Welcome
+welcome_heading:
+  en: "Easy NATS"
+  zh: "Easy NATS"
+welcome_body:
+  en: "Create or select a connection from the sidebar to get started.\nUse the resource tree to open publisher, subscriber, stream, KV, or object store tabs."
+  zh: "从侧边栏创建或选择连接以开始使用。\n使用资源树打开发布者、订阅者、流、KV 或对象存储标签页。"
+
+# Object Store placeholder
+object_store_wip:
+  en: "🚧 Object Store is under construction."
+  zh: "🚧 对象存储正在施工中。"

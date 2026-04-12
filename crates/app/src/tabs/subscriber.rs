@@ -2,7 +2,7 @@ use eframe::egui;
 use nats_backend::{BackendCommand, BackendHandle};
 
 use crate::format::{self, PayloadFormat};
-use crate::ui_strings as S;
+use crate::i18n::t;
 
 use super::common::{format_timestamp, payload_preview};
 use super::types::{ReceivedMessage, SubscriberState};
@@ -14,7 +14,7 @@ pub fn subscriber_ui(
     backend: &BackendHandle,
 ) {
     ui.horizontal(|ui| {
-        ui.label(S::SUBSCRIBER_SUBJECT);
+        ui.label(t("subscriber.subject"));
         ui.add_enabled(
             !state.subscribed,
             egui::TextEdit::singleline(&mut state.subject),
@@ -22,7 +22,7 @@ pub fn subscriber_ui(
         let can_toggle = !state.subject.trim().is_empty();
         if state.subscribed {
             if ui
-                .add_enabled(true, egui::Button::new(S::SUBSCRIBER_UNSUBSCRIBE))
+                .add_enabled(true, egui::Button::new(t("subscriber.unsubscribe")))
                 .clicked()
             {
                 backend.send(BackendCommand::Unsubscribe {
@@ -32,7 +32,7 @@ pub fn subscriber_ui(
                 state.subscribed = false;
             }
         } else if ui
-            .add_enabled(can_toggle, egui::Button::new(S::SUBSCRIBER_SUBSCRIBE))
+            .add_enabled(can_toggle, egui::Button::new(t("subscriber.subscribe")))
             .clicked()
         {
             backend.send(BackendCommand::Subscribe {
@@ -46,11 +46,11 @@ pub fn subscriber_ui(
     ui.horizontal(|ui| {
         ui.label(format!(
             "{} {} / {}",
-            S::SUBSCRIBER_MSG_COUNT,
+            t("subscriber.msg_count"),
             state.messages.len(),
             state.max_messages
         ));
-        if ui.small_button(S::SUBSCRIBER_CLEAR).clicked() {
+        if ui.small_button(t("subscriber.clear")).clicked() {
             state.messages.clear();
             state.selected_idx = None;
         }
@@ -59,14 +59,14 @@ pub fn subscriber_ui(
     ui.add_space(4.0);
     ui.separator();
     let list_height = (ui.available_height() * 0.5).max(100.0);
-    ui.label(S::SUBSCRIBER_MESSAGES);
+    ui.label(t("subscriber.messages"));
     egui::ScrollArea::vertical()
         .id_salt("sub_msg_list")
         .max_height(list_height)
         .stick_to_bottom(true)
         .show(ui, |ui| {
             if state.messages.is_empty() {
-                ui.label(S::SUBSCRIBER_NO_MESSAGES);
+                ui.label(t("subscriber.no_messages"));
             } else {
                 for (idx, msg) in state.messages.iter().enumerate() {
                     let label = format!(
@@ -92,13 +92,13 @@ pub fn subscriber_ui(
     {
         message_detail_ui(ui, msg, &mut state.payload_format);
     } else {
-        ui.label(S::SUBSCRIBER_SELECT_MSG);
+        ui.label(t("subscriber.select_msg"));
     }
 }
 
 fn message_detail_ui(ui: &mut egui::Ui, msg: &ReceivedMessage, payload_format: &mut PayloadFormat) {
     ui.horizontal(|ui| {
-        ui.label(S::SUBSCRIBER_DETAIL);
+        ui.label(t("subscriber.detail"));
         format::format_selector(ui, "sub_detail_fmt", payload_format);
     });
 
@@ -106,28 +106,28 @@ fn message_detail_ui(ui: &mut egui::Ui, msg: &ReceivedMessage, payload_format: &
         .num_columns(2)
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
-            ui.label(S::SUBSCRIBER_DETAIL_SUBJECT);
+            ui.label(t("subscriber.detail_subject"));
             ui.label(&msg.subject);
             ui.end_row();
 
             if let Some(reply) = &msg.reply {
-                ui.label(S::SUBSCRIBER_DETAIL_REPLY);
+                ui.label(t("subscriber.detail_reply"));
                 ui.label(reply);
                 ui.end_row();
             }
 
-            ui.label(S::SUBSCRIBER_DETAIL_TIMESTAMP);
+            ui.label(t("subscriber.detail_timestamp"));
             ui.label(format_timestamp(msg.timestamp));
             ui.end_row();
 
-            ui.label(S::SUBSCRIBER_DETAIL_SIZE);
+            ui.label(t("subscriber.detail_size"));
             ui.label(format!("{} bytes", msg.payload.len()));
             ui.end_row();
         });
 
     if !msg.headers.is_empty() {
         ui.add_space(4.0);
-        ui.label(S::SUBSCRIBER_DETAIL_HEADERS);
+        ui.label(t("subscriber.detail_headers"));
         egui::Grid::new("msg_detail_headers")
             .num_columns(2)
             .striped(true)
@@ -141,7 +141,7 @@ fn message_detail_ui(ui: &mut egui::Ui, msg: &ReceivedMessage, payload_format: &
     }
 
     ui.add_space(4.0);
-    ui.label(S::SUBSCRIBER_DETAIL_PAYLOAD);
+    ui.label(t("subscriber.detail_payload"));
     egui::ScrollArea::vertical()
         .id_salt("msg_detail_payload")
         .max_height(200.0)

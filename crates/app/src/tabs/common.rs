@@ -2,7 +2,7 @@ use std::time::SystemTime;
 
 use base64::Engine;
 
-use crate::ui_strings as S;
+use crate::i18n::t;
 
 pub(crate) fn format_timestamp(ts: SystemTime) -> String {
     match ts.duration_since(SystemTime::UNIX_EPOCH) {
@@ -48,7 +48,7 @@ pub(crate) fn decode_base64_payload(value_base64: Option<&str>) -> Vec<u8> {
 pub(crate) fn kv_empty_preview(payload: &[u8], max_len: usize) -> String {
     let preview = payload_preview(payload, max_len);
     if preview.is_empty() {
-        S::KV_EMPTY_VALUE.to_string()
+        t("kv.empty_value").to_string()
     } else {
         preview
     }

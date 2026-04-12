@@ -3,7 +3,7 @@ use eframe::egui;
 use nats_backend::{BackendCommand, BackendHandle};
 
 use crate::format::{self, PayloadFormat};
-use crate::ui_strings as S;
+use crate::i18n::t;
 
 use super::common::format_bytes;
 use super::stream_consumers::render_consumers;
@@ -18,7 +18,7 @@ pub fn stream_ui(
     actions: &mut Vec<TabAction>,
 ) {
     if let Some(info) = &state.info {
-        egui::CollapsingHeader::new(S::STREAM_INFO)
+        egui::CollapsingHeader::new(t("stream.info"))
             .id_salt("stream_info")
             .default_open(true)
             .show(ui, |ui| stream_info_panel(ui, info));
@@ -40,14 +40,14 @@ fn render_message_browser(
     backend: &BackendHandle,
 ) {
     ui.horizontal(|ui| {
-        ui.label(S::STREAM_START_SEQ);
+        ui.label(t("stream.start_seq"));
         ui.add(egui::TextEdit::singleline(&mut state.start_seq).desired_width(80.0));
-        ui.label(S::STREAM_SUBJECT_FILTER);
+        ui.label(t("stream.subject_filter"));
         ui.add(egui::TextEdit::singleline(&mut state.subject_filter).desired_width(120.0));
-        ui.label(S::STREAM_BATCH_SIZE);
+        ui.label(t("stream.batch_size"));
         ui.add(egui::TextEdit::singleline(&mut state.batch_size).desired_width(60.0));
         if ui
-            .add_enabled(!state.fetching, egui::Button::new(S::STREAM_FETCH))
+            .add_enabled(!state.fetching, egui::Button::new(t("stream.fetch")))
             .clicked()
         {
             backend.send(BackendCommand::GetStreamMessages {
@@ -67,13 +67,13 @@ fn render_message_browser(
     }
 
     ui.add_space(4.0);
-    ui.label(S::STREAM_MESSAGES);
+    ui.label(t("stream.messages"));
     egui::ScrollArea::vertical()
         .id_salt("stream_msg_list")
         .max_height((ui.available_height() * 0.45).max(100.0))
         .show(ui, |ui| {
             if state.messages.is_empty() {
-                ui.label(S::STREAM_NO_MESSAGES);
+                ui.label(t("stream.no_messages"));
             } else {
                 for (idx, msg) in state.messages.iter().enumerate() {
                     let seq = msg["sequence"].as_u64().unwrap_or(0);
@@ -97,7 +97,7 @@ fn render_message_browser(
             stream_message_detail(ui, msg, &mut state.payload_format);
         }
     } else {
-        ui.label(S::STREAM_SELECT_MSG);
+        ui.label(t("stream.select_msg"));
     }
 }
 
@@ -108,15 +108,15 @@ fn render_purge_controls(
     state: &mut StreamState,
     backend: &BackendHandle,
 ) {
-    egui::CollapsingHeader::new(S::STREAM_PURGE)
+    egui::CollapsingHeader::new(t("stream.purge"))
         .id_salt("stream_purge")
         .show(ui, |ui| {
             ui.horizontal(|ui| {
-                ui.label(S::STREAM_PURGE_SUBJECT);
+                ui.label(t("stream.purge_subject"));
                 ui.text_edit_singleline(&mut state.purge_subject);
             });
             ui.horizontal(|ui| {
-                if ui.button(S::STREAM_PURGE_FILTERED).clicked() && !state.purge_subject.is_empty()
+                if ui.button(t("stream.purge_filtered")).clicked() && !state.purge_subject.is_empty()
                 {
                     backend.send(BackendCommand::PurgeStream {
                         connection_id,
@@ -124,7 +124,7 @@ fn render_purge_controls(
                         filter: Some(state.purge_subject.clone()),
                     });
                 }
-                if ui.button(S::STREAM_PURGE_ALL).clicked() {
+                if ui.button(t("stream.purge_all")).clicked() {
                     backend.send(BackendCommand::PurgeStream {
                         connection_id,
                         name: stream_name.to_string(),
@@ -136,7 +136,7 @@ fn render_purge_controls(
                 && let Some(msg) = state.messages.get(idx)
                 && let Some(seq) = msg["sequence"].as_u64()
                 && ui
-                    .button(format!("{} #{seq}", S::STREAM_DELETE_MSG))
+                    .button(format!("{} #{seq}", t("stream.delete_msg")))
                     .clicked()
             {
                 backend.send(BackendCommand::DeleteStreamMessage {
@@ -155,12 +155,12 @@ fn stream_info_panel(ui: &mut egui::Ui, info: &serde_json::Value) {
         .show(ui, |ui| {
             if let Some(config) = info.get("config") {
                 if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
-                    ui.label(S::STREAM_NAME);
+                    ui.label(t("stream.name"));
                     ui.label(name);
                     ui.end_row();
                 }
                 if let Some(subjects) = config.get("subjects").and_then(|v| v.as_array()) {
-                    ui.label(S::STREAM_SUBJECTS);
+                    ui.label(t("stream.subjects"));
                     ui.label(
                         subjects
                             .iter()
@@ -171,31 +171,33 @@ fn stream_info_panel(ui: &mut egui::Ui, info: &serde_json::Value) {
                     ui.end_row();
                 }
                 if let Some(storage) = config.get("storage").and_then(|v| v.as_str()) {
-                    ui.label(S::STREAM_STORAGE);
+                    ui.label(t("stream.storage"));
                     ui.label(storage);
                     ui.end_row();
                 }
                 if let Some(retention) = config.get("retention").and_then(|v| v.as_str()) {
-                    ui.label(S::STREAM_RETENTION);
+                    ui.label(t("stream.retention"));
                     ui.label(retention);
                     ui.end_row();
                 }
             }
             if let Some(st) = info.get("state") {
-                for (label, value) in [
+                for (label, value, is_bytes) in [
                     (
-                        S::STREAM_MSG_COUNT,
+                        t("stream.msg_count"),
                         st.get("messages").and_then(|v| v.as_u64()),
+                        false,
                     ),
-                    (S::STREAM_BYTES, st.get("bytes").and_then(|v| v.as_u64())),
+                    (t("stream.bytes"), st.get("bytes").and_then(|v| v.as_u64()), true),
                     (
-                        S::STREAM_CONSUMERS,
+                        t("stream.consumers"),
                         st.get("consumer_count").and_then(|v| v.as_u64()),
+                        false,
                     ),
                 ] {
                     if let Some(value) = value {
                         ui.label(label);
-                        if label == S::STREAM_BYTES {
+                        if is_bytes {
                             ui.label(format_bytes(value));
                         } else {
                             ui.label(value.to_string());
@@ -213,7 +215,7 @@ fn stream_message_detail(
     payload_format: &mut PayloadFormat,
 ) {
     ui.horizontal(|ui| {
-        ui.label(S::STREAM_MSG_DETAIL);
+        ui.label(t("stream.msg_detail"));
         format::format_selector(ui, "stream_msg_fmt", payload_format);
     });
 
@@ -222,12 +224,12 @@ fn stream_message_detail(
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
             if let Some(seq) = msg["sequence"].as_u64() {
-                ui.label(S::STREAM_MSG_SEQUENCE);
+                ui.label(t("stream.msg_sequence"));
                 ui.label(seq.to_string());
                 ui.end_row();
             }
             if let Some(subject) = msg["subject"].as_str() {
-                ui.label(S::STREAM_MSG_SUBJECT);
+                ui.label(t("stream.msg_subject"));
                 ui.label(subject);
                 ui.end_row();
             }
@@ -237,7 +239,7 @@ fn stream_message_detail(
         && !headers.is_empty()
     {
         ui.add_space(4.0);
-        ui.label(S::STREAM_MSG_HEADERS);
+        ui.label(t("stream.msg_headers"));
         egui::Grid::new("stream_msg_headers")
             .num_columns(2)
             .striped(true)
@@ -255,7 +257,7 @@ fn stream_message_detail(
     }
 
     ui.add_space(4.0);
-    ui.label(S::STREAM_MSG_PAYLOAD);
+    ui.label(t("stream.msg_payload"));
     egui::ScrollArea::vertical()
         .id_salt("stream_msg_payload")
         .max_height(200.0)
@@ -264,11 +266,11 @@ fn stream_message_detail(
                 match base64::engine::general_purpose::STANDARD.decode(payload_b64) {
                     Ok(data) => format::render_payload(ui, &data, *payload_format),
                     Err(_) => {
-                        ui.label(S::STREAM_INVALID_BASE64);
+                        ui.label(t("stream.invalid_base64"));
                     }
                 }
             } else {
-                ui.label(S::STREAM_NO_PAYLOAD);
+                ui.label(t("stream.no_payload"));
             }
         });
 }

@@ -1,8 +1,8 @@
 use nats_backend::BackendCommand;
 
+use crate::i18n::t;
 use crate::tabs::TabKind;
 use crate::toast::ToastLevel;
-use crate::ui_strings as S;
 
 use super::model::EasyNatsApp;
 
@@ -47,7 +47,7 @@ impl EasyNatsApp {
             }
             "delete_stream" => {
                 self.toasts
-                    .push(ToastLevel::Success, S::TOAST_STREAM_DELETED.to_string());
+                    .push(ToastLevel::Success, t("toast.stream_deleted").to_string());
                 self.backend
                     .send(BackendCommand::ListStreams { connection_id });
                 true
@@ -130,7 +130,7 @@ impl EasyNatsApp {
             }
             "delete_stream_message" => {
                 self.toasts
-                    .push(ToastLevel::Success, S::TOAST_MESSAGE_DELETED.to_string());
+                    .push(ToastLevel::Success, t("toast.message_deleted").to_string());
                 true
             }
             _ => false,

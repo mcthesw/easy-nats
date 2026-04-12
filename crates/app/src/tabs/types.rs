@@ -5,7 +5,7 @@ use eframe::egui;
 use egui_dock::TabViewer;
 
 use crate::format::PayloadFormat;
-use crate::ui_strings;
+use crate::i18n::t;
 
 #[derive(Debug, Clone)]
 pub enum TabAction {
@@ -202,16 +202,16 @@ pub enum TabKind {
 impl TabKind {
     pub fn title(&self) -> String {
         match self {
-            TabKind::Welcome => ui_strings::TAB_WELCOME.to_string(),
+            TabKind::Welcome => t("common.tab_welcome").to_string(),
             TabKind::Publisher {
                 connection_name, ..
             } => {
-                format!("{} ({})", ui_strings::TAB_PUBLISHER, connection_name)
+                format!("{} ({})", t("common.tab_publisher"), connection_name)
             }
             TabKind::Subscriber {
                 connection_name, ..
             } => {
-                format!("{} ({})", ui_strings::TAB_SUBSCRIBER, connection_name)
+                format!("{} ({})", t("common.tab_subscriber"), connection_name)
             }
             TabKind::Stream {
                 connection_name,

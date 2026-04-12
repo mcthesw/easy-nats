@@ -2,7 +2,7 @@ use eframe::egui;
 use nats_backend::{BackendCommand, BackendHandle};
 
 use crate::format;
-use crate::ui_strings as S;
+use crate::i18n::t;
 
 use super::common::{decode_base64_payload, format_bytes, kv_empty_preview};
 use super::types::{KvBucketState, TabAction};
@@ -17,7 +17,7 @@ pub fn kv_bucket_ui(
 ) {
     ui.horizontal(|ui| {
         ui.heading(bucket_name);
-        if ui.button(S::KV_DELETE_BUCKET).clicked() {
+        if ui.button(t("kv.delete_bucket")).clicked() {
             actions.push(TabAction::ConfirmDeleteKvBucket {
                 connection_id,
                 bucket_name: bucket_name.to_string(),
@@ -26,7 +26,7 @@ pub fn kv_bucket_ui(
     });
 
     if let Some(info) = &state.info {
-        egui::CollapsingHeader::new(S::KV_BUCKET_INFO)
+        egui::CollapsingHeader::new(t("kv.bucket_info"))
             .id_salt(("kv_bucket_info", connection_id, bucket_name))
             .default_open(true)
             .show(ui, |ui| kv_bucket_info_panel(ui, info));
@@ -48,10 +48,10 @@ fn render_key_list(
     backend: &BackendHandle,
 ) {
     ui.horizontal(|ui| {
-        ui.label(S::KV_KEY_FILTER);
+        ui.label(t("kv.key_filter"));
         ui.text_edit_singleline(&mut state.key_filter);
         if ui
-            .add_enabled(!state.loading_entries, egui::Button::new(S::KV_REFRESH))
+            .add_enabled(!state.loading_entries, egui::Button::new(t("kv.refresh")))
             .clicked()
         {
             backend.send(BackendCommand::ListKvKeys {
@@ -60,7 +60,7 @@ fn render_key_list(
             });
             state.loading_entries = true;
         }
-        if ui.button(S::KV_NEW_ENTRY).clicked() {
+        if ui.button(t("kv.new_entry")).clicked() {
             clear_kv_editor(state);
         }
     });
@@ -68,12 +68,12 @@ fn render_key_list(
     if state.loading_entries {
         ui.horizontal(|ui| {
             ui.spinner();
-            ui.label(S::KV_LOADING_KEYS);
+            ui.label(t("kv.loading_keys"));
         });
     }
 
     ui.add_space(4.0);
-    ui.label(S::KV_KEYS);
+    ui.label(t("kv.keys"));
     egui::ScrollArea::vertical()
         .id_salt(("kv_keys", connection_id, bucket_name))
         .max_height(180.0)
@@ -89,7 +89,7 @@ fn render_key_list(
                 .collect();
 
             if filtered.is_empty() {
-                ui.label(S::KV_NO_KEYS);
+                ui.label(t("kv.no_keys"));
             } else {
                 for entry in &filtered {
                     let key = entry["key"].as_str().unwrap_or("");
@@ -129,7 +129,7 @@ fn render_value_editor(
     ui.horizontal(|ui| {
         let can_save = !state.entry_key.trim().is_empty();
         if ui
-            .add_enabled(can_save, egui::Button::new(S::SAVE))
+            .add_enabled(can_save, egui::Button::new(t("common.save")))
             .clicked()
         {
             backend.send(BackendCommand::PutKvEntry {
@@ -141,7 +141,7 @@ fn render_value_editor(
             state.loading_entries = true;
         }
         if ui
-            .add_enabled(can_save, egui::Button::new(S::KV_DELETE_ENTRY))
+            .add_enabled(can_save, egui::Button::new(t("kv.delete_entry")))
             .clicked()
         {
             backend.send(BackendCommand::DeleteKvEntry {
@@ -152,7 +152,7 @@ fn render_value_editor(
             state.loading_entries = true;
         }
         if ui
-            .add_enabled(can_save, egui::Button::new(S::KV_PURGE_ENTRY))
+            .add_enabled(can_save, egui::Button::new(t("kv.purge_entry")))
             .clicked()
         {
             backend.send(BackendCommand::PurgeKvEntry {
@@ -168,30 +168,30 @@ fn render_value_editor(
         .num_columns(2)
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
-            ui.label(S::KV_KEY);
+            ui.label(t("kv.key"));
             ui.text_edit_singleline(&mut state.entry_key);
             ui.end_row();
 
-            ui.label(S::KV_REVISION);
+            ui.label(t("kv.revision"));
             ui.label(
                 state
                     .entry_revision
                     .map(|rev| rev.to_string())
-                    .unwrap_or_else(|| S::KV_NONE.to_string()),
+                    .unwrap_or_else(|| t("kv.none").to_string()),
             );
             ui.end_row();
 
-            ui.label(S::KV_OPERATION);
-            ui.label(state.entry_operation.as_deref().unwrap_or(S::KV_NONE));
+            ui.label(t("kv.operation"));
+            ui.label(state.entry_operation.as_deref().unwrap_or(t("kv.none")));
             ui.end_row();
 
-            ui.label(S::KV_CREATED);
-            ui.label(state.entry_created.as_deref().unwrap_or(S::KV_NONE));
+            ui.label(t("kv.created"));
+            ui.label(state.entry_created.as_deref().unwrap_or(t("kv.none")));
             ui.end_row();
         });
 
     ui.add_space(4.0);
-    ui.label(S::KV_VALUE_EDITOR);
+    ui.label(t("kv.value_editor"));
     egui::ScrollArea::vertical()
         .id_salt(("kv_value_editor", connection_id, bucket_name))
         .max_height(120.0)
@@ -205,7 +205,7 @@ fn render_value_editor(
         });
 
     ui.horizontal(|ui| {
-        ui.label(S::KV_VALUE_PREVIEW);
+        ui.label(t("kv.value_preview"));
         format::format_selector(ui, "kv_value_fmt", &mut state.editor_format);
     });
     egui::ScrollArea::vertical()
@@ -223,17 +223,17 @@ fn render_history(
     state: &mut KvBucketState,
 ) {
     ui.horizontal(|ui| {
-        ui.label(S::KV_HISTORY);
+        ui.label(t("kv.history"));
         format::format_selector(ui, "kv_history_fmt", &mut state.history_format);
     });
 
     if state.loading_history {
         ui.horizontal(|ui| {
             ui.spinner();
-            ui.label(S::KV_LOADING_HISTORY);
+            ui.label(t("kv.loading_history"));
         });
     } else if state.history.is_empty() {
-        ui.label(S::KV_NO_HISTORY);
+        ui.label(t("kv.no_history"));
     } else {
         egui::ScrollArea::vertical()
             .id_salt(("kv_history", connection_id, bucket_name))
@@ -241,7 +241,7 @@ fn render_history(
             .show(ui, |ui| {
                 for item in &state.history {
                     let revision = item["revision"].as_u64().unwrap_or(0);
-                    let operation = item["operation"].as_str().unwrap_or(S::KV_NONE);
+                    let operation = item["operation"].as_str().unwrap_or(t("kv.none"));
                     let created = item["created"].as_str().unwrap_or("");
                     egui::CollapsingHeader::new(format!("r{revision} — {operation} — {created}"))
                         .id_salt(("kv_history_item", connection_id, bucket_name, revision))
@@ -260,18 +260,18 @@ fn kv_bucket_info_panel(ui: &mut egui::Ui, info: &serde_json::Value) {
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
             for (label, value) in [
-                (S::KV_BUCKET, info["bucket"].as_str().map(str::to_owned)),
+                (t("kv.bucket"), info["bucket"].as_str().map(str::to_owned)),
                 (
-                    S::KV_VALUES,
+                    t("kv.values"),
                     Some(info["values"].as_u64().unwrap_or(0).to_string()),
                 ),
                 (
-                    S::KV_HISTORY_DEPTH,
+                    t("kv.history_depth"),
                     Some(info["history"].as_i64().unwrap_or(0).to_string()),
                 ),
-                (S::KV_STORAGE, info["storage"].as_str().map(str::to_owned)),
+                (t("kv.storage"), info["storage"].as_str().map(str::to_owned)),
                 (
-                    S::KV_BYTES,
+                    t("kv.bytes"),
                     Some(format_bytes(info["bytes"].as_u64().unwrap_or(0))),
                 ),
             ] {

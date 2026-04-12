@@ -1,7 +1,7 @@
 use eframe::egui;
 use nats_backend::{BackendCommand, BackendHandle};
 
-use crate::ui_strings as S;
+use crate::i18n::t;
 
 use super::types::{StreamState, TabAction};
 
@@ -13,7 +13,7 @@ pub(crate) fn render_consumers(
     backend: &BackendHandle,
     actions: &mut Vec<TabAction>,
 ) {
-    egui::CollapsingHeader::new(S::CONSUMER_HEADING)
+    egui::CollapsingHeader::new(t("consumer.heading"))
         .id_salt(("stream_consumers", connection_id, stream_name))
         .default_open(true)
         .show(ui, |ui| {
@@ -21,7 +21,7 @@ pub(crate) fn render_consumers(
                 if ui
                     .add_enabled(
                         !state.consumers_fetching,
-                        egui::Button::new(S::CONSUMER_REFRESH),
+                        egui::Button::new(t("consumer.refresh")),
                     )
                     .clicked()
                 {
@@ -31,7 +31,7 @@ pub(crate) fn render_consumers(
                     });
                     state.consumers_fetching = true;
                 }
-                if ui.button(S::CONSUMER_CREATE).clicked() {
+                if ui.button(t("consumer.create")).clicked() {
                     actions.push(TabAction::OpenConsumerCreate {
                         connection_id,
                         stream_name: stream_name.to_string(),
@@ -42,10 +42,10 @@ pub(crate) fn render_consumers(
             if state.consumers_fetching {
                 ui.horizontal(|ui| {
                     ui.spinner();
-                    ui.label(S::CONSUMER_LOADING);
+                    ui.label(t("consumer.loading"));
                 });
             } else if state.consumers.is_empty() {
-                ui.label(S::CONSUMER_NO_CONSUMERS);
+                ui.label(t("consumer.no_consumers"));
             } else {
                 for consumer in &state.consumers {
                     consumer_card(ui, connection_id, stream_name, consumer, backend);
@@ -62,12 +62,12 @@ fn consumer_card(
     consumer: &serde_json::Value,
     backend: &BackendHandle,
 ) {
-    let name = consumer["name"].as_str().unwrap_or(S::CONSUMER_UNNAMED);
+    let name = consumer["name"].as_str().unwrap_or(t("consumer.unnamed"));
     let config = &consumer["config"];
     let consumer_type = if config["deliver_subject"].as_str().is_some() {
-        S::CONSUMER_TYPE_PUSH
+        t("consumer.type_push")
     } else {
-        S::CONSUMER_TYPE_PULL
+        t("consumer.type_pull")
     };
 
     egui::CollapsingHeader::new(name)
@@ -80,51 +80,51 @@ fn consumer_card(
             .num_columns(2)
             .spacing([8.0, 4.0])
             .show(ui, |ui| {
-                info_row(ui, S::CONSUMER_NAME, Some(name));
-                info_row(ui, S::CONSUMER_TYPE, Some(consumer_type));
+                info_row(ui, t("consumer.name"), Some(name));
+                info_row(ui, t("consumer.type"), Some(consumer_type));
                 info_row(
                     ui,
-                    S::CONSUMER_DURABLE,
+                    t("consumer.durable"),
                     config["durable_name"].as_str().filter(|s| !s.is_empty()),
                 );
                 info_row(
                     ui,
-                    S::CONSUMER_FILTER_SUBJECT,
+                    t("consumer.filter_subject"),
                     config["filter_subject"].as_str().filter(|s| !s.is_empty()),
                 );
                 info_row(
                     ui,
-                    S::CONSUMER_DELIVER_POLICY,
+                    t("consumer.deliver_policy"),
                     config["deliver_policy"].as_str(),
                 );
-                info_row(ui, S::CONSUMER_ACK_POLICY, config["ack_policy"].as_str());
-                info_num_row(ui, S::CONSUMER_MAX_DELIVER, config["max_deliver"].as_i64());
+                info_row(ui, t("consumer.ack_policy"), config["ack_policy"].as_str());
+                info_num_row(ui, t("consumer.max_deliver"), config["max_deliver"].as_i64());
                 info_num_row(
                     ui,
-                    S::CONSUMER_MAX_ACK_PENDING,
+                    t("consumer.max_ack_pending"),
                     config["max_ack_pending"].as_i64(),
                 );
                 info_row(
                     ui,
-                    S::CONSUMER_DESCRIPTION,
+                    t("consumer.description"),
                     config["description"].as_str().filter(|s| !s.is_empty()),
                 );
-                info_u64_row(ui, S::CONSUMER_PENDING, consumer["num_pending"].as_u64());
+                info_u64_row(ui, t("consumer.pending"), consumer["num_pending"].as_u64());
                 info_u64_row(
                     ui,
-                    S::CONSUMER_ACK_PENDING,
+                    t("consumer.ack_pending"),
                     consumer["num_ack_pending"].as_u64(),
                 );
-                info_u64_row(ui, S::CONSUMER_WAITING, consumer["num_waiting"].as_u64());
+                info_u64_row(ui, t("consumer.waiting"), consumer["num_waiting"].as_u64());
                 info_u64_row(
                     ui,
-                    S::CONSUMER_REDELIVERED,
+                    t("consumer.redelivered"),
                     consumer["num_redelivered"].as_u64(),
                 );
             });
 
             ui.add_space(4.0);
-            if ui.button(S::CONSUMER_DELETE).clicked() {
+            if ui.button(t("consumer.delete")).clicked() {
                 backend.send(BackendCommand::DeleteConsumer {
                     connection_id,
                     stream: stream_name.to_string(),

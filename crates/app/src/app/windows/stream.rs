@@ -1,6 +1,6 @@
 use eframe::egui;
 
-use crate::ui_strings as S;
+use crate::i18n::t;
 
 use super::super::model::EasyNatsApp;
 
@@ -8,7 +8,7 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     let mut save_requested = false;
     if app.stream_editor.visible {
         let mut open = true;
-        egui::Window::new(S::STREAM_CREATE_TITLE)
+        egui::Window::new(t("stream.create_title"))
             .open(&mut open)
             .resizable(false)
             .show(ui.ctx(), |ui| {
@@ -16,15 +16,15 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     .num_columns(2)
                     .spacing([8.0, 4.0])
                     .show(ui, |ui| {
-                        ui.label(S::STREAM_NAME);
+                        ui.label(t("stream.name"));
                         ui.text_edit_singleline(&mut app.stream_editor.name);
                         ui.end_row();
 
-                        ui.label(S::STREAM_SUBJECTS);
+                        ui.label(t("stream.subjects"));
                         ui.text_edit_singleline(&mut app.stream_editor.subjects);
                         ui.end_row();
 
-                        ui.label(S::STREAM_STORAGE);
+                        ui.label(t("stream.storage"));
                         egui::ComboBox::from_id_salt("stream_storage")
                             .selected_text(app.stream_editor.storage.label())
                             .show_ui(ui, |ui| {
@@ -41,7 +41,7 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                             });
                         ui.end_row();
 
-                        ui.label(S::STREAM_RETENTION);
+                        ui.label(t("stream.retention"));
                         egui::ComboBox::from_id_salt("stream_retention")
                             .selected_text(app.stream_editor.retention.label())
                             .show_ui(ui, |ui| {
@@ -63,33 +63,33 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                             });
                         ui.end_row();
 
-                        ui.label(S::STREAM_MAX_MSGS);
+                        ui.label(t("stream.max_msgs"));
                         ui.text_edit_singleline(&mut app.stream_editor.max_messages);
                         ui.end_row();
 
-                        ui.label(S::STREAM_MAX_BYTES);
+                        ui.label(t("stream.max_bytes"));
                         ui.text_edit_singleline(&mut app.stream_editor.max_bytes);
                         ui.end_row();
 
-                        ui.label(S::STREAM_MAX_AGE);
+                        ui.label(t("stream.max_age"));
                         ui.text_edit_singleline(&mut app.stream_editor.max_age_secs);
                         ui.end_row();
 
-                        ui.label(S::STREAM_REPLICAS);
+                        ui.label(t("stream.replicas"));
                         ui.text_edit_singleline(&mut app.stream_editor.num_replicas);
                         ui.end_row();
 
-                        ui.label(S::STREAM_DESCRIPTION);
+                        ui.label(t("stream.description"));
                         ui.text_edit_singleline(&mut app.stream_editor.description);
                         ui.end_row();
                     });
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     let valid = !app.stream_editor.name.trim().is_empty();
-                    if ui.add_enabled(valid, egui::Button::new(S::SAVE)).clicked() {
+                    if ui.add_enabled(valid, egui::Button::new(t("common.save"))).clicked() {
                         save_requested = true;
                     }
-                    if ui.button(S::CANCEL).clicked() {
+                    if ui.button(t("common.cancel")).clicked() {
                         app.stream_editor.visible = false;
                     }
                 });

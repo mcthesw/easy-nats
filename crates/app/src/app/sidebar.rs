@@ -1,8 +1,8 @@
 use eframe::egui;
 use nats_backend::{BackendCommand, ConnectionStatusKind};
 
+use crate::i18n::{self, t, Language};
 use crate::tabs::{KvBucketState, PublisherState, StreamState, SubscriberState, TabKind};
-use crate::ui_strings as S;
 
 use super::{
     editors::{KvBucketCreateEditor, StreamCreateEditor},
@@ -31,12 +31,12 @@ pub(crate) fn render_sidebar(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
 
 fn render_sidebar_header(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
-        ui.heading(S::CONNECTIONS_HEADING);
+        ui.heading(t("sidebar.connections_heading"));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
             let icon = if app.dark_mode {
-                S::THEME_LIGHT
+                t("common.theme_light")
             } else {
-                S::THEME_DARK
+                t("common.theme_dark")
             };
             if ui.small_button(icon).clicked() {
                 app.dark_mode = !app.dark_mode;
@@ -46,9 +46,25 @@ fn render_sidebar_header(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     ui.ctx().set_visuals(egui::Visuals::light());
                 }
             }
+
+            // Language selector
+            let mut lang = i18n::current_language();
+            egui::ComboBox::from_id_salt("lang_selector")
+                .width(60.0)
+                .selected_text(lang.label())
+                .show_ui(ui, |ui| {
+                    for l in Language::ALL {
+                        if ui.selectable_value(&mut lang, l, l.label()).changed() {
+                            i18n::set_language(lang);
+                            app.settings.language = lang;
+                            app.settings.save();
+                        }
+                    }
+                });
+
             if ui
                 .small_button("＋")
-                .on_hover_text(S::CONNECTION_NEW)
+                .on_hover_text(t("sidebar.connection_new"))
                 .clicked()
             {
                 app.open_new_editor();
@@ -113,13 +129,13 @@ fn render_connection_row(
             egui::Layout::right_to_left(egui::Align::Center),
             |ui| match status {
                 ConnectionStatusKind::Connected => {
-                    if ui.small_button("⏏").on_hover_text(S::DISCONNECT).clicked() {
+                    if ui.small_button("⏏").on_hover_text(t("connection.disconnect")).clicked() {
                         *action = Some(SidebarAction::Disconnect(id));
                     }
                 }
                 ConnectionStatusKind::Connecting => {}
                 _ => {
-                    if ui.small_button("▶").on_hover_text(S::CONNECT).clicked() {
+                    if ui.small_button("▶").on_hover_text(t("connection.connect")).clicked() {
                         *action = Some(SidebarAction::Connect(id));
                     }
                 }
@@ -139,10 +155,10 @@ fn render_resource_tree(
         render_pubsub_section(ui, id, name, action);
         render_streams_section(app, ui, id, name, action);
         render_kv_section(app, ui, id, name, action);
-        egui::CollapsingHeader::new(S::SECTION_OBJECT_STORE)
+        egui::CollapsingHeader::new(t("sidebar.section_object_store"))
             .id_salt(format!("objstore_{id}"))
             .show(ui, |ui| {
-                ui.weak(S::OBJECT_STORE_WIP);
+                ui.weak(t("common.object_store_wip"));
             });
     });
 }
@@ -153,17 +169,17 @@ fn render_pubsub_section(
     name: &str,
     action: &mut Option<SidebarAction>,
 ) {
-    egui::CollapsingHeader::new(S::SECTION_PUBSUB)
+    egui::CollapsingHeader::new(t("sidebar.section_pubsub"))
         .id_salt(format!("pubsub_{id}"))
         .show(ui, |ui| {
-            if ui.selectable_label(false, S::OPEN_PUBLISHER).clicked() {
+            if ui.selectable_label(false, t("sidebar.open_publisher")).clicked() {
                 *action = Some(SidebarAction::OpenTab(Box::new(TabKind::Publisher {
                     connection_id: id,
                     connection_name: name.to_string(),
                     state: PublisherState::default(),
                 })));
             }
-            if ui.selectable_label(false, S::OPEN_SUBSCRIBER).clicked() {
+            if ui.selectable_label(false, t("sidebar.open_subscriber")).clicked() {
                 *action = Some(SidebarAction::OpenTab(Box::new(TabKind::Subscriber {
                     connection_id: id,
                     connection_name: name.to_string(),
@@ -180,20 +196,20 @@ fn render_streams_section(
     name: &str,
     action: &mut Option<SidebarAction>,
 ) {
-    egui::CollapsingHeader::new(S::SECTION_STREAMS)
+    egui::CollapsingHeader::new(t("sidebar.section_streams"))
         .id_salt(format!("streams_{id}"))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 if ui
                     .small_button("＋")
-                    .on_hover_text(S::STREAM_CREATE_TITLE)
+                    .on_hover_text(t("stream.create_title"))
                     .clicked()
                 {
                     *action = Some(SidebarAction::OpenStreamCreate(id));
                 }
                 if ui
                     .small_button("↻")
-                    .on_hover_text(S::STREAM_REFRESH)
+                    .on_hover_text(t("stream.refresh"))
                     .clicked()
                 {
                     app.backend
@@ -227,18 +243,18 @@ fn render_kv_section(
     name: &str,
     action: &mut Option<SidebarAction>,
 ) {
-    egui::CollapsingHeader::new(S::SECTION_KV)
+    egui::CollapsingHeader::new(t("sidebar.section_kv"))
         .id_salt(format!("kv_{id}"))
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 if ui
                     .small_button("＋")
-                    .on_hover_text(S::KV_CREATE_BUCKET)
+                    .on_hover_text(t("kv.create_bucket"))
                     .clicked()
                 {
                     *action = Some(SidebarAction::OpenKvBucketCreate(id));
                 }
-                if ui.small_button("↻").on_hover_text(S::KV_REFRESH).clicked() {
+                if ui.small_button("↻").on_hover_text(t("kv.refresh")).clicked() {
                     app.backend
                         .send(BackendCommand::ListKvBuckets { connection_id: id });
                 }
@@ -270,12 +286,12 @@ fn render_selected_connection_actions(app: &mut EasyNatsApp, ui: &mut egui::Ui) 
         ui.separator();
         let cfg_clone = app.config.connections.iter().find(|c| c.id == id).cloned();
         ui.horizontal(|ui| {
-            if ui.small_button(S::EDIT).clicked()
+            if ui.small_button(t("common.edit")).clicked()
                 && let Some(cfg) = &cfg_clone
             {
                 app.open_edit_editor(cfg);
             }
-            if ui.small_button(S::DELETE).clicked() {
+            if ui.small_button(t("common.delete")).clicked() {
                 app.editor.delete_confirm = Some(id);
             }
         });

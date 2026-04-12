@@ -1,0 +1,43 @@
+# Publisher tab strings
+subject:
+  en: "Subject:"
+  zh: "主题:"
+payload:
+  en: "Payload"
+  zh: "载荷"
+headers:
+  en: "Headers"
+  zh: "头部"
+header_key:
+  en: "Key"
+  zh: "键"
+header_value:
+  en: "Value"
+  zh: "值"
+add_header:
+  en: "+ Header"
+  zh: "+ 头部"
+publish:
+  en: "Publish"
+  zh: "发布"
+request:
+  en: "Request"
+  zh: "请求"
+timeout:
+  en: "Timeout (ms):"
+  zh: "超时 (ms):"
+response:
+  en: "Response"
+  zh: "响应"
+no_response:
+  en: "No response yet. Use \"Request\" to send a request-reply."
+  zh: "暂无响应。使用「请求」发送请求-回复。"
+response_payload:
+  en: "Payload:"
+  zh: "载荷:"
+response_headers:
+  en: "Headers:"
+  zh: "头部:"
+waiting:
+  en: "Waiting for response..."
+  zh: "等待响应中..."

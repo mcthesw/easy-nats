@@ -77,7 +77,7 @@ impl Toasts {
                             ui.horizontal(|ui| {
                                 ui.colored_label(text_color, &toast.message);
                                 if ui
-                                    .colored_label(text_color, crate::ui_strings::TOAST_DISMISS)
+                                    .colored_label(text_color, crate::i18n::t("toast.dismiss"))
                                     .on_hover_text("Dismiss")
                                     .clicked()
                                 {

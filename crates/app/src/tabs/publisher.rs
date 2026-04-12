@@ -2,7 +2,7 @@ use eframe::egui;
 use nats_backend::{BackendCommand, BackendHandle};
 
 use crate::format;
-use crate::ui_strings as S;
+use crate::i18n::t;
 
 use super::types::PublisherState;
 
@@ -13,12 +13,12 @@ pub fn publisher_ui(
     backend: &BackendHandle,
 ) {
     ui.horizontal(|ui| {
-        ui.label(S::PUBLISHER_SUBJECT);
+        ui.label(t("publisher.subject"));
         ui.text_edit_singleline(&mut state.subject);
     });
 
     ui.add_space(4.0);
-    egui::CollapsingHeader::new(S::PUBLISHER_HEADERS)
+    egui::CollapsingHeader::new(t("publisher.headers"))
         .id_salt("publisher_headers")
         .show(ui, |ui| {
             let mut remove_idx = None;
@@ -26,12 +26,12 @@ pub fn publisher_ui(
                 ui.horizontal(|ui| {
                     ui.add(
                         egui::TextEdit::singleline(key)
-                            .hint_text(S::PUBLISHER_HEADER_KEY)
+                            .hint_text(t("publisher.header_key"))
                             .desired_width(120.0),
                     );
                     ui.add(
                         egui::TextEdit::singleline(val)
-                            .hint_text(S::PUBLISHER_HEADER_VALUE)
+                            .hint_text(t("publisher.header_value"))
                             .desired_width(200.0),
                     );
                     if ui.small_button("✕").clicked() {
@@ -42,13 +42,13 @@ pub fn publisher_ui(
             if let Some(idx) = remove_idx {
                 state.headers.remove(idx);
             }
-            if ui.small_button(S::PUBLISHER_ADD_HEADER).clicked() {
+            if ui.small_button(t("publisher.add_header")).clicked() {
                 state.headers.push((String::new(), String::new()));
             }
         });
 
     ui.add_space(4.0);
-    ui.label(S::PUBLISHER_PAYLOAD);
+    ui.label(t("publisher.payload"));
     egui::ScrollArea::vertical()
         .id_salt("publisher_payload")
         .max_height(200.0)
@@ -65,7 +65,7 @@ pub fn publisher_ui(
     ui.horizontal(|ui| {
         let can_send = !state.subject.trim().is_empty();
         if ui
-            .add_enabled(can_send, egui::Button::new(S::PUBLISHER_PUBLISH))
+            .add_enabled(can_send, egui::Button::new(t("publisher.publish")))
             .clicked()
         {
             backend.send(BackendCommand::Publish {
@@ -77,13 +77,13 @@ pub fn publisher_ui(
         }
 
         ui.separator();
-        ui.label(S::PUBLISHER_TIMEOUT);
+        ui.label(t("publisher.timeout"));
         ui.add(egui::TextEdit::singleline(&mut state.timeout_ms).desired_width(60.0));
 
         if ui
             .add_enabled(
                 can_send && !state.waiting,
-                egui::Button::new(S::PUBLISHER_REQUEST),
+                egui::Button::new(t("publisher.request")),
             )
             .clicked()
         {
@@ -103,7 +103,7 @@ pub fn publisher_ui(
     ui.add_space(8.0);
     ui.separator();
     ui.horizontal(|ui| {
-        ui.label(S::PUBLISHER_RESPONSE);
+        ui.label(t("publisher.response"));
         format::format_selector(ui, "pub_resp_fmt", &mut state.response_format);
     });
     render_response(ui, state);
@@ -112,13 +112,13 @@ pub fn publisher_ui(
 fn render_response(ui: &mut egui::Ui, state: &mut PublisherState) {
     if state.waiting {
         ui.spinner();
-        ui.label(S::PUBLISHER_WAITING);
+        ui.label(t("publisher.waiting"));
         return;
     }
 
     if let Some(resp) = &state.response {
         if !resp.headers.is_empty() {
-            ui.label(S::PUBLISHER_RESPONSE_HEADERS);
+            ui.label(t("publisher.response_headers"));
             egui::Grid::new("resp_headers")
                 .num_columns(2)
                 .striped(true)
@@ -131,7 +131,7 @@ fn render_response(ui: &mut egui::Ui, state: &mut PublisherState) {
                 });
             ui.add_space(4.0);
         }
-        ui.label(S::PUBLISHER_RESPONSE_PAYLOAD);
+        ui.label(t("publisher.response_payload"));
         egui::ScrollArea::vertical()
             .id_salt("resp_payload")
             .max_height(200.0)
@@ -139,7 +139,7 @@ fn render_response(ui: &mut egui::Ui, state: &mut PublisherState) {
                 format::render_payload(ui, &resp.payload, state.response_format);
             });
     } else {
-        ui.label(S::PUBLISHER_NO_RESPONSE);
+        ui.label(t("publisher.no_response"));
     }
 }
 

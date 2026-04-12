@@ -1,15 +1,15 @@
 use eframe::egui;
 
 use crate::tabs::{kv_bucket_ui, publisher_ui, stream_ui, subscriber_ui};
-use crate::ui_strings;
+use crate::i18n::t;
 
 use super::types::{AppTabViewer, TabKind};
 
 pub(crate) fn render_tab(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut TabKind) {
     match tab {
         TabKind::Welcome => {
-            ui.heading(ui_strings::WELCOME_HEADING);
-            ui.label(ui_strings::WELCOME_BODY);
+            ui.heading(t("common.welcome_heading"));
+            ui.label(t("common.welcome_body"));
         }
         TabKind::Publisher {
             connection_id,
@@ -57,7 +57,7 @@ pub(crate) fn render_tab(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: 
         }
         TabKind::ObjectStoreBucket { bucket_name, .. } => {
             ui.heading(format!("Object Store: {bucket_name}"));
-            ui.label(ui_strings::OBJECT_STORE_WIP);
+            ui.label(t("common.object_store_wip"));
         }
     }
 }

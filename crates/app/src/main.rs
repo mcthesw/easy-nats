@@ -1,8 +1,9 @@
 mod app;
 mod format;
+mod i18n;
+mod settings;
 mod tabs;
 mod toast;
-mod ui_strings;
 
 fn main() {
     tracing_subscriber::fmt()
@@ -11,6 +12,9 @@ fn main() {
                 .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
         )
         .init();
+
+    let app_settings = settings::AppSettings::load();
+    i18n::init(app_settings.language);
 
     let native_options = eframe::NativeOptions::default();
     if let Err(e) = eframe::run_native(
@@ -21,7 +25,7 @@ fn main() {
                 .egui_ctx
                 .system_theme()
                 .map(|t| t == eframe::egui::Theme::Dark)
-                .unwrap_or(true);
+                .unwrap_or(app_settings.dark_mode);
             if dark {
                 cc.egui_ctx.set_visuals(eframe::egui::Visuals::dark());
             } else {

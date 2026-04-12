@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use egui_dock::DockState;
 use nats_backend::{AppConfig, ConnectionStatusKind};
 
+use crate::settings::AppSettings;
 use crate::tabs::TabKind;
 use crate::toast::Toasts;
 
@@ -13,6 +14,7 @@ use super::editors::{
 pub struct EasyNatsApp {
     pub(crate) backend: nats_backend::BackendHandle,
     pub(crate) config: AppConfig,
+    pub(crate) settings: AppSettings,
     pub(crate) conn_statuses: HashMap<u64, ConnectionStatusKind>,
     pub(crate) selected_conn: Option<u64>,
     pub(crate) editor: ConnectionEditor,
@@ -32,6 +34,7 @@ impl EasyNatsApp {
         Self {
             backend: nats_backend::BackendHandle::spawn(),
             config: AppConfig::load(),
+            settings: AppSettings::load(),
             conn_statuses: HashMap::new(),
             selected_conn: None,
             editor: ConnectionEditor::default(),

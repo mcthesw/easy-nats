@@ -1,0 +1,29 @@
+# Sidebar UI strings
+connections_heading:
+  en: "Connections"
+  zh: "连接"
+connection_new:
+  en: "New Connection"
+  zh: "新建连接"
+
+# Resource tree sections
+section_pubsub:
+  en: "Pub/Sub"
+  zh: "发布/订阅"
+section_streams:
+  en: "Streams"
+  zh: "流"
+section_kv:
+  en: "Key-Value"
+  zh: "键值存储"
+section_object_store:
+  en: "Object Store"
+  zh: "对象存储"
+
+# Resource openers
+open_publisher:
+  en: "Publisher"
+  zh: "发布者"
+open_subscriber:
+  en: "Subscriber"
+  zh: "订阅者"

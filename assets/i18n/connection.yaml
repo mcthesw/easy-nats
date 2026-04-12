@@ -1,0 +1,74 @@
+# Connection editor and auth strings
+connection_edit:
+  en: "Edit Connection"
+  zh: "编辑连接"
+connection_delete_confirm_title:
+  en: "Confirm Delete"
+  zh: "确认删除"
+connection_delete_prompt:
+  en: "Delete connection"
+  zh: "删除连接"
+connect:
+  en: "Connect"
+  zh: "连接"
+disconnect:
+  en: "Disconnect"
+  zh: "断开连接"
+
+# Editor fields
+field_name:
+  en: "Name:"
+  zh: "名称:"
+field_url:
+  en: "URL:"
+  zh: "URL:"
+field_auth:
+  en: "Auth:"
+  zh: "认证:"
+field_token:
+  en: "Token:"
+  zh: "令牌:"
+field_username:
+  en: "Username:"
+  zh: "用户名:"
+field_password:
+  en: "Password:"
+  zh: "密码:"
+field_nkey_seed:
+  en: "NKey Seed:"
+  zh: "NKey 种子:"
+field_creds_file:
+  en: "Creds File:"
+  zh: "凭证文件:"
+field_cert_path:
+  en: "Cert Path:"
+  zh: "证书路径:"
+field_key_path:
+  en: "Key Path:"
+  zh: "密钥路径:"
+field_tls:
+  en: "TLS:"
+  zh: "TLS:"
+require_tls:
+  en: "Require TLS"
+  zh: "要求 TLS"
+
+# Auth methods
+auth_none:
+  en: "No Auth"
+  zh: "无认证"
+auth_token:
+  en: "Token"
+  zh: "令牌"
+auth_user_password:
+  en: "User / Password"
+  zh: "用户名 / 密码"
+auth_nkey:
+  en: "NKey"
+  zh: "NKey"
+auth_credentials_file:
+  en: "Credentials File"
+  zh: "凭证文件"
+auth_tls_client_cert:
+  en: "TLS Client Certificate"
+  zh: "TLS 客户端证书"

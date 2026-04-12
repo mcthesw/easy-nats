@@ -1,0 +1,94 @@
+# Consumer tab strings
+heading:
+  en: "Consumers"
+  zh: "消费者"
+refresh:
+  en: "Refresh"
+  zh: "刷新"
+create:
+  en: "Create Consumer"
+  zh: "创建消费者"
+loading:
+  en: "Loading consumers..."
+  zh: "加载消费者中..."
+no_consumers:
+  en: "No consumers. Click Create to add one."
+  zh: "暂无消费者。点击创建以添加。"
+stream:
+  en: "Stream:"
+  zh: "流:"
+name:
+  en: "Name:"
+  zh: "名称:"
+type:
+  en: "Type:"
+  zh: "类型:"
+type_pull:
+  en: "Pull"
+  zh: "拉取"
+type_push:
+  en: "Push"
+  zh: "推送"
+durable_mode:
+  en: "Durability:"
+  zh: "持久性:"
+durable_checkbox:
+  en: "Durable consumer"
+  zh: "持久化消费者"
+pending:
+  en: "Pending:"
+  zh: "待处理:"
+ack_pending:
+  en: "Ack pending:"
+  zh: "待确认:"
+waiting:
+  en: "Waiting:"
+  zh: "等待中:"
+redelivered:
+  en: "Redelivered:"
+  zh: "重新投递:"
+delete:
+  en: "Delete"
+  zh: "删除"
+durable:
+  en: "Durable name:"
+  zh: "持久化名称:"
+filter_subject:
+  en: "Filter subject:"
+  zh: "过滤主题:"
+ack_policy:
+  en: "Ack policy:"
+  zh: "确认策略:"
+deliver_policy:
+  en: "Deliver policy:"
+  zh: "投递策略:"
+max_deliver:
+  en: "Max deliver:"
+  zh: "最大投递次数:"
+max_ack_pending:
+  en: "Max ack pending:"
+  zh: "最大待确认数:"
+description:
+  en: "Description:"
+  zh: "描述:"
+policy_all:
+  en: "All"
+  zh: "全部"
+policy_last:
+  en: "Last"
+  zh: "最新"
+policy_new:
+  en: "New"
+  zh: "新消息"
+ack_explicit:
+  en: "Explicit"
+  zh: "显式"
+ack_all:
+  en: "All"
+  zh: "全部"
+ack_none:
+  en: "None"
+  zh: "无"
+unnamed:
+  en: "(unnamed)"
+  zh: "(未命名)"

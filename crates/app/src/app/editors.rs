@@ -1,4 +1,4 @@
-use crate::ui_strings as S;
+use crate::i18n::t;
 
 #[derive(Default)]
 pub(crate) struct ConnectionEditor {
@@ -41,12 +41,12 @@ impl AuthKindSelection {
 
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::None => S::AUTH_NONE,
-            Self::Token => S::AUTH_TOKEN,
-            Self::UserPassword => S::AUTH_USER_PASSWORD,
-            Self::NKey => S::AUTH_NKEY,
-            Self::CredentialsFile => S::AUTH_CREDENTIALS_FILE,
-            Self::TlsClientCert => S::AUTH_TLS_CLIENT_CERT,
+            Self::None => t("connection.auth_none"),
+            Self::Token => t("connection.auth_token"),
+            Self::UserPassword => t("connection.auth_user_password"),
+            Self::NKey => t("connection.auth_nkey"),
+            Self::CredentialsFile => t("connection.auth_credentials_file"),
+            Self::TlsClientCert => t("connection.auth_tls_client_cert"),
         }
     }
 }
@@ -155,9 +155,9 @@ pub(crate) enum DeliverPolicySelection {
 impl DeliverPolicySelection {
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::All => S::CONSUMER_POLICY_ALL,
-            Self::Last => S::CONSUMER_POLICY_LAST,
-            Self::New => S::CONSUMER_POLICY_NEW,
+            Self::All => t("consumer.policy_all"),
+            Self::Last => t("consumer.policy_last"),
+            Self::New => t("consumer.policy_new"),
         }
     }
 
@@ -180,9 +180,9 @@ pub(crate) enum AckPolicySelection {
 impl AckPolicySelection {
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::Explicit => S::CONSUMER_ACK_EXPLICIT,
-            Self::All => S::CONSUMER_ACK_ALL,
-            Self::None => S::CONSUMER_ACK_NONE,
+            Self::Explicit => t("consumer.ack_explicit"),
+            Self::All => t("consumer.ack_all"),
+            Self::None => t("consumer.ack_none"),
         }
     }
 
@@ -205,8 +205,8 @@ pub(crate) enum StorageSelection {
 impl StorageSelection {
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::File => crate::ui_strings::STORAGE_FILE,
-            Self::Memory => crate::ui_strings::STORAGE_MEMORY,
+            Self::File => t("common.storage_file"),
+            Self::Memory => t("common.storage_memory"),
         }
     }
 }
@@ -222,9 +222,9 @@ pub(crate) enum RetentionSelection {
 impl RetentionSelection {
     pub(crate) fn label(self) -> &'static str {
         match self {
-            Self::Limits => crate::ui_strings::RETENTION_LIMITS,
-            Self::Interest => crate::ui_strings::RETENTION_INTEREST,
-            Self::WorkQueue => crate::ui_strings::RETENTION_WORK_QUEUE,
+            Self::Limits => t("common.retention_limits"),
+            Self::Interest => t("common.retention_interest"),
+            Self::WorkQueue => t("common.retention_work_queue"),
         }
     }
 }

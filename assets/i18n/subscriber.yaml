@@ -1,0 +1,46 @@
+# Subscriber tab strings
+subject:
+  en: "Subject:"
+  zh: "主题:"
+subscribe:
+  en: "Subscribe"
+  zh: "订阅"
+unsubscribe:
+  en: "Unsubscribe"
+  zh: "取消订阅"
+msg_count:
+  en: "Messages:"
+  zh: "消息数:"
+clear:
+  en: "Clear"
+  zh: "清空"
+messages:
+  en: "Messages"
+  zh: "消息"
+no_messages:
+  en: "No messages received yet."
+  zh: "尚未收到消息。"
+select_msg:
+  en: "Select a message to view details."
+  zh: "选择一条消息以查看详情。"
+detail:
+  en: "Message Detail"
+  zh: "消息详情"
+detail_subject:
+  en: "Subject:"
+  zh: "主题:"
+detail_reply:
+  en: "Reply-To:"
+  zh: "回复至:"
+detail_timestamp:
+  en: "Timestamp:"
+  zh: "时间戳:"
+detail_size:
+  en: "Size:"
+  zh: "大小:"
+detail_headers:
+  en: "Headers:"
+  zh: "头部:"
+detail_payload:
+  en: "Payload:"
+  zh: "载荷:"

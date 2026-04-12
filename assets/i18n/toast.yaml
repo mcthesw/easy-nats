@@ -1,0 +1,10 @@
+# Toast and result message strings
+dismiss:
+  en: "✕"
+  zh: "✕"
+stream_deleted:
+  en: "Stream deleted"
+  zh: "流已删除"
+message_deleted:
+  en: "Message deleted"
+  zh: "消息已删除"
