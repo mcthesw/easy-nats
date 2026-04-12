@@ -1,0 +1,52 @@
+name: Nightly Build
+
+on:
+  schedule:
+    - cron: "0 2 * * *" # 2:00 AM UTC daily
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - target: x86_64-pc-windows-msvc
+            os: windows-latest
+            artifact: easy-nats.exe
+          - target: x86_64-apple-darwin
+            os: macos-latest
+            artifact: easy-nats
+          - target: aarch64-apple-darwin
+            os: macos-latest
+            artifact: easy-nats
+          - target: x86_64-unknown-linux-gnu
+            os: ubuntu-latest
+            artifact: easy-nats
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
+
+      - name: Build
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: easy-nats-${{ matrix.target }}-nightly
+          path: target/${{ matrix.target }}/release/${{ matrix.artifact }}
