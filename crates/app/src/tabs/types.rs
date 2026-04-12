@@ -56,6 +56,7 @@ pub enum TabAction {
     CloseTabsToRight {
         of_title: String,
     },
+    OpenConnectionEditor,
 }
 
 #[derive(Debug)]

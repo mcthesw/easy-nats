@@ -64,6 +64,9 @@ welcome_heading:
 welcome_body:
   en: "Create or select a connection from the sidebar to get started.\nUse the resource tree to open publisher, subscriber, stream, KV, or object store tabs."
   zh: "从侧边栏创建或选择连接以开始使用。\n使用资源树打开发布者、订阅者、流、KV 或对象存储标签页。"
+welcome_new_conn:
+  en: "＋ New Connection"
+  zh: "＋ 新建连接"
 
 # Object Store placeholder
 object_store_wip:

@@ -1,7 +1,7 @@
 use eframe::egui;
 use egui_dock::DockArea;
 
-use crate::tabs::{AppTabViewer, TabAction};
+use crate::tabs::{AppTabViewer, TabAction, TabKind};
 
 use super::{editors::ConsumerCreateEditor, model::EasyNatsApp, sidebar, windows};
 
@@ -24,6 +24,11 @@ impl eframe::App for EasyNatsApp {
                     actions: &mut tab_actions,
                 },
             );
+
+        // Auto-show Welcome tab when all tabs are closed
+        if self.dock_state.iter_all_tabs().next().is_none() {
+            self.open_tab(TabKind::Welcome);
+        }
 
         for action in tab_actions {
             match action {
@@ -52,6 +57,9 @@ impl eframe::App for EasyNatsApp {
                 }
                 TabAction::CloseTabsToRight { of_title } => {
                     self.close_tabs_to_right(&of_title);
+                }
+                TabAction::OpenConnectionEditor => {
+                    self.editor.visible = true;
                 }
             }
         }

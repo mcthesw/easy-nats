@@ -3,13 +3,49 @@ use eframe::egui;
 use crate::tabs::{kv_bucket_ui, publisher_ui, stream_ui, subscriber_ui};
 use crate::i18n::t;
 
-use super::types::{AppTabViewer, TabKind};
+use super::types::{AppTabViewer, TabAction, TabKind};
 
 pub(crate) fn render_tab(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut TabKind) {
     match tab {
         TabKind::Welcome => {
-            ui.heading(t("common.welcome_heading"));
-            ui.label(t("common.welcome_body"));
+            let available = ui.available_size();
+            ui.scope_builder(
+                egui::UiBuilder::new().max_rect(egui::Rect::from_min_size(
+                    ui.cursor().min,
+                    available,
+                )),
+                |ui| {
+                    ui.vertical_centered(|ui| {
+                        let top_pad = (available.y * 0.25).max(40.0);
+                        ui.add_space(top_pad);
+
+                        ui.heading(
+                            egui::RichText::new("Easy NATS")
+                                .size(32.0)
+                                .strong(),
+                        );
+                        ui.add_space(4.0);
+                        ui.label(
+                            egui::RichText::new(format!("v{}", env!("CARGO_PKG_VERSION")))
+                                .weak(),
+                        );
+                        ui.add_space(16.0);
+                        ui.label(t("common.welcome_body"));
+                        ui.add_space(24.0);
+                        if ui
+                            .button(
+                                egui::RichText::new(t("common.welcome_new_conn"))
+                                    .size(16.0),
+                            )
+                            .clicked()
+                        {
+                            viewer
+                                .actions
+                                .push(TabAction::OpenConnectionEditor);
+                        }
+                    });
+                },
+            );
         }
         TabKind::Publisher {
             connection_id,
