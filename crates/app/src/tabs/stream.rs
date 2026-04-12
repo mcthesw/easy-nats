@@ -5,7 +5,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
 
-use super::common::format_bytes;
+use super::common::{draggable_separator, format_bytes};
 use super::stream_consumers::render_consumers;
 use super::types::{StreamState, TabAction};
 
@@ -66,11 +66,14 @@ fn render_message_browser(
         ui.spinner();
     }
 
+    let available_height = ui.available_height();
+    let list_height = (available_height * state.split_ratio).max(40.0);
+
     ui.add_space(4.0);
     ui.label(t("stream.messages"));
     egui::ScrollArea::vertical()
         .id_salt("stream_msg_list")
-        .max_height((ui.available_height() * 0.45).max(100.0))
+        .max_height(list_height)
         .show(ui, |ui| {
             if state.messages.is_empty() {
                 ui.label(t("stream.no_messages"));
@@ -91,7 +94,11 @@ fn render_message_browser(
             }
         });
 
-    ui.separator();
+    let delta = draggable_separator(ui, "stream_msg_split");
+    if delta != 0.0 {
+        state.split_ratio = (state.split_ratio + delta / available_height).clamp(0.15, 0.85);
+    }
+
     if let Some(idx) = state.selected_msg {
         if let Some(msg) = state.messages.get(idx) {
             stream_message_detail(ui, msg, &mut state.payload_format);

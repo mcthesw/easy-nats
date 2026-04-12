@@ -75,6 +75,8 @@ pub struct SubscriberState {
     pub payload_format: PayloadFormat,
     /// When set, only display messages matching this subject.
     pub subject_filter: Option<String>,
+    /// Ratio of message-list height to total available height (0.0–1.0).
+    pub split_ratio: f32,
 }
 
 impl Default for SubscriberState {
@@ -87,6 +89,7 @@ impl Default for SubscriberState {
             selected_idx: None,
             payload_format: PayloadFormat::Auto,
             subject_filter: None,
+            split_ratio: 0.5,
         }
     }
 }
@@ -120,6 +123,8 @@ pub struct StreamState {
     pub purge_subject: String,
     pub consumers: Vec<serde_json::Value>,
     pub consumers_fetching: bool,
+    /// Ratio of message-list height to total available height (0.0–1.0).
+    pub split_ratio: f32,
 }
 
 impl Default for StreamState {
@@ -136,6 +141,7 @@ impl Default for StreamState {
             purge_subject: String::new(),
             consumers: Vec::new(),
             consumers_fetching: false,
+            split_ratio: 0.5,
         }
     }
 }

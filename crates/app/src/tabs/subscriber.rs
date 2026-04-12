@@ -4,7 +4,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
 
-use super::common::{format_timestamp, payload_preview};
+use super::common::{draggable_separator, format_timestamp, payload_preview};
 use super::types::{ReceivedMessage, SubjectSubscription, SubscriberState};
 
 pub fn subscriber_ui(
@@ -15,12 +15,20 @@ pub fn subscriber_ui(
 ) {
     render_subscription_controls(ui, connection_id, state, backend);
     ui.separator();
-    render_message_list(ui, state);
-    ui.add_space(4.0);
-    ui.separator();
-    let selected_msg = state.selected_idx.and_then(|idx| {
-        filtered_messages(state).get(idx).cloned().cloned()
-    });
+
+    let available_height = ui.available_height();
+    let list_height = (available_height * state.split_ratio).max(40.0);
+
+    render_message_list(ui, state, list_height);
+
+    let delta = draggable_separator(ui, "sub_split");
+    if delta != 0.0 {
+        state.split_ratio = (state.split_ratio + delta / available_height).clamp(0.15, 0.85);
+    }
+
+    let selected_msg = state
+        .selected_idx
+        .and_then(|idx| filtered_messages(state).get(idx).cloned().cloned());
     if let Some(msg) = &selected_msg {
         message_detail_ui(ui, msg, &mut state.payload_format);
     } else {
@@ -93,7 +101,7 @@ fn render_subscription_controls(
     }
 }
 
-fn render_message_list(ui: &mut egui::Ui, state: &mut SubscriberState) {
+fn render_message_list(ui: &mut egui::Ui, state: &mut SubscriberState, list_height: f32) {
     ui.horizontal(|ui| {
         ui.label(format!(
             "{} {} / {}",
@@ -136,7 +144,6 @@ fn render_message_list(ui: &mut egui::Ui, state: &mut SubscriberState) {
     });
 
     ui.add_space(4.0);
-    let list_height = (ui.available_height() * 0.5).max(100.0);
     ui.label(t("subscriber.messages"));
 
     // Collect filtered message indices to avoid borrow conflicts

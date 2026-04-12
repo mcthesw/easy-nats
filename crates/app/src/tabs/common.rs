@@ -1,8 +1,35 @@
 use std::time::SystemTime;
 
 use base64::Engine;
+use eframe::egui;
 
 use crate::i18n::t;
+
+/// Draws a horizontal draggable separator. Returns the vertical delta to apply to split_ratio.
+pub(crate) fn draggable_separator(ui: &mut egui::Ui, _id_salt: &str) -> f32 {
+    let available_width = ui.available_width();
+    let (rect, response) = ui.allocate_exact_size(
+        egui::vec2(available_width, 6.0),
+        egui::Sense::click_and_drag(),
+    );
+    let color = if response.dragged() || response.hovered() {
+        ui.visuals().widgets.active.bg_fill
+    } else {
+        ui.visuals().widgets.noninteractive.bg_stroke.color
+    };
+    ui.painter().line_segment(
+        [rect.center_top() + egui::vec2(0.0, 3.0), rect.center_top() + egui::vec2(available_width - 8.0, 3.0)],
+        egui::Stroke::new(1.0, color),
+    );
+    if response.hovered() || response.dragged() {
+        ui.ctx().set_cursor_icon(egui::CursorIcon::ResizeVertical);
+    }
+    if response.dragged() {
+        response.drag_delta().y
+    } else {
+        0.0
+    }
+}
 
 pub(crate) fn format_timestamp(ts: SystemTime) -> String {
     match ts.duration_since(SystemTime::UNIX_EPOCH) {
