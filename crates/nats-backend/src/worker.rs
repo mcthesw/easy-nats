@@ -1,7 +1,11 @@
+use std::collections::HashMap;
+
+use async_nats::Client;
 use tokio::sync::mpsc;
 
 use crate::command::BackendCommand;
-use crate::event::BackendEvent;
+use crate::connection::{AuthMethod, ConnectionConfig};
+use crate::event::{BackendEvent, ConnectionStatusKind};
 
 /// Main async worker loop that receives commands and dispatches to async-nats.
 pub async fn run_worker(
@@ -10,21 +14,44 @@ pub async fn run_worker(
 ) {
     tracing::info!("Backend worker started");
 
+    let mut clients: HashMap<u64, Client> = HashMap::new();
+
     while let Some(cmd) = cmd_rx.recv().await {
         tracing::debug!(?cmd, "Received command");
 
         match cmd {
-            BackendCommand::Connect { id } => {
-                // TODO: Implement connection logic
+            BackendCommand::Connect { config } => {
+                let id = config.id;
                 let _ = evt_tx.send(BackendEvent::ConnectionStatus {
                     connection_id: id,
-                    status: crate::event::ConnectionStatusKind::Disconnected,
+                    status: ConnectionStatusKind::Connecting,
                 });
+
+                match do_connect(&config, &evt_tx).await {
+                    Ok(client) => {
+                        clients.insert(id, client);
+                        let _ = evt_tx.send(BackendEvent::ConnectionStatus {
+                            connection_id: id,
+                            status: ConnectionStatusKind::Connected,
+                        });
+                    }
+                    Err(e) => {
+                        let _ = evt_tx.send(BackendEvent::ConnectionStatus {
+                            connection_id: id,
+                            status: ConnectionStatusKind::Error(e.to_string()),
+                        });
+                    }
+                }
             }
             BackendCommand::Disconnect { id } => {
+                if let Some(client) = clients.remove(&id)
+                    && let Err(e) = client.drain().await
+                {
+                    tracing::warn!(id, %e, "Error draining connection");
+                }
                 let _ = evt_tx.send(BackendEvent::ConnectionStatus {
                     connection_id: id,
-                    status: crate::event::ConnectionStatusKind::Disconnected,
+                    status: ConnectionStatusKind::Disconnected,
                 });
             }
             BackendCommand::Publish { connection_id, .. } => {
@@ -143,4 +170,62 @@ pub async fn run_worker(
     }
 
     tracing::info!("Backend worker stopped");
+}
+
+/// Build ConnectOptions from a ConnectionConfig and connect.
+async fn do_connect(
+    config: &ConnectionConfig,
+    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+) -> Result<Client, Box<dyn std::error::Error + Send + Sync>> {
+    let id = config.id;
+    let event_tx = evt_tx.clone();
+
+    let mut opts = match &config.auth {
+        AuthMethod::None => async_nats::ConnectOptions::new(),
+        AuthMethod::Token { token } => async_nats::ConnectOptions::with_token(token.clone()),
+        AuthMethod::UserPassword { username, password } => {
+            async_nats::ConnectOptions::with_user_and_password(username.clone(), password.clone())
+        }
+        AuthMethod::NKey { seed } => async_nats::ConnectOptions::with_nkey(seed.clone()),
+        AuthMethod::CredentialsFile { path } => {
+            async_nats::ConnectOptions::with_credentials_file(path).await?
+        }
+        AuthMethod::TlsClientCert {
+            cert_path,
+            key_path,
+        } => async_nats::ConnectOptions::new()
+            .add_client_certificate(cert_path.into(), key_path.into()),
+    };
+
+    if config.tls_enabled {
+        opts = opts.require_tls(true);
+    }
+
+    opts = opts.name(&config.name).event_callback(move |event| {
+        let tx = event_tx.clone();
+        async move {
+            let status = match event {
+                async_nats::Event::Connected => ConnectionStatusKind::Connected,
+                async_nats::Event::Disconnected => ConnectionStatusKind::Disconnected,
+                async_nats::Event::ClientError(e) => ConnectionStatusKind::Error(e.to_string()),
+                other => {
+                    tracing::debug!(connection_id = id, %other, "NATS event");
+                    return;
+                }
+            };
+            let _ = tx.send(BackendEvent::ConnectionStatus {
+                connection_id: id,
+                status,
+            });
+        }
+    });
+
+    let addrs: Vec<async_nats::ServerAddr> = config
+        .urls
+        .iter()
+        .map(|u| u.parse())
+        .collect::<Result<_, _>>()?;
+
+    let client = opts.connect(&addrs[..]).await?;
+    Ok(client)
 }

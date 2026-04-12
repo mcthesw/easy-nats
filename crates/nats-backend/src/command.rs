@@ -1,9 +1,11 @@
+use crate::connection::ConnectionConfig;
+
 /// Commands sent from the UI thread to the async backend worker.
 #[derive(Debug)]
 pub enum BackendCommand {
     // Connection
     Connect {
-        id: u64,
+        config: ConnectionConfig,
     },
     Disconnect {
         id: u64,

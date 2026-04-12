@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-async-nats = "0.47.0"
+async-nats = { version = "0.47.0", features = ["nkeys"] }
 tokio = { version = "1", features = ["full"] }
 tracing = "0.1"
 scc = "3.6.12"
