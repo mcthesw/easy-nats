@@ -1,0 +1,36 @@
+services:
+  # ── Main NATS server (with auth) ──
+  nats:
+    image: nats:latest
+    container_name: easy-nats-dev
+    ports:
+      - "4222:4222"   # Client
+      - "8222:8222"   # HTTP monitoring
+    volumes:
+      - ./nats-server.conf:/etc/nats/nats-server.conf
+      - nats-data:/data
+    command: ["-c", "/etc/nats/nats-server.conf"]
+
+  # ── Second NATS server (no auth) for multi-connection testing ──
+  nats-open:
+    image: nats:latest
+    container_name: easy-nats-open
+    ports:
+      - "4223:4222"
+      - "8223:8222"
+    command: ["--jetstream", "--store_dir", "/data", "-m", "8222"]
+    volumes:
+      - nats-open-data:/data
+
+  # ── NATS toolbox (nats CLI) ──
+  nats-box:
+    image: natsio/nats-box:latest
+    container_name: easy-nats-box
+    depends_on: [nats, nats-open]
+    entrypoint: ["/bin/sh", "-c", "sleep infinity"]
+    environment:
+      - NATS_URL=nats://nats-open:4222
+
+volumes:
+  nats-data:
+  nats-open-data:
