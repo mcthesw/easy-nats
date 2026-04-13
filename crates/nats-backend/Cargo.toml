@@ -5,7 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
-async-nats = { version = "0.47.0", features = ["nkeys", "jetstream", "kv"] }
+async-nats = { version = "0.47.0", features = ["nkeys", "jetstream", "kv", "object-store"] }
 base64 = "0.22"
 bytes = "1"
 futures-util = "0.3"

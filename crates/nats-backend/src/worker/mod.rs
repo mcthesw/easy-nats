@@ -204,23 +204,57 @@ pub async fn run_worker(
                 kv::handle_get_history(&state, connection_id, bucket, key, &evt_tx).await;
             }
             BackendCommand::ListObjectStoreBuckets { connection_id } => {
-                object_store::handle_list_buckets(connection_id, &evt_tx);
+                object_store::handle_list_buckets(&state, connection_id, &evt_tx).await;
             }
-            BackendCommand::CreateObjectStoreBucket { connection_id, .. } => {
-                object_store::handle_create_bucket(connection_id, &evt_tx);
+            BackendCommand::CreateObjectStoreBucket {
+                connection_id,
+                config,
+            } => {
+                object_store::handle_create_bucket(&state, connection_id, config, &evt_tx).await;
             }
-            BackendCommand::DeleteObjectStoreBucket { connection_id, .. } => {
-                object_store::handle_delete_bucket(connection_id, &evt_tx);
+            BackendCommand::DeleteObjectStoreBucket {
+                connection_id,
+                bucket,
+            } => {
+                object_store::handle_delete_bucket(&state, connection_id, bucket, &evt_tx).await;
             }
-            BackendCommand::ListObjects { connection_id, .. }
-            | BackendCommand::DownloadObject { connection_id, .. } => {
-                object_store::handle_query(connection_id, &evt_tx);
+            BackendCommand::ListObjects {
+                connection_id,
+                bucket,
+            } => {
+                object_store::handle_list_objects(&state, connection_id, bucket, &evt_tx).await;
             }
-            BackendCommand::DeleteObject { connection_id, .. } => {
-                object_store::handle_delete_object(connection_id, &evt_tx);
+            BackendCommand::DownloadObject {
+                connection_id,
+                bucket,
+                name,
+            } => {
+                object_store::handle_download_object(&state, connection_id, bucket, name, &evt_tx)
+                    .await;
             }
-            BackendCommand::UploadObject { connection_id, .. } => {
-                object_store::handle_upload_object(connection_id, &evt_tx);
+            BackendCommand::DeleteObject {
+                connection_id,
+                bucket,
+                name,
+            } => {
+                object_store::handle_delete_object(&state, connection_id, bucket, name, &evt_tx)
+                    .await;
+            }
+            BackendCommand::UploadObject {
+                connection_id,
+                bucket,
+                name,
+                data,
+            } => {
+                object_store::handle_upload_object(
+                    &state,
+                    connection_id,
+                    bucket,
+                    name,
+                    data,
+                    &evt_tx,
+                )
+                .await;
             }
         }
     }
