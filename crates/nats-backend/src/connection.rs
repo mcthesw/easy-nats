@@ -7,7 +7,10 @@ pub struct ConnectionConfig {
     pub name: String,
     pub urls: Vec<String>,
     pub auth: AuthMethod,
+    #[serde(default)]
     pub tls_enabled: bool,
+    #[serde(default)]
+    pub tls_first: bool,
 }
 
 impl ConnectionConfig {
@@ -18,6 +21,7 @@ impl ConnectionConfig {
             urls: vec![url],
             auth: AuthMethod::None,
             tls_enabled: false,
+            tls_first: false,
         }
     }
 }

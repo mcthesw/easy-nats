@@ -108,6 +108,7 @@ impl EasyNatsApp {
             cert_path,
             key_path,
             tls_enabled: cfg.tls_enabled,
+            tls_first: cfg.tls_first,
             delete_confirm: None,
         };
     }
@@ -140,6 +141,7 @@ impl EasyNatsApp {
                 c.urls = vec![self.editor.url.clone()];
                 c.auth = auth;
                 c.tls_enabled = self.editor.tls_enabled;
+                c.tls_first = self.editor.tls_first;
             }
         } else {
             let id = self.config.next_connection_id();
@@ -149,6 +151,7 @@ impl EasyNatsApp {
                 urls: vec![self.editor.url.clone()],
                 auth,
                 tls_enabled: self.editor.tls_enabled,
+                tls_first: self.editor.tls_first,
             });
         }
         self.config.save();

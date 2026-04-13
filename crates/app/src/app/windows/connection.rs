@@ -30,7 +30,10 @@ fn render_connection_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                 ui.horizontal(|ui| {
                     let valid =
                         !app.editor.name.trim().is_empty() && !app.editor.url.trim().is_empty();
-                    if ui.add_enabled(valid, egui::Button::new(t("common.save"))).clicked() {
+                    if ui
+                        .add_enabled(valid, egui::Button::new(t("common.save")))
+                        .clicked()
+                    {
                         save_requested = true;
                     }
                     if ui.button(t("common.cancel")).clicked() {
@@ -72,8 +75,27 @@ fn render_editor_grid(editor: &mut ConnectionEditor, ui: &mut egui::Ui) {
 
             render_auth_fields(editor, ui);
 
-            ui.label(t("connection.field_tls"));
-            ui.checkbox(&mut editor.tls_enabled, t("connection.require_tls"));
+            ui.label(t("connection.field_tls_mode"));
+            let mut mode = if editor.tls_first {
+                2
+            } else if editor.tls_enabled {
+                1
+            } else {
+                0
+            };
+            egui::ComboBox::from_id_salt("tls_mode")
+                .selected_text(match mode {
+                    1 => t("connection.tls_mode_required"),
+                    2 => t("connection.tls_mode_first"),
+                    _ => t("connection.tls_mode_off"),
+                })
+                .show_ui(ui, |ui| {
+                    ui.selectable_value(&mut mode, 0, t("connection.tls_mode_off"));
+                    ui.selectable_value(&mut mode, 1, t("connection.tls_mode_required"));
+                    ui.selectable_value(&mut mode, 2, t("connection.tls_mode_first"));
+                });
+            editor.tls_enabled = mode != 0;
+            editor.tls_first = mode == 2;
             ui.end_row();
         });
 }

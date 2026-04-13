@@ -52,6 +52,18 @@ field_tls:
 require_tls:
   en: "Require TLS"
   zh: "要求 TLS"
+field_tls_mode:
+  en: "TLS Mode:"
+  zh: "TLS 模式:"
+tls_mode_off:
+  en: "Off"
+  zh: "关闭"
+tls_mode_required:
+  en: "Required"
+  zh: "要求 TLS"
+tls_mode_first:
+  en: "TLS First"
+  zh: "TLS First"
 
 # Auth methods
 auth_none:

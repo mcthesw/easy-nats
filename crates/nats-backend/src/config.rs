@@ -85,6 +85,7 @@ mod tests {
                 urls: vec!["nats://localhost:4222".to_string()],
                 auth: AuthMethod::None,
                 tls_enabled: false,
+                tls_first: false,
             }],
             next_id: 1,
         };

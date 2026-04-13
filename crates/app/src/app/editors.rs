@@ -15,6 +15,7 @@ pub(crate) struct ConnectionEditor {
     pub(crate) cert_path: String,
     pub(crate) key_path: String,
     pub(crate) tls_enabled: bool,
+    pub(crate) tls_first: bool,
     pub(crate) delete_confirm: Option<u64>,
 }
 

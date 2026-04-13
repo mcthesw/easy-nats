@@ -84,7 +84,9 @@ async fn do_connect(
             .add_client_certificate(cert_path.into(), key_path.into()),
     };
 
-    if config.tls_enabled {
+    if config.tls_first {
+        opts = opts.require_tls(true).tls_first();
+    } else if config.tls_enabled {
         opts = opts.require_tls(true);
     }
 
