@@ -20,16 +20,20 @@ impl EasyNatsApp {
                     status,
                 } => {
                     tracing::info!(connection_id, ?status, "Connection status changed");
+                    let prev = self.conn_statuses.get(&connection_id).cloned();
                     match &status {
                         ConnectionStatusKind::Connected => {
-                            self.toasts.push(
-                                ToastLevel::Success,
-                                format!("Connected to {}", self.conn_name(connection_id)),
-                            );
-                            self.backend
-                                .send(BackendCommand::ListStreams { connection_id });
-                            self.backend
-                                .send(BackendCommand::ListKvBuckets { connection_id });
+                            // Guard against duplicate Connected events from the NATS event_callback
+                            if !matches!(prev, Some(ConnectionStatusKind::Connected)) {
+                                self.toasts.push(
+                                    ToastLevel::Success,
+                                    format!("Connected to {}", self.conn_name(connection_id)),
+                                );
+                                self.backend
+                                    .send(BackendCommand::ListStreams { connection_id });
+                                self.backend
+                                    .send(BackendCommand::ListKvBuckets { connection_id });
+                            }
                         }
                         ConnectionStatusKind::Disconnected => {
                             self.stream_lists.remove(&connection_id);

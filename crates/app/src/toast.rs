@@ -53,8 +53,9 @@ impl Toasts {
         ctx.request_repaint_after(std::time::Duration::from_millis(100));
 
         let mut dismissed: Option<usize> = None;
-        egui::Area::new(egui::Id::new("toasts_area"))
+        let _area_resp = egui::Area::new(egui::Id::new("toasts_area"))
             .anchor(egui::Align2::RIGHT_TOP, egui::vec2(-8.0, 8.0))
+            .order(egui::Order::Foreground)
             .show(ctx, |ui| {
                 for (i, toast) in self.items.iter().enumerate() {
                     let (bg, text_color) = match toast.level {
@@ -91,6 +92,9 @@ impl Toasts {
 
         if let Some(i) = dismissed {
             self.items.remove(i);
+            // Yield input focus back to the main window after dismissal
+            // to prevent stale hover/drag state from blocking OS window interactions.
+            ctx.memory_mut(|m| m.stop_text_input());
         }
     }
 }
