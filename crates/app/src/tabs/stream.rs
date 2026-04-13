@@ -5,7 +5,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
 
-use super::common::{auto_refresh_ui, draggable_separator, format_bytes};
+use super::common::{auto_refresh_ui, format_bytes};
 use super::stream_consumers::render_consumers;
 use super::types::{StreamState, TabAction};
 
@@ -36,22 +36,55 @@ pub fn stream_ui(
             .request_repaint_after(std::time::Duration::from_secs(1));
     }
 
+    // Collapsible stream info header
     if let Some(info) = &state.info {
         egui::CollapsingHeader::new(t("stream.info"))
             .id_salt("stream_info")
-            .default_open(true)
+            .default_open(false)
             .show(ui, |ui| stream_info_panel(ui, info));
-        ui.separator();
     }
 
-    render_message_browser(ui, connection_id, stream_name, state, backend);
+    // Message browser controls
+    render_message_controls(ui, connection_id, stream_name, state, backend);
     ui.separator();
-    render_consumers(ui, connection_id, stream_name, state, backend, actions);
-    ui.separator();
-    render_purge_controls(ui, connection_id, stream_name, state, backend);
+
+    // Horizontal split: left message list, right message detail + consumers + purge
+    let panel_id = egui::Id::new(("stream_left_panel", connection_id, stream_name));
+    egui::Panel::left(panel_id)
+        .resizable(true)
+        .default_size(300.0)
+        .size_range(200.0..=f32::INFINITY)
+        .show_inside(ui, |ui| {
+            render_message_list(ui, state);
+        });
+
+    egui::CentralPanel::default().show_inside(ui, |ui| {
+        // Bottom: consumers + purge (resizable)
+        egui::Panel::bottom(egui::Id::new((
+            "stream_right_bottom",
+            connection_id,
+            stream_name,
+        )))
+        .resizable(true)
+        .default_size(150.0)
+        .show_inside(ui, |ui| {
+            render_consumers(ui, connection_id, stream_name, state, backend, actions);
+            ui.separator();
+            render_purge_controls(ui, connection_id, stream_name, state, backend);
+        });
+
+        // Remaining space: message detail
+        if let Some(idx) = state.selected_msg {
+            if let Some(msg) = state.messages.get(idx) {
+                stream_message_detail(ui, msg, &mut state.payload_format);
+            }
+        } else {
+            ui.label(t("stream.select_msg"));
+        }
+    });
 }
 
-fn render_message_browser(
+fn render_message_controls(
     ui: &mut egui::Ui,
     connection_id: u64,
     stream_name: &str,
@@ -98,15 +131,13 @@ fn render_message_browser(
     if state.fetching {
         ui.spinner();
     }
+}
 
-    let available_height = ui.available_height();
-    let list_height = (available_height * state.split_ratio).max(40.0);
-
-    ui.add_space(4.0);
+fn render_message_list(ui: &mut egui::Ui, state: &mut StreamState) {
     ui.label(t("stream.messages"));
     egui::ScrollArea::vertical()
         .id_salt("stream_msg_list")
-        .max_height(list_height)
+        .auto_shrink(false)
         .show(ui, |ui| {
             if state.messages.is_empty() {
                 ui.label(t("stream.no_messages"));
@@ -114,11 +145,10 @@ fn render_message_browser(
                 for (idx, msg) in state.messages.iter().enumerate() {
                     let seq = msg["sequence"].as_u64().unwrap_or(0);
                     let subject = msg["subject"].as_str().unwrap_or("");
+                    let label = format!("#{seq} {subject}");
+                    let selected = state.selected_msg == Some(idx);
                     if ui
-                        .selectable_label(
-                            state.selected_msg == Some(idx),
-                            format!("#{seq} — {subject}"),
-                        )
+                        .selectable_label(selected, &label)
                         .clicked()
                     {
                         state.selected_msg = Some(idx);
@@ -126,22 +156,6 @@ fn render_message_browser(
                 }
             }
         });
-
-    let delta = draggable_separator(
-        ui,
-        &format!("stream_msg_split_{connection_id}_{stream_name}"),
-    );
-    if delta != 0.0 {
-        state.split_ratio = (state.split_ratio + delta / available_height).clamp(0.15, 0.85);
-    }
-
-    if let Some(idx) = state.selected_msg {
-        if let Some(msg) = state.messages.get(idx) {
-            stream_message_detail(ui, msg, &mut state.payload_format);
-        }
-    } else {
-        ui.label(t("stream.select_msg"));
-    }
 }
 
 fn render_purge_controls(
@@ -308,7 +322,6 @@ fn stream_message_detail(
     ui.label(t("stream.msg_payload"));
     egui::ScrollArea::vertical()
         .id_salt("stream_msg_payload")
-        .max_height(200.0)
         .show(ui, |ui| {
             if let Some(payload_b64) = msg["payload_base64"].as_str() {
                 match base64::engine::general_purpose::STANDARD.decode(payload_b64) {

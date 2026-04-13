@@ -57,7 +57,6 @@ pub enum TabAction {
         of_title: String,
     },
     OpenConnectionEditor,
-    OpenTab(Box<TabKind>),
     ApplyTheme {
         dark: bool,
     },
@@ -119,8 +118,6 @@ pub struct SubscriberState {
     pub payload_format: PayloadFormat,
     /// When set, only display messages matching this subject.
     pub subject_filter: Option<String>,
-    /// Ratio of message-list height to total available height (0.0–1.0).
-    pub split_ratio: f32,
 }
 
 impl Default for SubscriberState {
@@ -133,7 +130,6 @@ impl Default for SubscriberState {
             selected_idx: None,
             payload_format: PayloadFormat::Auto,
             subject_filter: None,
-            split_ratio: 0.5,
         }
     }
 }
@@ -167,7 +163,6 @@ pub struct StreamState {
     pub purge_subject: String,
     pub consumers: Vec<serde_json::Value>,
     pub consumers_fetching: bool,
-    pub split_ratio: f32,
     pub auto_refresh: AutoRefresh,
 }
 
@@ -185,7 +180,6 @@ impl Default for StreamState {
             purge_subject: String::new(),
             consumers: Vec::new(),
             consumers_fetching: false,
-            split_ratio: 0.5,
             auto_refresh: AutoRefresh::default(),
         }
     }
@@ -208,6 +202,7 @@ pub struct KvBucketState {
     pub history: Vec<serde_json::Value>,
     pub history_format: PayloadFormat,
     pub show_history: bool,
+    pub creating_new: bool,
     pub auto_refresh: AutoRefresh,
 }
 
@@ -229,6 +224,7 @@ impl Default for KvBucketState {
             history: Vec::new(),
             history_format: PayloadFormat::Auto,
             show_history: false,
+            creating_new: false,
             auto_refresh: AutoRefresh::default(),
         }
     }

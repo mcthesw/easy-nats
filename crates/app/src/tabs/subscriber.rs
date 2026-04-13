@@ -4,7 +4,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
 
-use super::common::{draggable_separator, format_timestamp, payload_preview};
+use super::common::format_timestamp;
 use super::types::{ReceivedMessage, SubjectSubscription, SubscriberState};
 
 pub fn subscriber_ui(
@@ -16,24 +16,28 @@ pub fn subscriber_ui(
     render_subscription_controls(ui, connection_id, state, backend);
     ui.separator();
 
-    let available_height = ui.available_height();
-    let list_height = (available_height * state.split_ratio).max(40.0);
+    // Horizontal split: left message list, right detail
+    let panel_id = egui::Id::new(("sub_left_panel", connection_id));
+    egui::Panel::left(panel_id)
+        .resizable(true)
+        .default_size(300.0)
+        .size_range(200.0..=f32::INFINITY)
+        .show_inside(ui, |ui| {
+            render_message_list(ui, state);
+        });
 
-    render_message_list(ui, state, list_height);
-
-    let delta = draggable_separator(ui, &format!("sub_split_{connection_id}"));
-    if delta != 0.0 {
-        state.split_ratio = (state.split_ratio + delta / available_height).clamp(0.15, 0.85);
-    }
-
-    let selected_msg = state
-        .selected_idx
-        .and_then(|idx| filtered_messages(state).get(idx).cloned().cloned());
-    if let Some(msg) = &selected_msg {
-        message_detail_ui(ui, msg, &mut state.payload_format);
-    } else {
-        ui.label(t("subscriber.select_msg"));
-    }
+    egui::CentralPanel::default().show_inside(ui, |ui| {
+        let selected_msg = state
+            .selected_idx
+            .and_then(|idx| filtered_messages(state).get(idx).cloned().cloned());
+        if let Some(msg) = &selected_msg {
+            message_detail_ui(ui, msg, &mut state.payload_format);
+        } else {
+            ui.centered_and_justified(|ui| {
+                ui.label(t("subscriber.select_msg"));
+            });
+        }
+    });
 }
 
 fn render_subscription_controls(
@@ -97,7 +101,7 @@ fn render_subscription_controls(
     }
 }
 
-fn render_message_list(ui: &mut egui::Ui, state: &mut SubscriberState, list_height: f32) {
+fn render_message_list(ui: &mut egui::Ui, state: &mut SubscriberState) {
     ui.horizontal(|ui| {
         ui.label(format!(
             "{} {} / {}",
@@ -147,35 +151,55 @@ fn render_message_list(ui: &mut egui::Ui, state: &mut SubscriberState, list_heig
     ui.label(t("subscriber.messages"));
 
     // Collect filtered message indices to avoid borrow conflicts
-    let filtered: Vec<(usize, String)> = {
+    let filtered: Vec<(usize, String, String)> = {
         let msgs = filtered_messages(state);
         msgs.iter()
             .enumerate()
             .map(|(idx, msg)| {
-                let label = format!(
-                    "[{}] {} — {}",
-                    format_timestamp(msg.timestamp),
-                    msg.subject,
-                    payload_preview(&msg.payload, 80)
-                );
-                (idx, label)
+                let time = format_timestamp(msg.timestamp);
+                let subject = msg.subject.clone();
+                (idx, time, subject)
             })
             .collect()
     };
 
     egui::ScrollArea::vertical()
         .id_salt("sub_msg_list")
-        .max_height(list_height)
         .stick_to_bottom(true)
+        .auto_shrink(false)
         .show(ui, |ui| {
             if filtered.is_empty() {
                 ui.label(t("subscriber.no_messages"));
             } else {
-                for (idx, label) in &filtered {
-                    if ui
-                        .selectable_label(state.selected_idx == Some(*idx), label.as_str())
-                        .clicked()
-                    {
+                for (idx, time, subject) in &filtered {
+                    let selected = state.selected_idx == Some(*idx);
+                    let visuals = ui.visuals();
+                    let time_color = visuals.weak_text_color();
+                    let subj_color = if selected {
+                        visuals.strong_text_color()
+                    } else {
+                        visuals.text_color()
+                    };
+                    let mut job = egui::text::LayoutJob::default();
+                    job.append(
+                        time,
+                        0.0,
+                        egui::TextFormat {
+                            font_id: egui::FontId::proportional(11.0),
+                            color: time_color,
+                            ..Default::default()
+                        },
+                    );
+                    job.append(
+                        &format!("\n{subject}"),
+                        0.0,
+                        egui::TextFormat {
+                            font_id: egui::FontId::proportional(13.0),
+                            color: subj_color,
+                            ..Default::default()
+                        },
+                    );
+                    if ui.selectable_label(selected, job).clicked() {
                         state.selected_idx = Some(*idx);
                     }
                 }
@@ -242,7 +266,6 @@ fn message_detail_ui(ui: &mut egui::Ui, msg: &ReceivedMessage, payload_format: &
     ui.label(t("subscriber.detail_payload"));
     egui::ScrollArea::vertical()
         .id_salt("msg_detail_payload")
-        .max_height(200.0)
         .show(ui, |ui| {
             format::render_payload(ui, &msg.payload, *payload_format);
         });

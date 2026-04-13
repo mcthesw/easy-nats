@@ -4,7 +4,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 use crate::format;
 use crate::i18n::t;
 
-use super::common::{auto_refresh_ui, decode_base64_payload, format_bytes, kv_empty_preview};
+use super::common::{auto_refresh_ui, decode_base64_payload, format_bytes};
 use super::types::{KvBucketState, TabAction};
 
 pub fn kv_bucket_ui(
@@ -25,6 +25,24 @@ pub fn kv_bucket_ui(
         }
     });
 
+    // Auto-refresh (outside the split to avoid panel width jitter)
+    ui.horizontal(|ui| {
+        auto_refresh_ui(ui, "kv_auto_refresh", &mut state.auto_refresh);
+    });
+    if state.auto_refresh.should_refresh() {
+        backend.send(BackendCommand::ListKvKeys {
+            connection_id,
+            bucket: bucket_name.to_string(),
+        });
+        state.loading_entries = true;
+        state.auto_refresh.mark_refreshed();
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_secs(1));
+    } else if state.auto_refresh.enabled {
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_secs(1));
+    }
+
     if let Some(info) = &state.info {
         egui::CollapsingHeader::new(t("kv.bucket_info"))
             .id_salt(("kv_bucket_info", connection_id, bucket_name))
@@ -37,8 +55,8 @@ pub fn kv_bucket_ui(
     let panel_id = egui::Id::new(("kv_left_panel", connection_id, bucket_name));
     egui::Panel::left(panel_id)
         .resizable(true)
-        .default_size(260.0)
-        .size_range(160.0..=500.0)
+        .default_size(300.0)
+        .size_range(200.0..=f32::INFINITY)
         .show_inside(ui, |ui| {
             render_key_list(ui, connection_id, bucket_name, state, backend);
         });
@@ -60,12 +78,8 @@ fn render_key_list(
     state: &mut KvBucketState,
     backend: &BackendHandle,
 ) {
+    // Toolbar row: refresh + new entry
     ui.horizontal(|ui| {
-        ui.add(
-            egui::TextEdit::singleline(&mut state.key_filter)
-                .hint_text(t("kv.key_filter"))
-                .desired_width(ui.available_width() - 70.0),
-        );
         if ui
             .add_enabled(!state.loading_entries, egui::Button::new("↻"))
             .on_hover_text(t("kv.refresh"))
@@ -77,26 +91,17 @@ fn render_key_list(
             });
             state.loading_entries = true;
         }
+        if ui.button("+").on_hover_text(t("kv.new_entry")).clicked() {
+            clear_kv_editor(state);
+            state.creating_new = true;
+        }
     });
-
-    ui.horizontal(|ui| {
-        auto_refresh_ui(ui, "kv_auto_refresh", &mut state.auto_refresh);
-    });
-
-    // Auto-refresh timer
-    if state.auto_refresh.should_refresh() {
-        backend.send(BackendCommand::ListKvKeys {
-            connection_id,
-            bucket: bucket_name.to_string(),
-        });
-        state.loading_entries = true;
-        state.auto_refresh.mark_refreshed();
-        ui.ctx()
-            .request_repaint_after(std::time::Duration::from_secs(1));
-    } else if state.auto_refresh.enabled {
-        ui.ctx()
-            .request_repaint_after(std::time::Duration::from_secs(1));
-    }
+    // Filter row: full width
+    ui.add(
+        egui::TextEdit::singleline(&mut state.key_filter)
+            .hint_text(t("kv.key_filter"))
+            .desired_width(f32::INFINITY),
+    );
 
     if state.loading_entries {
         ui.horizontal(|ui| {
@@ -104,12 +109,6 @@ fn render_key_list(
             ui.label(t("kv.loading_keys"));
         });
     }
-
-    if ui.small_button(t("kv.new_entry")).clicked() {
-        clear_kv_editor(state);
-    }
-
-    ui.add_space(4.0);
 
     egui::ScrollArea::vertical()
         .id_salt(("kv_keys", connection_id, bucket_name))
@@ -129,15 +128,13 @@ fn render_key_list(
             } else {
                 for entry in &filtered {
                     let key = entry["key"].as_str().unwrap_or("");
-                    let revision = entry["revision"].as_u64().unwrap_or(0);
-                    let preview = kv_payload_preview(entry, 48);
-                    let label = format!("{key} (r{revision}) — {preview}");
                     if ui
-                        .selectable_label(state.selected_key.as_deref() == Some(key), label)
+                        .selectable_label(state.selected_key.as_deref() == Some(key), key)
                         .clicked()
                     {
                         state.selected_key = Some(key.to_string());
                         state.show_history = false;
+                        state.creating_new = false;
                         load_kv_entry_into_editor(state, entry);
                         backend.send(BackendCommand::GetKvEntry {
                             connection_id,
@@ -163,15 +160,21 @@ fn render_detail_panel(
     state: &mut KvBucketState,
     backend: &BackendHandle,
 ) {
-    if state.selected_key.is_none() && state.entry_key.is_empty() {
+    if state.selected_key.is_none() && !state.creating_new {
         ui.centered_and_justified(|ui| {
             ui.label(t("kv.select_key_hint"));
         });
         return;
     }
 
+    let is_new = state.selected_key.is_none();
+
     // Action toolbar
     ui.horizontal(|ui| {
+        if is_new {
+            ui.label(egui::RichText::new(t("kv.new_entry")).strong());
+            ui.separator();
+        }
         let can_save = !state.entry_key.trim().is_empty();
         if ui
             .add_enabled(can_save, egui::Button::new(t("common.save")))
@@ -366,9 +369,4 @@ fn load_kv_entry_into_editor(state: &mut KvBucketState, entry: &serde_json::Valu
     state.entry_revision = entry["revision"].as_u64();
     state.entry_operation = entry["operation"].as_str().map(str::to_owned);
     state.entry_created = entry["created"].as_str().map(str::to_owned);
-}
-
-fn kv_payload_preview(entry: &serde_json::Value, max_len: usize) -> String {
-    let payload = decode_base64_payload(entry["value_base64"].as_str());
-    kv_empty_preview(&payload, max_len)
 }
