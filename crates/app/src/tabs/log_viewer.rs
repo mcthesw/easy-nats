@@ -33,7 +33,8 @@ pub fn log_viewer_ui(ui: &mut egui::Ui, log_buffer: &SharedLogBuffer) {
                 }
             });
     });
-    ui.ctx().data_mut(|d| d.insert_persisted(filter_id, filter_idx));
+    ui.ctx()
+        .data_mut(|d| d.insert_persisted(filter_id, filter_idx));
     ui.separator();
 
     let min_level = LEVELS[filter_idx];

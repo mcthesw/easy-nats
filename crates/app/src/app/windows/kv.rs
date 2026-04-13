@@ -105,7 +105,10 @@ fn render_bucket_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     let valid = !app.kv_bucket_editor.bucket.trim().is_empty();
-                    if ui.add_enabled(valid, egui::Button::new(t("common.save"))).clicked() {
+                    if ui
+                        .add_enabled(valid, egui::Button::new(t("common.save")))
+                        .clicked()
+                    {
                         save_requested = true;
                     }
                     if ui.button(t("common.cancel")).clicked() {

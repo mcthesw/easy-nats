@@ -111,49 +111,46 @@ fn render_connection_row(
             *action = Some(SidebarAction::Select(id));
         }
 
-        ui.with_layout(
-            egui::Layout::right_to_left(egui::Align::Center),
-            |ui| {
-                match status {
-                    ConnectionStatusKind::Connected => {
-                        if ui
-                            .small_button("⏏")
-                            .on_hover_text(t("connection.disconnect"))
-                            .clicked()
-                        {
-                            *action = Some(SidebarAction::Disconnect(id));
-                        }
-                    }
-                    ConnectionStatusKind::Connecting => {}
-                    _ => {
-                        if ui
-                            .small_button("▶")
-                            .on_hover_text(t("connection.connect"))
-                            .clicked()
-                        {
-                            *action = Some(SidebarAction::Connect(id));
-                        }
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            match status {
+                ConnectionStatusKind::Connected => {
+                    if ui
+                        .small_button("⏏")
+                        .on_hover_text(t("connection.disconnect"))
+                        .clicked()
+                    {
+                        *action = Some(SidebarAction::Disconnect(id));
                     }
                 }
-
-                if ui
-                    .small_button("🗑")
-                    .on_hover_text(t("sidebar.action_delete"))
-                    .clicked()
-                {
-                    app.editor.delete_confirm = Some(id);
+                ConnectionStatusKind::Connecting => {}
+                _ => {
+                    if ui
+                        .small_button("▶")
+                        .on_hover_text(t("connection.connect"))
+                        .clicked()
+                    {
+                        *action = Some(SidebarAction::Connect(id));
+                    }
                 }
+            }
 
-                if ui
-                    .small_button("✏")
-                    .on_hover_text(t("sidebar.action_edit"))
-                    .clicked()
-                    && let Some(cfg) = app.config.connections.iter().find(|c| c.id == id).cloned()
-                {
-                    app.open_edit_editor(&cfg);
-                }
-            },
-        );
+            if ui
+                .small_button("🗑")
+                .on_hover_text(t("sidebar.action_delete"))
+                .clicked()
+            {
+                app.editor.delete_confirm = Some(id);
+            }
+
+            if ui
+                .small_button("✏")
+                .on_hover_text(t("sidebar.action_edit"))
+                .clicked()
+                && let Some(cfg) = app.config.connections.iter().find(|c| c.id == id).cloned()
+            {
+                app.open_edit_editor(&cfg);
+            }
+        });
     });
 
     let _ = row_resp;

@@ -98,7 +98,11 @@ fn consumer_card(
                     config["deliver_policy"].as_str(),
                 );
                 info_row(ui, t("consumer.ack_policy"), config["ack_policy"].as_str());
-                info_num_row(ui, t("consumer.max_deliver"), config["max_deliver"].as_i64());
+                info_num_row(
+                    ui,
+                    t("consumer.max_deliver"),
+                    config["max_deliver"].as_i64(),
+                );
                 info_num_row(
                     ui,
                     t("consumer.max_ack_pending"),
