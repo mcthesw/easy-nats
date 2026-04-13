@@ -4,6 +4,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 
 use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
+use crate::proto::ProtoSchemaManager;
 
 use super::common::{auto_refresh_ui, format_bytes};
 use super::stream_consumers::render_consumers;
@@ -16,6 +17,7 @@ pub fn stream_ui(
     state: &mut StreamState,
     backend: &BackendHandle,
     actions: &mut Vec<TabAction>,
+    proto_manager: &ProtoSchemaManager,
 ) {
     // Auto-refresh toggle
     ui.horizontal(|ui| {
@@ -76,7 +78,13 @@ pub fn stream_ui(
         // Remaining space: message detail
         if let Some(idx) = state.selected_msg {
             if let Some(msg) = state.messages.get(idx) {
-                stream_message_detail(ui, msg, &mut state.payload_format);
+                stream_message_detail(
+                    ui,
+                    msg,
+                    &mut state.payload_format,
+                    &mut state.proto_view,
+                    proto_manager,
+                );
             }
         } else {
             ui.label(t("stream.select_msg"));
@@ -272,6 +280,8 @@ fn stream_message_detail(
     ui: &mut egui::Ui,
     msg: &serde_json::Value,
     payload_format: &mut PayloadFormat,
+    proto_view: &mut crate::proto::ProtoViewState,
+    proto_manager: &ProtoSchemaManager,
 ) {
     ui.horizontal(|ui| {
         ui.label(t("stream.msg_detail"));
@@ -322,7 +332,14 @@ fn stream_message_detail(
         .show(ui, |ui| {
             if let Some(payload_b64) = msg["payload_base64"].as_str() {
                 match base64::engine::general_purpose::STANDARD.decode(payload_b64) {
-                    Ok(data) => format::render_payload(ui, &data, *payload_format),
+                    Ok(data) => format::render_payload_with_proto(
+                        ui,
+                        &data,
+                        *payload_format,
+                        "stream_proto",
+                        proto_view,
+                        proto_manager,
+                    ),
                     Err(_) => {
                         ui.label(t("stream.invalid_base64"));
                     }

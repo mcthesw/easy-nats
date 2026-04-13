@@ -3,6 +3,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 
 use crate::format;
 use crate::i18n::t;
+use crate::proto::ProtoSchemaManager;
 
 use super::common::{auto_refresh_ui, decode_base64_payload, format_bytes};
 use super::types::{KvBucketState, TabAction};
@@ -14,6 +15,7 @@ pub fn kv_bucket_ui(
     state: &mut KvBucketState,
     backend: &BackendHandle,
     actions: &mut Vec<TabAction>,
+    proto_manager: &ProtoSchemaManager,
 ) {
     ui.horizontal(|ui| {
         ui.heading(bucket_name);
@@ -64,9 +66,16 @@ pub fn kv_bucket_ui(
     // Right panel: detail or history
     egui::CentralPanel::default().show_inside(ui, |ui| {
         if state.show_history {
-            render_history(ui, connection_id, bucket_name, state);
+            render_history(ui, connection_id, bucket_name, state, proto_manager);
         } else {
-            render_detail_panel(ui, connection_id, bucket_name, state, backend);
+            render_detail_panel(
+                ui,
+                connection_id,
+                bucket_name,
+                state,
+                backend,
+                proto_manager,
+            );
         }
     });
 }
@@ -159,6 +168,7 @@ fn render_detail_panel(
     bucket_name: &str,
     state: &mut KvBucketState,
     backend: &BackendHandle,
+    proto_manager: &ProtoSchemaManager,
 ) {
     if state.selected_key.is_none() && !state.creating_new {
         ui.centered_and_justified(|ui| {
@@ -277,7 +287,14 @@ fn render_detail_panel(
     egui::ScrollArea::vertical()
         .id_salt(("kv_value_preview", connection_id, bucket_name))
         .show(ui, |ui| {
-            format::render_payload(ui, state.entry_value.as_bytes(), state.editor_format);
+            format::render_payload_with_proto(
+                ui,
+                state.entry_value.as_bytes(),
+                state.editor_format,
+                "kv_editor_proto",
+                &mut state.editor_proto_view,
+                proto_manager,
+            );
         });
 }
 
@@ -286,6 +303,7 @@ fn render_history(
     connection_id: u64,
     bucket_name: &str,
     state: &mut KvBucketState,
+    proto_manager: &ProtoSchemaManager,
 ) {
     ui.horizontal(|ui| {
         if ui.button(t("kv.back_to_detail")).clicked() {
@@ -316,7 +334,14 @@ fn render_history(
                         .id_salt(("kv_history_item", connection_id, bucket_name, revision))
                         .show(ui, |ui| {
                             let payload = decode_base64_payload(item["value_base64"].as_str());
-                            format::render_payload(ui, &payload, state.history_format);
+                            format::render_payload_with_proto(
+                                ui,
+                                &payload,
+                                state.history_format,
+                                "kv_history_proto",
+                                &mut state.history_proto_view,
+                                proto_manager,
+                            );
                         });
                 }
             });

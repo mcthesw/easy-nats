@@ -3,6 +3,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 
 use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
+use crate::proto::ProtoSchemaManager;
 
 use super::common::format_timestamp;
 use super::types::{ReceivedMessage, SubjectSubscription, SubscriberState};
@@ -12,6 +13,7 @@ pub fn subscriber_ui(
     connection_id: u64,
     state: &mut SubscriberState,
     backend: &BackendHandle,
+    proto_manager: &ProtoSchemaManager,
 ) {
     render_subscription_controls(ui, connection_id, state, backend);
     ui.separator();
@@ -31,7 +33,13 @@ pub fn subscriber_ui(
             .selected_idx
             .and_then(|idx| filtered_messages(state).get(idx).cloned().cloned());
         if let Some(msg) = &selected_msg {
-            message_detail_ui(ui, msg, &mut state.payload_format);
+            message_detail_ui(
+                ui,
+                msg,
+                &mut state.payload_format,
+                &mut state.proto_view,
+                proto_manager,
+            );
         } else {
             ui.centered_and_justified(|ui| {
                 ui.label(t("subscriber.select_msg"));
@@ -218,7 +226,13 @@ fn filtered_messages(state: &SubscriberState) -> Vec<&ReceivedMessage> {
     }
 }
 
-fn message_detail_ui(ui: &mut egui::Ui, msg: &ReceivedMessage, payload_format: &mut PayloadFormat) {
+fn message_detail_ui(
+    ui: &mut egui::Ui,
+    msg: &ReceivedMessage,
+    payload_format: &mut PayloadFormat,
+    proto_view: &mut crate::proto::ProtoViewState,
+    proto_manager: &ProtoSchemaManager,
+) {
     ui.horizontal(|ui| {
         ui.label(t("subscriber.detail"));
         format::format_selector(ui, "sub_detail_fmt", payload_format);
@@ -267,7 +281,14 @@ fn message_detail_ui(ui: &mut egui::Ui, msg: &ReceivedMessage, payload_format: &
     egui::ScrollArea::vertical()
         .id_salt("msg_detail_payload")
         .show(ui, |ui| {
-            format::render_payload(ui, &msg.payload, *payload_format);
+            format::render_payload_with_proto(
+                ui,
+                &msg.payload,
+                *payload_format,
+                "sub_proto",
+                proto_view,
+                proto_manager,
+            );
         });
 }
 

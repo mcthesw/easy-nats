@@ -79,6 +79,10 @@ pub fn init(lang: Language) {
             include_str!("../../../assets/i18n/consumer.yaml"),
         ),
         ("kv", include_str!("../../../assets/i18n/kv.yaml")),
+        (
+            "obj_store",
+            include_str!("../../../assets/i18n/obj_store.yaml"),
+        ),
         ("toast", include_str!("../../../assets/i18n/toast.yaml")),
         (
             "settings",

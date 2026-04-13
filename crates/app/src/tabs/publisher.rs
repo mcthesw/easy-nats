@@ -3,6 +3,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 
 use crate::format;
 use crate::i18n::t;
+use crate::proto::ProtoSchemaManager;
 
 use super::types::PublisherState;
 
@@ -11,6 +12,7 @@ pub fn publisher_ui(
     connection_id: u64,
     state: &mut PublisherState,
     backend: &BackendHandle,
+    proto_manager: &ProtoSchemaManager,
 ) {
     ui.horizontal(|ui| {
         ui.label(t("publisher.subject"));
@@ -114,10 +116,14 @@ pub fn publisher_ui(
         ui.label(t("publisher.response"));
         format::format_selector(ui, "pub_resp_fmt", &mut state.response_format);
     });
-    render_response(ui, state);
+    render_response(ui, state, proto_manager);
 }
 
-fn render_response(ui: &mut egui::Ui, state: &mut PublisherState) {
+fn render_response(
+    ui: &mut egui::Ui,
+    state: &mut PublisherState,
+    proto_manager: &ProtoSchemaManager,
+) {
     if state.waiting {
         ui.spinner();
         ui.label(t("publisher.waiting"));
@@ -145,7 +151,14 @@ fn render_response(ui: &mut egui::Ui, state: &mut PublisherState) {
             .id_salt("resp_payload")
             .max_height(200.0)
             .show(ui, |ui| {
-                format::render_payload(ui, &resp.payload, state.response_format);
+                format::render_payload_with_proto(
+                    ui,
+                    &resp.payload,
+                    state.response_format,
+                    "pub_proto",
+                    &mut state.proto_view,
+                    proto_manager,
+                );
             });
     } else {
         ui.label(t("publisher.no_response"));

@@ -1,7 +1,7 @@
 use eframe::egui;
 
 use crate::i18n::t;
-use crate::tabs::{kv_bucket_ui, publisher_ui, stream_ui, subscriber_ui};
+use crate::tabs::{kv_bucket_ui, obj_store_bucket_ui, publisher_ui, stream_ui, subscriber_ui};
 
 use super::log_viewer::log_viewer_ui;
 use super::settings::settings_ui;
@@ -42,14 +42,26 @@ pub(crate) fn render_tab(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: 
             state,
             ..
         } => {
-            publisher_ui(ui, *connection_id, state, viewer.backend);
+            publisher_ui(
+                ui,
+                *connection_id,
+                state,
+                viewer.backend,
+                viewer.proto_manager,
+            );
         }
         TabKind::Subscriber {
             connection_id,
             state,
             ..
         } => {
-            subscriber_ui(ui, *connection_id, state, viewer.backend);
+            subscriber_ui(
+                ui,
+                *connection_id,
+                state,
+                viewer.backend,
+                viewer.proto_manager,
+            );
         }
         TabKind::Stream {
             connection_id,
@@ -64,6 +76,7 @@ pub(crate) fn render_tab(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: 
                 state,
                 viewer.backend,
                 viewer.actions,
+                viewer.proto_manager,
             );
         }
         TabKind::KvBucket {
@@ -79,11 +92,23 @@ pub(crate) fn render_tab(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: 
                 state,
                 viewer.backend,
                 viewer.actions,
+                viewer.proto_manager,
             );
         }
-        TabKind::ObjectStoreBucket { bucket_name, .. } => {
-            ui.heading(format!("Object Store: {bucket_name}"));
-            ui.label(t("common.object_store_wip"));
+        TabKind::ObjectStoreBucket {
+            connection_id,
+            bucket_name,
+            state,
+            ..
+        } => {
+            obj_store_bucket_ui(
+                ui,
+                *connection_id,
+                bucket_name,
+                state,
+                viewer.backend,
+                viewer.actions,
+            );
         }
         TabKind::Settings => {
             settings_ui(ui, viewer.settings, viewer.dark_mode, viewer.actions);

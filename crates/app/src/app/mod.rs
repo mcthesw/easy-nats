@@ -3,6 +3,7 @@ mod editors;
 mod events;
 mod kv_results;
 mod model;
+mod obj_store_results;
 mod operation_results;
 mod sidebar;
 mod stream_results;

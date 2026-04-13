@@ -2,10 +2,12 @@ use eframe::egui;
 use nats_backend::{BackendCommand, ConnectionStatusKind};
 
 use crate::i18n::t;
-use crate::tabs::{KvBucketState, PublisherState, StreamState, SubscriberState, TabKind};
+use crate::tabs::{
+    KvBucketState, ObjectStoreBucketState, PublisherState, StreamState, SubscriberState, TabKind,
+};
 
 use super::{
-    editors::{KvBucketCreateEditor, StreamCreateEditor},
+    editors::{KvBucketCreateEditor, ObjStoreBucketCreateEditor, StreamCreateEditor},
     model::EasyNatsApp,
 };
 
@@ -16,6 +18,7 @@ pub(crate) enum SidebarAction {
     OpenTab(Box<TabKind>),
     OpenStreamCreate(u64),
     OpenKvBucketCreate(u64),
+    OpenObjStoreBucketCreate(u64),
 }
 
 pub(crate) fn render_sidebar(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
@@ -167,11 +170,7 @@ fn render_resource_tree(
         render_pubsub_section(app, ui, id, name, action);
         render_streams_section(app, ui, id, name, action);
         render_kv_section(app, ui, id, name, action);
-        egui::CollapsingHeader::new(t("sidebar.section_object_store"))
-            .id_salt(format!("objstore_{id}"))
-            .show(ui, |ui| {
-                ui.weak(t("common.object_store_wip"));
-            });
+        render_obj_store_section(app, ui, id, name, action);
         ui.add_enabled_ui(false, |ui| {
             egui::CollapsingHeader::new(t("sidebar.section_metrics"))
                 .id_salt(format!("metrics_{id}"))
@@ -317,6 +316,57 @@ fn render_kv_section(
         });
 }
 
+fn render_obj_store_section(
+    app: &mut EasyNatsApp,
+    ui: &mut egui::Ui,
+    id: u64,
+    name: &str,
+    action: &mut Option<SidebarAction>,
+) {
+    egui::CollapsingHeader::new(t("sidebar.section_object_store"))
+        .id_salt(format!("objstore_{id}"))
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                if ui
+                    .small_button("＋")
+                    .on_hover_text(t("obj_store.create_bucket"))
+                    .clicked()
+                {
+                    *action = Some(SidebarAction::OpenObjStoreBucketCreate(id));
+                }
+                if ui
+                    .small_button("↻")
+                    .on_hover_text(t("obj_store.refresh"))
+                    .clicked()
+                {
+                    app.backend
+                        .send(BackendCommand::ListObjectStoreBuckets { connection_id: id });
+                }
+            });
+
+            if let Some(infos) = app.obj_store_lists.get(&id) {
+                for info in infos {
+                    if let Some(bucket_name) = info["bucket"].as_str()
+                        && ui.selectable_label(false, bucket_name).clicked()
+                    {
+                        *action = Some(SidebarAction::OpenTab(Box::new(
+                            TabKind::ObjectStoreBucket {
+                                connection_id: id,
+                                connection_name: name.to_string(),
+                                bucket_name: bucket_name.to_string(),
+                                state: ObjectStoreBucketState {
+                                    info: Some(info.clone()),
+                                    loading_objects: true,
+                                    ..Default::default()
+                                },
+                            },
+                        )));
+                    }
+                }
+            }
+        });
+}
+
 fn apply_sidebar_action(app: &mut EasyNatsApp, action: Option<SidebarAction>) {
     match action {
         Some(SidebarAction::Select(id)) => app.selected_conn = Some(id),
@@ -332,6 +382,13 @@ fn apply_sidebar_action(app: &mut EasyNatsApp, action: Option<SidebarAction>) {
         }
         Some(SidebarAction::OpenKvBucketCreate(connection_id)) => {
             app.kv_bucket_editor = KvBucketCreateEditor {
+                visible: true,
+                connection_id,
+                ..Default::default()
+            };
+        }
+        Some(SidebarAction::OpenObjStoreBucketCreate(connection_id)) => {
+            app.obj_store_bucket_editor = ObjStoreBucketCreateEditor {
                 visible: true,
                 connection_id,
                 ..Default::default()

@@ -90,3 +90,15 @@ close_to_right:
 auto_refresh:
   en: "Auto-refresh"
   zh: "自动刷新"
+yes:
+  en: "Yes"
+  zh: "是"
+no:
+  en: "No"
+  zh: "否"
+storage_label:
+  en: "Storage"
+  zh: "存储"
+replicas:
+  en: "Replicas"
+  zh: "副本数"

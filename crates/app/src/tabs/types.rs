@@ -6,6 +6,7 @@ use egui_dock::TabViewer;
 
 use crate::format::PayloadFormat;
 use crate::i18n::t;
+use crate::proto::{ProtoSchemaManager, ProtoViewState};
 
 /// Auto-refresh configuration for periodic data reloading.
 #[derive(Debug)]
@@ -49,6 +50,10 @@ pub enum TabAction {
         connection_id: u64,
         bucket_name: String,
     },
+    ConfirmDeleteObjStoreBucket {
+        connection_id: u64,
+        bucket_name: String,
+    },
     CloseOtherTabs {
         keep_title: String,
     },
@@ -60,6 +65,10 @@ pub enum TabAction {
     ApplyTheme {
         dark: bool,
     },
+    LoadProtoSchemas {
+        dir: String,
+    },
+    ClearProtoSchemas,
 }
 
 #[derive(Debug)]
@@ -71,6 +80,7 @@ pub struct PublisherState {
     pub response: Option<ResponseData>,
     pub waiting: bool,
     pub response_format: PayloadFormat,
+    pub proto_view: ProtoViewState,
 }
 
 impl Default for PublisherState {
@@ -83,6 +93,7 @@ impl Default for PublisherState {
             response: None,
             waiting: false,
             response_format: PayloadFormat::Auto,
+            proto_view: ProtoViewState::default(),
         }
     }
 }
@@ -118,6 +129,7 @@ pub struct SubscriberState {
     pub payload_format: PayloadFormat,
     /// When set, only display messages matching this subject.
     pub subject_filter: Option<String>,
+    pub proto_view: ProtoViewState,
 }
 
 impl Default for SubscriberState {
@@ -130,6 +142,7 @@ impl Default for SubscriberState {
             selected_idx: None,
             payload_format: PayloadFormat::Auto,
             subject_filter: None,
+            proto_view: ProtoViewState::default(),
         }
     }
 }
@@ -164,6 +177,7 @@ pub struct StreamState {
     pub consumers: Vec<serde_json::Value>,
     pub consumers_fetching: bool,
     pub auto_refresh: AutoRefresh,
+    pub proto_view: ProtoViewState,
 }
 
 impl Default for StreamState {
@@ -181,6 +195,7 @@ impl Default for StreamState {
             consumers: Vec::new(),
             consumers_fetching: false,
             auto_refresh: AutoRefresh::default(),
+            proto_view: ProtoViewState::default(),
         }
     }
 }
@@ -204,6 +219,8 @@ pub struct KvBucketState {
     pub show_history: bool,
     pub creating_new: bool,
     pub auto_refresh: AutoRefresh,
+    pub editor_proto_view: ProtoViewState,
+    pub history_proto_view: ProtoViewState,
 }
 
 impl Default for KvBucketState {
@@ -226,8 +243,21 @@ impl Default for KvBucketState {
             show_history: false,
             creating_new: false,
             auto_refresh: AutoRefresh::default(),
+            editor_proto_view: ProtoViewState::default(),
+            history_proto_view: ProtoViewState::default(),
         }
     }
+}
+
+#[derive(Debug, Default)]
+pub struct ObjectStoreBucketState {
+    pub info: Option<serde_json::Value>,
+    pub objects: Vec<serde_json::Value>,
+    pub selected_object: Option<String>,
+    pub object_filter: String,
+    pub loading_objects: bool,
+    pub delete_confirm: bool,
+    pub auto_refresh: AutoRefresh,
 }
 
 #[derive(Debug)]
@@ -257,11 +287,11 @@ pub enum TabKind {
         bucket_name: String,
         state: KvBucketState,
     },
-    #[allow(dead_code)]
     ObjectStoreBucket {
         connection_id: u64,
         connection_name: String,
         bucket_name: String,
+        state: ObjectStoreBucketState,
     },
     Settings,
     LogViewer,
@@ -328,6 +358,7 @@ pub struct AppTabViewer<'a> {
     pub settings: &'a mut crate::settings::AppSettings,
     pub dark_mode: &'a mut bool,
     pub log_buffer: &'a crate::log_layer::SharedLogBuffer,
+    pub proto_manager: &'a ProtoSchemaManager,
 }
 
 impl TabViewer for AppTabViewer<'_> {

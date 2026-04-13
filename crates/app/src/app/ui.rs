@@ -25,6 +25,7 @@ impl eframe::App for EasyNatsApp {
                     settings: &mut self.settings,
                     dark_mode: &mut self.dark_mode,
                     log_buffer: &self.log_buffer,
+                    proto_manager: &self.proto_manager,
                 },
             );
 
@@ -52,6 +53,12 @@ impl eframe::App for EasyNatsApp {
                 } => {
                     self.kv_bucket_delete_confirm = Some((connection_id, bucket_name));
                 }
+                TabAction::ConfirmDeleteObjStoreBucket {
+                    connection_id,
+                    bucket_name,
+                } => {
+                    self.obj_store_bucket_delete_confirm = Some((connection_id, bucket_name));
+                }
                 TabAction::CloseOtherTabs { keep_title } => {
                     self.close_other_tabs(&keep_title);
                 }
@@ -66,6 +73,13 @@ impl eframe::App for EasyNatsApp {
                 }
                 TabAction::ApplyTheme { dark } => {
                     crate::apply_theme(ui.ctx(), dark);
+                }
+                TabAction::LoadProtoSchemas { dir } => {
+                    self.proto_manager
+                        .set_schema_dir(std::path::PathBuf::from(dir));
+                }
+                TabAction::ClearProtoSchemas => {
+                    self.proto_manager.clear();
                 }
             }
         }

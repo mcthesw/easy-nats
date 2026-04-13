@@ -205,6 +205,20 @@ impl EasyNatsApp {
             });
         }
 
+        if let TabKind::ObjectStoreBucket {
+            connection_id,
+            bucket_name,
+            state,
+            ..
+        } = &mut tab
+        {
+            state.loading_objects = true;
+            self.backend.send(BackendCommand::ListObjects {
+                connection_id: *connection_id,
+                bucket: bucket_name.clone(),
+            });
+        }
+
         self.dock_state.push_to_focused_leaf(tab);
     }
 

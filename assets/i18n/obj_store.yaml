@@ -1,0 +1,67 @@
+# Object Store UI strings
+create_bucket:
+  en: "Create Object Store Bucket"
+  zh: "创建对象存储桶"
+delete_bucket:
+  en: "Delete Bucket"
+  zh: "删除存储桶"
+delete_bucket_confirm_title:
+  en: "Delete Object Store Bucket"
+  zh: "删除对象存储桶"
+delete_bucket_confirm_prompt:
+  en: "Are you sure you want to delete bucket"
+  zh: "确定要删除存储桶"
+bucket_info:
+  en: "Bucket Info"
+  zh: "存储桶信息"
+bucket_name:
+  en: "Bucket Name"
+  zh: "存储桶名称"
+max_bytes:
+  en: "Max Bytes"
+  zh: "最大字节数"
+description:
+  en: "Description"
+  zh: "描述"
+refresh:
+  en: "Refresh"
+  zh: "刷新"
+upload:
+  en: "Upload"
+  zh: "上传"
+download:
+  en: "Download"
+  zh: "下载"
+filter:
+  en: "Filter objects…"
+  zh: "过滤对象…"
+loading:
+  en: "Loading objects…"
+  zh: "加载对象中…"
+select_object:
+  en: "Select an object from the list"
+  zh: "从列表中选择一个对象"
+delete_object:
+  en: "Delete Object"
+  zh: "删除对象"
+confirm_delete:
+  en: "Are you sure?"
+  zh: "确定删除？"
+size:
+  en: "Size"
+  zh: "大小"
+chunks:
+  en: "Chunks"
+  zh: "分块数"
+digest:
+  en: "Digest"
+  zh: "摘要"
+modified:
+  en: "Modified"
+  zh: "修改时间"
+total_bytes:
+  en: "Total Bytes"
+  zh: "总字节数"
+object_count:
+  en: "Objects"
+  zh: "对象数"

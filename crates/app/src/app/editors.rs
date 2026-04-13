@@ -229,3 +229,27 @@ impl RetentionSelection {
         }
     }
 }
+
+pub(crate) struct ObjStoreBucketCreateEditor {
+    pub(crate) visible: bool,
+    pub(crate) connection_id: u64,
+    pub(crate) bucket: String,
+    pub(crate) max_bytes: String,
+    pub(crate) storage: StorageSelection,
+    pub(crate) num_replicas: String,
+    pub(crate) description: String,
+}
+
+impl Default for ObjStoreBucketCreateEditor {
+    fn default() -> Self {
+        Self {
+            visible: false,
+            connection_id: 0,
+            bucket: String::new(),
+            max_bytes: String::new(),
+            storage: StorageSelection::File,
+            num_replicas: "1".to_string(),
+            description: String::new(),
+        }
+    }
+}

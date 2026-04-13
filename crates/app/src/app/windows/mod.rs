@@ -1,6 +1,7 @@
 mod connection;
 mod consumer;
 mod kv;
+mod obj_store;
 mod stream;
 
 use eframe::egui;
@@ -12,4 +13,5 @@ pub(crate) fn render_windows(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     stream::render(app, ui);
     consumer::render(app, ui);
     kv::render(app, ui);
+    obj_store::render(app, ui);
 }

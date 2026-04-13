@@ -22,3 +22,27 @@ theme_dark:
 theme_light:
   en: "Light"
   zh: "浅色"
+
+section_protobuf:
+  en: "Protobuf Schemas"
+  zh: "Protobuf 模式"
+
+proto_schema_dir:
+  en: "Schema Directory"
+  zh: "模式目录"
+
+proto_not_set:
+  en: "(not configured)"
+  zh: "（未配置）"
+
+proto_browse:
+  en: "Browse…"
+  zh: "浏览…"
+
+proto_reload:
+  en: "Reload"
+  zh: "重新加载"
+
+proto_clear:
+  en: "Clear"
+  zh: "清除"

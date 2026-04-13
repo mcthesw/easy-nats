@@ -52,4 +52,40 @@ pub fn settings_ui(
             actions.push(TabAction::ApplyTheme { dark: false });
         }
     });
+
+    ui.add_space(12.0);
+    ui.separator();
+    ui.label(egui::RichText::new(t("settings.section_protobuf")).strong());
+    ui.add_space(4.0);
+
+    ui.horizontal(|ui| {
+        ui.label(t("settings.proto_schema_dir"));
+        let display = settings
+            .proto_schema_dir
+            .as_deref()
+            .unwrap_or(t("settings.proto_not_set"));
+        ui.label(display);
+    });
+    ui.horizontal(|ui| {
+        if ui.button(t("settings.proto_browse")).clicked()
+            && let Some(dir) = rfd::FileDialog::new().pick_folder()
+        {
+            let dir_str = dir.to_string_lossy().to_string();
+            settings.proto_schema_dir = Some(dir_str.clone());
+            settings.save();
+            actions.push(TabAction::LoadProtoSchemas { dir: dir_str });
+        }
+        if settings.proto_schema_dir.is_some() {
+            if ui.button(t("settings.proto_reload")).clicked()
+                && let Some(dir) = &settings.proto_schema_dir
+            {
+                actions.push(TabAction::LoadProtoSchemas { dir: dir.clone() });
+            }
+            if ui.button(t("settings.proto_clear")).clicked() {
+                settings.proto_schema_dir = None;
+                settings.save();
+                actions.push(TabAction::ClearProtoSchemas);
+            }
+        }
+    });
 }

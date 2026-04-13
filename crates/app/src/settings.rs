@@ -12,6 +12,8 @@ pub struct AppSettings {
     pub language: Language,
     #[serde(default = "default_true")]
     pub dark_mode: bool,
+    #[serde(default)]
+    pub proto_schema_dir: Option<String>,
 }
 
 fn default_true() -> bool {
@@ -23,6 +25,7 @@ impl Default for AppSettings {
         Self {
             language: Language::En,
             dark_mode: true,
+            proto_schema_dir: None,
         }
     }
 }

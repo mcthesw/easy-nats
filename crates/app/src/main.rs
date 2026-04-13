@@ -4,6 +4,7 @@ mod app;
 mod format;
 mod i18n;
 mod log_layer;
+mod proto;
 mod settings;
 mod tabs;
 mod toast;

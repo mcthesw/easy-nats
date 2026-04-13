@@ -33,11 +33,14 @@ impl EasyNatsApp {
                                     .send(BackendCommand::ListStreams { connection_id });
                                 self.backend
                                     .send(BackendCommand::ListKvBuckets { connection_id });
+                                self.backend
+                                    .send(BackendCommand::ListObjectStoreBuckets { connection_id });
                             }
                         }
                         ConnectionStatusKind::Disconnected => {
                             self.stream_lists.remove(&connection_id);
                             self.kv_lists.remove(&connection_id);
+                            self.obj_store_lists.remove(&connection_id);
                         }
                         ConnectionStatusKind::Error(msg) => {
                             self.toasts.push(
