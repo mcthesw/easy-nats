@@ -3,17 +3,25 @@
 mod app;
 mod format;
 mod i18n;
+mod log_layer;
 mod settings;
 mod tabs;
 mod toast;
 
 fn main() {
-    tracing_subscriber::fmt()
-        .with_env_filter(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-        )
-        .init();
+    let log_buffer = log_layer::SharedLogBuffer::default();
+    {
+        use tracing_subscriber::prelude::*;
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::fmt::layer().with_filter(
+                    tracing_subscriber::EnvFilter::try_from_default_env()
+                        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
+                ),
+            )
+            .with(log_layer::AppLogLayer::new(log_buffer.clone()))
+            .init();
+    }
 
     let app_settings = settings::AppSettings::load();
     i18n::init(app_settings.language);
@@ -27,20 +35,59 @@ fn main() {
     if let Err(e) = eframe::run_native(
         "Easy NATS",
         native_options,
-        Box::new(|cc| {
+        Box::new(move |cc| {
+            setup_fonts(&cc.egui_ctx);
             let dark = cc
                 .egui_ctx
                 .system_theme()
                 .map(|t| t == eframe::egui::Theme::Dark)
                 .unwrap_or(app_settings.dark_mode);
-            if dark {
-                cc.egui_ctx.set_visuals(eframe::egui::Visuals::dark());
-            } else {
-                cc.egui_ctx.set_visuals(eframe::egui::Visuals::light());
-            }
-            Ok(Box::new(app::EasyNatsApp::new(dark)))
+            apply_theme(&cc.egui_ctx, dark);
+            Ok(Box::new(app::EasyNatsApp::new(dark, log_buffer)))
         }),
     ) {
         tracing::error!("Failed to start application: {e}");
+    }
+}
+
+fn setup_fonts(ctx: &eframe::egui::Context) {
+    use eframe::egui::{FontData, FontDefinitions, FontFamily};
+
+    let mut fonts = FontDefinitions::default();
+
+    fonts.font_data.insert(
+        "Inter".to_owned(),
+        std::sync::Arc::new(FontData::from_static(include_bytes!(
+            "../../../assets/fonts/Inter-Regular.ttf"
+        ))),
+    );
+    fonts.font_data.insert(
+        "LXGWNeoXiHei".to_owned(),
+        std::sync::Arc::new(FontData::from_static(include_bytes!(
+            "../../../assets/fonts/LXGWNeoXiHei-Regular.ttf"
+        ))),
+    );
+
+    // Inter as primary proportional font, LXGW as CJK fallback
+    fonts
+        .families
+        .entry(FontFamily::Proportional)
+        .or_default()
+        .insert(0, "Inter".to_owned());
+    fonts
+        .families
+        .entry(FontFamily::Proportional)
+        .or_default()
+        .push("LXGWNeoXiHei".to_owned());
+
+    ctx.set_fonts(fonts);
+}
+
+pub(crate) fn apply_theme(ctx: &eframe::egui::Context, dark: bool) {
+    use eframe::egui::Visuals;
+    if dark {
+        ctx.set_visuals(Visuals::dark());
+    } else {
+        ctx.set_visuals(Visuals::light());
     }
 }
