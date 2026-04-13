@@ -1,7 +1,7 @@
 use eframe::egui;
 use nats_backend::{BackendCommand, ConnectionStatusKind};
 
-use crate::i18n::{self, t, Language};
+use crate::i18n::t;
 use crate::tabs::{KvBucketState, PublisherState, StreamState, SubscriberState, TabKind};
 
 use super::{
@@ -25,7 +25,6 @@ pub(crate) fn render_sidebar(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
             render_sidebar_header(app, ui);
             ui.separator();
             render_connection_tree(app, ui);
-            render_selected_connection_actions(app, ui);
         });
 }
 
@@ -33,36 +32,23 @@ fn render_sidebar_header(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     ui.horizontal(|ui| {
         ui.heading(t("sidebar.connections_heading"));
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            let icon = if app.dark_mode {
-                t("common.theme_light")
-            } else {
-                t("common.theme_dark")
-            };
-            if ui.small_button(icon).clicked() {
-                app.dark_mode = !app.dark_mode;
-                if app.dark_mode {
-                    ui.ctx().set_visuals(egui::Visuals::dark());
-                } else {
-                    ui.ctx().set_visuals(egui::Visuals::light());
-                }
-                app.settings.dark_mode = app.dark_mode;
-                app.settings.save();
+            // Settings button
+            if ui
+                .small_button("⚙")
+                .on_hover_text(t("settings.title"))
+                .clicked()
+            {
+                app.open_or_focus_tab_kind(crate::tabs::TabKind::Settings);
             }
 
-            // Language selector
-            let mut lang = i18n::current_language();
-            egui::ComboBox::from_id_salt("lang_selector")
-                .width(60.0)
-                .selected_text(lang.label())
-                .show_ui(ui, |ui| {
-                    for l in Language::ALL {
-                        if ui.selectable_value(&mut lang, l, l.label()).changed() {
-                            i18n::set_language(lang);
-                            app.settings.language = lang;
-                            app.settings.save();
-                        }
-                    }
-                });
+            // Log viewer button
+            if ui
+                .small_button("📋")
+                .on_hover_text(t("log_viewer.title"))
+                .clicked()
+            {
+                app.open_or_focus_tab_kind(crate::tabs::TabKind::LogViewer);
+            }
 
             if ui
                 .small_button("＋")
@@ -119,32 +105,58 @@ fn render_connection_row(
         ConnectionStatusKind::Error(_) => egui::Color32::RED,
     };
 
-    ui.horizontal(|ui| {
+    let row_resp = ui.horizontal(|ui| {
         ui.colored_label(status_color, "●");
-        if ui
-            .selectable_label(selected, name)
-            .clicked()
-        {
+        if ui.selectable_label(selected, name).clicked() {
             *action = Some(SidebarAction::Select(id));
         }
 
         ui.with_layout(
             egui::Layout::right_to_left(egui::Align::Center),
-            |ui| match status {
-                ConnectionStatusKind::Connected => {
-                    if ui.small_button("⏏").on_hover_text(t("connection.disconnect")).clicked() {
-                        *action = Some(SidebarAction::Disconnect(id));
+            |ui| {
+                match status {
+                    ConnectionStatusKind::Connected => {
+                        if ui
+                            .small_button("⏏")
+                            .on_hover_text(t("connection.disconnect"))
+                            .clicked()
+                        {
+                            *action = Some(SidebarAction::Disconnect(id));
+                        }
+                    }
+                    ConnectionStatusKind::Connecting => {}
+                    _ => {
+                        if ui
+                            .small_button("▶")
+                            .on_hover_text(t("connection.connect"))
+                            .clicked()
+                        {
+                            *action = Some(SidebarAction::Connect(id));
+                        }
                     }
                 }
-                ConnectionStatusKind::Connecting => {}
-                _ => {
-                    if ui.small_button("▶").on_hover_text(t("connection.connect")).clicked() {
-                        *action = Some(SidebarAction::Connect(id));
-                    }
+
+                if ui
+                    .small_button("🗑")
+                    .on_hover_text(t("sidebar.action_delete"))
+                    .clicked()
+                {
+                    app.editor.delete_confirm = Some(id);
+                }
+
+                if ui
+                    .small_button("✏")
+                    .on_hover_text(t("sidebar.action_edit"))
+                    .clicked()
+                    && let Some(cfg) = app.config.connections.iter().find(|c| c.id == id).cloned()
+                {
+                    app.open_edit_editor(&cfg);
                 }
             },
         );
     });
+
+    let _ = row_resp;
 }
 
 fn render_resource_tree(
@@ -183,7 +195,10 @@ fn render_pubsub_section(
     egui::CollapsingHeader::new(t("sidebar.section_pubsub"))
         .id_salt(format!("pubsub_{id}"))
         .show(ui, |ui| {
-            if ui.selectable_label(false, t("sidebar.open_publisher")).clicked() {
+            if ui
+                .selectable_label(false, t("sidebar.open_publisher"))
+                .clicked()
+            {
                 let instance_id = app.next_tab_instance;
                 app.next_tab_instance += 1;
                 *action = Some(SidebarAction::OpenTab(Box::new(TabKind::Publisher {
@@ -193,7 +208,10 @@ fn render_pubsub_section(
                     state: PublisherState::default(),
                 })));
             }
-            if ui.selectable_label(false, t("sidebar.open_subscriber")).clicked() {
+            if ui
+                .selectable_label(false, t("sidebar.open_subscriber"))
+                .clicked()
+            {
                 let instance_id = app.next_tab_instance;
                 app.next_tab_instance += 1;
                 *action = Some(SidebarAction::OpenTab(Box::new(TabKind::Subscriber {
@@ -271,7 +289,11 @@ fn render_kv_section(
                 {
                     *action = Some(SidebarAction::OpenKvBucketCreate(id));
                 }
-                if ui.small_button("↻").on_hover_text(t("kv.refresh")).clicked() {
+                if ui
+                    .small_button("↻")
+                    .on_hover_text(t("kv.refresh"))
+                    .clicked()
+                {
                     app.backend
                         .send(BackendCommand::ListKvBuckets { connection_id: id });
                 }
@@ -296,24 +318,6 @@ fn render_kv_section(
                 }
             }
         });
-}
-
-fn render_selected_connection_actions(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
-    if let Some(id) = app.selected_conn {
-        ui.separator();
-        ui.add_space(4.0);
-        let cfg_clone = app.config.connections.iter().find(|c| c.id == id).cloned();
-        ui.horizontal(|ui| {
-            if ui.small_button(t("common.edit")).clicked()
-                && let Some(cfg) = &cfg_clone
-            {
-                app.open_edit_editor(cfg);
-            }
-            if ui.small_button(t("common.delete")).clicked() {
-                app.editor.delete_confirm = Some(id);
-            }
-        });
-    }
 }
 
 fn apply_sidebar_action(app: &mut EasyNatsApp, action: Option<SidebarAction>) {

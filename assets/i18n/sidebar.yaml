@@ -30,3 +30,11 @@ open_publisher:
 open_subscriber:
   en: "Subscriber"
   zh: "订阅者"
+
+# Connection inline actions
+action_edit:
+  en: "Edit connection"
+  zh: "编辑连接"
+action_delete:
+  en: "Delete connection"
+  zh: "删除连接"
