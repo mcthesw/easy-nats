@@ -169,11 +169,11 @@ impl EasyNatsApp {
     }
 
     pub(crate) fn open_tab(&mut self, mut tab: TabKind) {
-        if self
+        if let Some(path) = self
             .dock_state
             .find_tab_from(|existing| same_tab(existing, &tab))
-            .is_some()
         {
+            let _ = self.dock_state.set_active_tab(path);
             return;
         }
 

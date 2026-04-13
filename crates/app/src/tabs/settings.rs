@@ -2,7 +2,6 @@ use eframe::egui;
 
 use crate::i18n::{self, Language, t};
 use crate::settings::AppSettings;
-use crate::tabs::TabKind;
 
 use super::types::TabAction;
 
@@ -53,12 +52,4 @@ pub fn settings_ui(
             actions.push(TabAction::ApplyTheme { dark: false });
         }
     });
-
-    ui.add_space(12.0);
-    ui.separator();
-
-    // Log viewer shortcut
-    if ui.button(t("settings.open_log_viewer")).clicked() {
-        actions.push(TabAction::OpenTab(Box::new(TabKind::LogViewer)));
-    }
 }

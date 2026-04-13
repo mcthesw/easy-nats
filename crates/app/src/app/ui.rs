@@ -64,9 +64,6 @@ impl eframe::App for EasyNatsApp {
                 TabAction::OpenConnectionEditor => {
                     self.editor.visible = true;
                 }
-                TabAction::OpenTab(tab) => {
-                    self.open_tab(*tab);
-                }
                 TabAction::ApplyTheme { dark } => {
                     crate::apply_theme(ui.ctx(), dark);
                 }
