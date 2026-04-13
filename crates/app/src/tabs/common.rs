@@ -8,19 +8,21 @@ use crate::i18n::t;
 use super::types::AutoRefresh;
 
 /// Draws a horizontal draggable separator. Returns the vertical delta to apply to split_ratio.
-pub(crate) fn draggable_separator(ui: &mut egui::Ui, _id_salt: &str) -> f32 {
+pub(crate) fn draggable_separator(ui: &mut egui::Ui, id_salt: &str) -> f32 {
     let available_width = ui.available_width();
-    let (rect, response) = ui.allocate_exact_size(
-        egui::vec2(available_width, 6.0),
-        egui::Sense::click_and_drag(),
-    );
+    let (rect, _) = ui.allocate_exact_size(egui::vec2(available_width, 6.0), egui::Sense::hover());
+    let id = ui.make_persistent_id(id_salt);
+    let response = ui.interact(rect, id, egui::Sense::click_and_drag());
     let color = if response.dragged() || response.hovered() {
         ui.visuals().widgets.active.bg_fill
     } else {
         ui.visuals().widgets.noninteractive.bg_stroke.color
     };
     ui.painter().line_segment(
-        [rect.center_top() + egui::vec2(0.0, 3.0), rect.center_top() + egui::vec2(available_width - 8.0, 3.0)],
+        [
+            rect.center_top() + egui::vec2(0.0, 3.0),
+            rect.center_top() + egui::vec2(available_width - 8.0, 3.0),
+        ],
         egui::Stroke::new(1.0, color),
     );
     if response.hovered() || response.dragged() {

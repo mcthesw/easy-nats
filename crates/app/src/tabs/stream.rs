@@ -29,9 +29,11 @@ pub fn stream_ui(
             stream: stream_name.to_string(),
         });
         state.auto_refresh.mark_refreshed();
-        ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_secs(1));
     } else if state.auto_refresh.enabled {
-        ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_secs(1));
     }
 
     if let Some(info) = &state.info {
@@ -125,7 +127,10 @@ fn render_message_browser(
             }
         });
 
-    let delta = draggable_separator(ui, "stream_msg_split");
+    let delta = draggable_separator(
+        ui,
+        &format!("stream_msg_split_{connection_id}_{stream_name}"),
+    );
     if delta != 0.0 {
         state.split_ratio = (state.split_ratio + delta / available_height).clamp(0.15, 0.85);
     }
@@ -154,7 +159,8 @@ fn render_purge_controls(
                 ui.text_edit_singleline(&mut state.purge_subject);
             });
             ui.horizontal(|ui| {
-                if ui.button(t("stream.purge_filtered")).clicked() && !state.purge_subject.is_empty()
+                if ui.button(t("stream.purge_filtered")).clicked()
+                    && !state.purge_subject.is_empty()
                 {
                     backend.send(BackendCommand::PurgeStream {
                         connection_id,
@@ -226,7 +232,11 @@ fn stream_info_panel(ui: &mut egui::Ui, info: &serde_json::Value) {
                         st.get("messages").and_then(|v| v.as_u64()),
                         false,
                     ),
-                    (t("stream.bytes"), st.get("bytes").and_then(|v| v.as_u64()), true),
+                    (
+                        t("stream.bytes"),
+                        st.get("bytes").and_then(|v| v.as_u64()),
+                        true,
+                    ),
                     (
                         t("stream.consumers"),
                         st.get("consumer_count").and_then(|v| v.as_u64()),

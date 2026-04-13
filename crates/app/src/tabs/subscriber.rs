@@ -21,7 +21,7 @@ pub fn subscriber_ui(
 
     render_message_list(ui, state, list_height);
 
-    let delta = draggable_separator(ui, "sub_split");
+    let delta = draggable_separator(ui, &format!("sub_split_{connection_id}"));
     if delta != 0.0 {
         state.split_ratio = (state.split_ratio + delta / available_height).clamp(0.15, 0.85);
     }
@@ -81,11 +81,7 @@ fn render_subscription_controls(
                 };
                 ui.colored_label(color, "●");
                 ui.label(&sub.subject);
-                if sub.active
-                    && ui
-                        .small_button(t("subscriber.unsubscribe"))
-                        .clicked()
-                {
+                if sub.active && ui.small_button(t("subscriber.unsubscribe")).clicked() {
                     to_remove.push(i);
                 }
             });
@@ -120,7 +116,11 @@ fn render_message_list(ui: &mut egui::Ui, state: &mut SubscriberState, list_heig
                 .selected_text(filter_label)
                 .show_ui(ui, |ui| {
                     if ui
-                        .selectable_value(&mut state.subject_filter, None, t("subscriber.filter_all"))
+                        .selectable_value(
+                            &mut state.subject_filter,
+                            None,
+                            t("subscriber.filter_all"),
+                        )
                         .changed()
                     {
                         state.selected_idx = None;
