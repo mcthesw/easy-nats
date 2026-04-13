@@ -1,6 +1,8 @@
 mod common;
 mod kv;
+pub(crate) mod log_viewer;
 mod publisher;
+pub(crate) mod settings;
 mod stream;
 mod stream_consumers;
 mod subscriber;

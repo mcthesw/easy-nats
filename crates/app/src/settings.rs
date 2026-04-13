@@ -51,11 +51,11 @@ impl AppSettings {
 
     pub fn save(&self) {
         let path = Self::path();
-        if let Some(parent) = path.parent() {
-            if let Err(e) = std::fs::create_dir_all(parent) {
-                tracing::error!(?parent, %e, "Failed to create settings directory");
-                return;
-            }
+        if let Some(parent) = path.parent()
+            && let Err(e) = std::fs::create_dir_all(parent)
+        {
+            tracing::error!(?parent, %e, "Failed to create settings directory");
+            return;
         }
         match serde_json::to_string_pretty(self) {
             Ok(json) => {

@@ -205,6 +205,18 @@ impl EasyNatsApp {
         self.dock_state.push_to_focused_leaf(tab);
     }
 
+    /// Open a singleton tab (Settings, LogViewer, etc.) or focus it if already open.
+    pub(crate) fn open_or_focus_tab_kind(&mut self, tab: TabKind) {
+        if let Some(path) = self
+            .dock_state
+            .find_tab_from(|existing| same_tab(existing, &tab))
+        {
+            let _ = self.dock_state.set_active_tab(path);
+        } else {
+            self.dock_state.push_to_focused_leaf(tab);
+        }
+    }
+
     pub(crate) fn save_stream_editor(&mut self) {
         let subjects: Vec<String> = self
             .stream_editor
@@ -361,13 +373,12 @@ impl EasyNatsApp {
                 found = true;
                 continue;
             }
-            if found {
-                if let Some(pos) = self
+            if found
+                && let Some(pos) = self
                     .dock_state
                     .find_tab_from(|t| t.title() == title && !matches!(t, TabKind::Welcome))
-                {
-                    self.dock_state.remove_tab(pos);
-                }
+            {
+                self.dock_state.remove_tab(pos);
             }
         }
     }

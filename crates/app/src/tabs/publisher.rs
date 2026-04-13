@@ -50,12 +50,11 @@ pub fn publisher_ui(
     ui.add_space(4.0);
     ui.horizontal(|ui| {
         ui.label(t("publisher.payload"));
-        if ui.small_button(t("publisher.format_json")).clicked() {
-            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&state.payload) {
-                if let Ok(pretty) = serde_json::to_string_pretty(&val) {
-                    state.payload = pretty;
-                }
-            }
+        if ui.small_button(t("publisher.format_json")).clicked()
+            && let Ok(val) = serde_json::from_str::<serde_json::Value>(&state.payload)
+            && let Ok(pretty) = serde_json::to_string_pretty(&val)
+        {
+            state.payload = pretty;
         }
     });
     egui::ScrollArea::vertical()

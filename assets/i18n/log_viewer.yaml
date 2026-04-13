@@ -1,0 +1,12 @@
+# Log viewer tab strings
+title:
+  en: "Log Viewer"
+  zh: "日志查看器"
+
+empty:
+  en: "No log entries yet."
+  zh: "暂无日志条目。"
+
+level_filter:
+  en: "Level filter:"
+  zh: "日志等级过滤："

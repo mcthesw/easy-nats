@@ -52,6 +52,8 @@ pub(crate) fn same_tab(a: &TabKind, b: &TabKind) -> bool {
                 ..
             },
         ) => a1 == a2 && b1 == b2,
+        (TabKind::Settings, TabKind::Settings) => true,
+        (TabKind::LogViewer, TabKind::LogViewer) => true,
         _ => false,
     }
 }

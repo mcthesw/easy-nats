@@ -1,0 +1,28 @@
+# Settings tab strings
+title:
+  en: "Settings"
+  zh: "设置"
+
+section_appearance:
+  en: "Appearance"
+  zh: "外观"
+
+language:
+  en: "Language"
+  zh: "语言"
+
+theme:
+  en: "Theme"
+  zh: "主题"
+
+theme_dark:
+  en: "Dark"
+  zh: "深色"
+
+theme_light:
+  en: "Light"
+  zh: "浅色"
+
+open_log_viewer:
+  en: "Open Log Viewer"
+  zh: "打开日志查看器"

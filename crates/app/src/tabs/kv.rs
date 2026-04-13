@@ -91,9 +91,11 @@ fn render_key_list(
         });
         state.loading_entries = true;
         state.auto_refresh.mark_refreshed();
-        ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_secs(1));
     } else if state.auto_refresh.enabled {
-        ui.ctx().request_repaint_after(std::time::Duration::from_secs(1));
+        ui.ctx()
+            .request_repaint_after(std::time::Duration::from_secs(1));
     }
 
     if state.loading_entries {
@@ -248,12 +250,11 @@ fn render_detail_panel(
     ui.horizontal(|ui| {
         ui.label(t("kv.value_editor"));
         format::format_selector(ui, "kv_value_fmt", &mut state.editor_format);
-        if ui.small_button(t("kv.format_json")).clicked() {
-            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&state.entry_value) {
-                if let Ok(pretty) = serde_json::to_string_pretty(&val) {
-                    state.entry_value = pretty;
-                }
-            }
+        if ui.small_button(t("kv.format_json")).clicked()
+            && let Ok(val) = serde_json::from_str::<serde_json::Value>(&state.entry_value)
+            && let Ok(pretty) = serde_json::to_string_pretty(&val)
+        {
+            state.entry_value = pretty;
         }
     });
     egui::ScrollArea::vertical()

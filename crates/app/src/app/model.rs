@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use egui_dock::DockState;
 use nats_backend::{AppConfig, ConnectionStatusKind};
 
+use crate::log_layer::SharedLogBuffer;
 use crate::settings::AppSettings;
 use crate::tabs::TabKind;
 use crate::toast::Toasts;
@@ -28,10 +29,11 @@ pub struct EasyNatsApp {
     pub(crate) dark_mode: bool,
     pub(crate) kv_bucket_delete_confirm: Option<(u64, String)>,
     pub(crate) next_tab_instance: u32,
+    pub(crate) log_buffer: SharedLogBuffer,
 }
 
 impl EasyNatsApp {
-    pub fn new(dark_mode: bool) -> Self {
+    pub fn new(dark_mode: bool, log_buffer: SharedLogBuffer) -> Self {
         Self {
             backend: nats_backend::BackendHandle::spawn(),
             config: AppConfig::load(),
@@ -49,6 +51,7 @@ impl EasyNatsApp {
             dark_mode,
             kv_bucket_delete_confirm: None,
             next_tab_instance: 1,
+            log_buffer,
         }
     }
 

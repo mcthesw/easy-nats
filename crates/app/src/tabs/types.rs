@@ -39,7 +39,7 @@ impl AutoRefresh {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub enum TabAction {
     OpenConsumerCreate {
         connection_id: u64,
@@ -57,6 +57,10 @@ pub enum TabAction {
         of_title: String,
     },
     OpenConnectionEditor,
+    OpenTab(Box<TabKind>),
+    ApplyTheme {
+        dark: bool,
+    },
 }
 
 #[derive(Debug)]
@@ -263,6 +267,8 @@ pub enum TabKind {
         connection_name: String,
         bucket_name: String,
     },
+    Settings,
+    LogViewer,
 }
 
 impl TabKind {
@@ -274,14 +280,24 @@ impl TabKind {
                 instance_id,
                 ..
             } => {
-                format!("{} #{} ({})", t("common.tab_publisher"), instance_id, connection_name)
+                format!(
+                    "{} #{} ({})",
+                    t("common.tab_publisher"),
+                    instance_id,
+                    connection_name
+                )
             }
             TabKind::Subscriber {
                 connection_name,
                 instance_id,
                 ..
             } => {
-                format!("{} #{} ({})", t("common.tab_subscriber"), instance_id, connection_name)
+                format!(
+                    "{} #{} ({})",
+                    t("common.tab_subscriber"),
+                    instance_id,
+                    connection_name
+                )
             }
             TabKind::Stream {
                 connection_name,
@@ -304,6 +320,8 @@ impl TabKind {
             } => {
                 format!("{bucket_name} ({connection_name})")
             }
+            TabKind::Settings => t("settings.title").to_string(),
+            TabKind::LogViewer => t("log_viewer.title").to_string(),
         }
     }
 }
@@ -311,6 +329,9 @@ impl TabKind {
 pub struct AppTabViewer<'a> {
     pub backend: &'a nats_backend::BackendHandle,
     pub actions: &'a mut Vec<TabAction>,
+    pub settings: &'a mut crate::settings::AppSettings,
+    pub dark_mode: &'a mut bool,
+    pub log_buffer: &'a crate::log_layer::SharedLogBuffer,
 }
 
 impl TabViewer for AppTabViewer<'_> {
@@ -324,12 +345,7 @@ impl TabViewer for AppTabViewer<'_> {
         crate::tabs::viewer::render_tab(self, ui, tab);
     }
 
-    fn context_menu(
-        &mut self,
-        ui: &mut egui::Ui,
-        tab: &mut Self::Tab,
-        _path: egui_dock::NodePath,
-    ) {
+    fn context_menu(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab, _path: egui_dock::NodePath) {
         let title = tab.title();
         if ui.button(t("common.close_others")).clicked() {
             self.actions.push(TabAction::CloseOtherTabs {
@@ -342,7 +358,8 @@ impl TabViewer for AppTabViewer<'_> {
             ui.close();
         }
         if ui.button(t("common.close_to_right")).clicked() {
-            self.actions.push(TabAction::CloseTabsToRight { of_title: title });
+            self.actions
+                .push(TabAction::CloseTabsToRight { of_title: title });
             ui.close();
         }
     }

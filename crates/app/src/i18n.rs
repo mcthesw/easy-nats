@@ -5,8 +5,8 @@
 //! Keys are namespaced by filename: `t("sidebar.connections")`.
 
 use std::collections::HashMap;
-use std::sync::atomic::{AtomicU8, Ordering};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicU8, Ordering};
 
 use serde::{Deserialize, Serialize};
 
@@ -80,14 +80,22 @@ pub fn init(lang: Language) {
         ),
         ("kv", include_str!("../../../assets/i18n/kv.yaml")),
         ("toast", include_str!("../../../assets/i18n/toast.yaml")),
+        (
+            "settings",
+            include_str!("../../../assets/i18n/settings.yaml"),
+        ),
+        (
+            "log_viewer",
+            include_str!("../../../assets/i18n/log_viewer.yaml"),
+        ),
     ];
 
     let mut en = HashMap::new();
     let mut zh = HashMap::new();
 
     for (namespace, content) in yaml_sources {
-        let parsed: HashMap<String, HashMap<String, String>> =
-            serde_yaml::from_str(content).unwrap_or_else(|e| {
+        let parsed: HashMap<String, HashMap<String, String>> = serde_yaml::from_str(content)
+            .unwrap_or_else(|e| {
                 panic!("Failed to parse i18n file {namespace}.yaml: {e}");
             });
         for (key, langs) in parsed {

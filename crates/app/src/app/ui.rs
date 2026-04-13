@@ -22,6 +22,9 @@ impl eframe::App for EasyNatsApp {
                 &mut AppTabViewer {
                     backend: &self.backend,
                     actions: &mut tab_actions,
+                    settings: &mut self.settings,
+                    dark_mode: &mut self.dark_mode,
+                    log_buffer: &self.log_buffer,
                 },
             );
 
@@ -60,6 +63,12 @@ impl eframe::App for EasyNatsApp {
                 }
                 TabAction::OpenConnectionEditor => {
                     self.editor.visible = true;
+                }
+                TabAction::OpenTab(tab) => {
+                    self.open_tab(*tab);
+                }
+                TabAction::ApplyTheme { dark } => {
+                    crate::apply_theme(ui.ctx(), dark);
                 }
             }
         }
