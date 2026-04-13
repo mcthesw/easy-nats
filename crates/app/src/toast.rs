@@ -77,11 +77,7 @@ impl Toasts {
                         .show(ui, |ui| {
                             ui.horizontal(|ui| {
                                 ui.colored_label(text_color, &toast.message);
-                                if ui
-                                    .colored_label(text_color, crate::i18n::t("toast.dismiss"))
-                                    .on_hover_text("Dismiss")
-                                    .clicked()
-                                {
+                                if ui.small_button(crate::i18n::t("toast.dismiss")).clicked() {
                                     dismissed = Some(i);
                                 }
                             });

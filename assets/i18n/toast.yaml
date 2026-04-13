@@ -1,7 +1,7 @@
 # Toast and result message strings
 dismiss:
-  en: "✕"
-  zh: "✕"
+  en: "x"
+  zh: "x"
 stream_deleted:
   en: "Stream deleted"
   zh: "流已删除"
