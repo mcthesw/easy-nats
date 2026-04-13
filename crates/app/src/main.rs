@@ -69,10 +69,7 @@ fn setup_fonts(ctx: &eframe::egui::Context) {
     );
 
     // Inter as primary, LXGW as CJK fallback; keep egui defaults (emoji-icon-font, NotoEmoji) after
-    let proportional = fonts
-        .families
-        .entry(FontFamily::Proportional)
-        .or_default();
+    let proportional = fonts.families.entry(FontFamily::Proportional).or_default();
     proportional.insert(0, "LXGWNeoXiHei".to_owned());
     proportional.insert(0, "Inter".to_owned());
 

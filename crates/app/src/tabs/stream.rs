@@ -147,10 +147,7 @@ fn render_message_list(ui: &mut egui::Ui, state: &mut StreamState) {
                     let subject = msg["subject"].as_str().unwrap_or("");
                     let label = format!("#{seq} {subject}");
                     let selected = state.selected_msg == Some(idx);
-                    if ui
-                        .selectable_label(selected, &label)
-                        .clicked()
-                    {
+                    if ui.selectable_label(selected, &label).clicked() {
                         state.selected_msg = Some(idx);
                     }
                 }
