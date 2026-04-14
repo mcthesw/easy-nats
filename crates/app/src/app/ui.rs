@@ -21,8 +21,13 @@ impl eframe::App for EasyNatsApp {
         ui.ctx().set_global_style(dock_egui_style);
 
         let mut dock_style = egui_dock::Style::from_egui(ui.style().as_ref());
+
+        // Main
         dock_style.main_surface_border_rounding = egui::CornerRadius::ZERO;
+        // Tab bar
+        dock_style.tab_bar.bg_fill = ui.visuals().window_fill;
         dock_style.tab_bar.corner_radius = egui::CornerRadius::ZERO;
+        // Tabs
         dock_style.tab.active.corner_radius = egui::CornerRadius::ZERO;
         dock_style.tab.inactive.corner_radius = egui::CornerRadius::ZERO;
         dock_style.tab.focused.corner_radius = egui::CornerRadius::ZERO;
@@ -32,11 +37,10 @@ impl eframe::App for EasyNatsApp {
         dock_style.tab.focused_with_kb_focus.corner_radius = egui::CornerRadius::ZERO;
         dock_style.tab.tab_body.corner_radius = egui::CornerRadius::ZERO;
 
-        #[allow(deprecated)]
         DockArea::new(&mut self.dock_state)
             .style(dock_style)
-            .show_window_close_buttons(false)
-            .show_window_collapse_buttons(false)
+            .show_leaf_close_all_buttons(false)
+            .show_leaf_collapse_buttons(false)
             .show_inside(
                 ui,
                 &mut AppTabViewer {
