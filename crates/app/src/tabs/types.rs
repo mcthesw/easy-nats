@@ -368,6 +368,39 @@ impl TabViewer for AppTabViewer<'_> {
         tab.title().into()
     }
 
+    fn id(&mut self, tab: &mut Self::Tab) -> egui::Id {
+        match tab {
+            TabKind::Welcome => egui::Id::new("tab:welcome"),
+            TabKind::Publisher {
+                connection_id,
+                instance_id,
+                ..
+            } => egui::Id::new(("tab:publisher", connection_id, instance_id)),
+            TabKind::Subscriber {
+                connection_id,
+                instance_id,
+                ..
+            } => egui::Id::new(("tab:subscriber", connection_id, instance_id)),
+            TabKind::Stream {
+                connection_id,
+                stream_name,
+                ..
+            } => egui::Id::new(("tab:stream", connection_id, stream_name)),
+            TabKind::KvBucket {
+                connection_id,
+                bucket_name,
+                ..
+            } => egui::Id::new(("tab:kv", connection_id, bucket_name)),
+            TabKind::ObjectStoreBucket {
+                connection_id,
+                bucket_name,
+                ..
+            } => egui::Id::new(("tab:object-store", connection_id, bucket_name)),
+            TabKind::Settings => egui::Id::new("tab:settings"),
+            TabKind::LogViewer => egui::Id::new("tab:log-viewer"),
+        }
+    }
+
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
         crate::tabs::viewer::render_tab(self, ui, tab);
     }

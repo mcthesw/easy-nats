@@ -8,11 +8,5 @@ edition = "2024"
 license = "MIT"
 repository = "https://github.com/mcthesw/easy-nats"
 
-# Workaround for egui bug #5178: `Widget changed layer_id during the frame` panic
-# triggered by egui_dock's tab drag preview using `scope_builder` with a different LayerId.
-# This is a debug-only assertion; release builds are unaffected.
-[profile.dev.package.egui]
-debug-assertions = false
-
-[profile.test.package.egui]
-debug-assertions = false
+[patch.crates-io]
+egui_dock = { git = "https://github.com/mcthesw/egui_dock.git", rev = "5dfa88feb4dddbc26eda0c0a5b469182816cb2ce" }
