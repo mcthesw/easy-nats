@@ -8,15 +8,15 @@ license.workspace = true
 nats-backend = { path = "../nats-backend" }
 base64 = "0.22"
 dirs = "6"
-eframe = "0.34.1"
-egui_dock = "0.19.1"
-protox = "0.7"
-prost = "0.13"
-prost-reflect = { version = "0.14", features = ["serde"] }
-prost-types = "0.13"
-rfd = "0.15"
+eframe = "0.34"
+egui_dock = "0.19"
+protox = "0.9"
+prost = "0.14"
+prost-reflect = { version = "0.16", features = ["serde"] }
+prost-types = "0.14"
+rfd = "0.17"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-serde_yaml = "0.9"
+serde_yaml = "0.9.34+deprecated"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "registry", "fmt"] }
