@@ -47,6 +47,9 @@ start_time:
 fetch:
   en: "Fetch"
   zh: "获取"
+publish_message:
+  en: "Publish Message"
+  zh: "投递消息"
 msg_detail:
   en: "Message Detail"
   zh: "消息详情"

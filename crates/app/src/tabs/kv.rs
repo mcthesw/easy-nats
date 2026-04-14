@@ -19,6 +19,14 @@ pub fn kv_bucket_ui(
 ) {
     ui.horizontal(|ui| {
         ui.heading(bucket_name);
+        if let Some(info) = &state.info
+            && ui.button(t("kv.edit_bucket")).clicked()
+        {
+            actions.push(TabAction::OpenKvBucketEdit {
+                connection_id,
+                bucket_json: info.clone(),
+            });
+        }
         if ui.button(t("kv.delete_bucket")).clicked() {
             actions.push(TabAction::ConfirmDeleteKvBucket {
                 connection_id,
@@ -60,7 +68,7 @@ pub fn kv_bucket_ui(
         .default_size(300.0)
         .size_range(200.0..=f32::INFINITY)
         .show_inside(ui, |ui| {
-            render_key_list(ui, connection_id, bucket_name, state, backend);
+            render_key_list(ui, connection_id, bucket_name, state, backend, actions);
         });
 
     // Right panel: detail or history
@@ -86,6 +94,7 @@ fn render_key_list(
     bucket_name: &str,
     state: &mut KvBucketState,
     backend: &BackendHandle,
+    actions: &mut Vec<TabAction>,
 ) {
     // Toolbar row: refresh + new entry
     ui.horizontal(|ui| {
@@ -101,8 +110,11 @@ fn render_key_list(
             state.loading_entries = true;
         }
         if ui.button("+").on_hover_text(t("kv.new_entry")).clicked() {
-            clear_kv_editor(state);
-            state.creating_new = true;
+            actions.push(TabAction::OpenKvEntryCreate {
+                connection_id,
+                bucket_name: bucket_name.to_string(),
+                initial_key: state.key_filter.trim().to_string(),
+            });
         }
     });
     // Filter row: full width
@@ -143,7 +155,6 @@ fn render_key_list(
                     {
                         state.selected_key = Some(key.to_string());
                         state.show_history = false;
-                        state.creating_new = false;
                         load_kv_entry_into_editor(state, entry);
                         backend.send(BackendCommand::GetKvEntry {
                             connection_id,
@@ -170,21 +181,15 @@ fn render_detail_panel(
     backend: &BackendHandle,
     proto_manager: &ProtoSchemaManager,
 ) {
-    if state.selected_key.is_none() && !state.creating_new {
+    if state.selected_key.is_none() {
         ui.centered_and_justified(|ui| {
             ui.label(t("kv.select_key_hint"));
         });
         return;
     }
 
-    let is_new = state.selected_key.is_none();
-
     // Action toolbar
     ui.horizontal(|ui| {
-        if is_new {
-            ui.label(egui::RichText::new(t("kv.new_entry")).strong());
-            ui.separator();
-        }
         let can_save = !state.entry_key.trim().is_empty();
         if ui
             .add_enabled(can_save, egui::Button::new(t("common.save")))
@@ -374,17 +379,6 @@ fn kv_bucket_info_panel(ui: &mut egui::Ui, info: &serde_json::Value) {
                 ui.end_row();
             }
         });
-}
-
-fn clear_kv_editor(state: &mut KvBucketState) {
-    state.selected_key = None;
-    state.entry_key.clear();
-    state.entry_value.clear();
-    state.entry_revision = None;
-    state.entry_operation = None;
-    state.entry_created = None;
-    state.history.clear();
-    state.loading_history = false;
 }
 
 fn load_kv_entry_into_editor(state: &mut KvBucketState, entry: &serde_json::Value) {

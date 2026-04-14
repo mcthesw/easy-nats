@@ -48,7 +48,7 @@ pub fn stream_ui(
     }
 
     // Message browser controls
-    render_message_controls(ui, connection_id, stream_name, state, backend);
+    render_message_controls(ui, connection_id, stream_name, state, backend, actions);
     ui.separator();
 
     // Horizontal split: left message list, right message detail + consumers + purge
@@ -75,33 +75,30 @@ pub fn stream_ui(
                 .id_salt(("stream_bottom_scroll", connection_id, stream_name))
                 .auto_shrink(false)
                 .show(ui, |ui| {
-                    render_consumers(
-                        ui,
-                        connection_id,
-                        stream_name,
-                        state,
-                        backend,
-                        actions,
-                    );
+                    render_consumers(ui, connection_id, stream_name, state, backend, actions);
                     ui.separator();
                     render_purge_controls(ui, connection_id, stream_name, state, backend);
                 });
         });
 
-        // Remaining space: message detail
-        if let Some(idx) = state.selected_msg {
-            if let Some(msg) = state.messages.get(idx) {
-                stream_message_detail(
-                    ui,
-                    msg,
-                    &mut state.payload_format,
-                    &mut state.proto_view,
-                    proto_manager,
-                );
-            }
-        } else {
-            ui.label(t("stream.select_msg"));
-        }
+        egui::ScrollArea::vertical()
+            .id_salt(("stream_detail_scroll", connection_id, stream_name))
+            .auto_shrink(false)
+            .show(ui, |ui| {
+                if let Some(idx) = state.selected_msg {
+                    if let Some(msg) = state.messages.get(idx) {
+                        stream_message_detail(
+                            ui,
+                            msg,
+                            &mut state.payload_format,
+                            &mut state.proto_view,
+                            proto_manager,
+                        );
+                    }
+                } else {
+                    ui.label(t("stream.select_msg"));
+                }
+            });
     });
 }
 
@@ -111,6 +108,7 @@ fn render_message_controls(
     stream_name: &str,
     state: &mut StreamState,
     backend: &BackendHandle,
+    actions: &mut Vec<TabAction>,
 ) {
     // WorkQueue retention warning
     if let Some(info) = &state.info {
@@ -134,7 +132,7 @@ fn render_message_controls(
         ui.label(t("stream.batch_size"));
         ui.add(egui::TextEdit::singleline(&mut state.batch_size).desired_width(60.0));
     });
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         ui.label(t("stream.start_time"));
         ui.add(
             egui::TextEdit::singleline(&mut state.start_time)
@@ -148,16 +146,22 @@ fn render_message_controls(
             ("stream.time_30d", 2592000),
         ] {
             if ui.small_button(t(label_key)).clicked() {
-                state.start_time = system_time_to_rfc3339(
-                    SystemTime::now() - Duration::from_secs(secs),
-                );
+                state.start_time =
+                    system_time_to_rfc3339(SystemTime::now() - Duration::from_secs(secs));
             }
         }
         if !state.start_time.is_empty() && ui.small_button(t("stream.time_clear")).clicked() {
             state.start_time.clear();
         }
     });
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
+        if ui.button(t("stream.publish_message")).clicked() {
+            actions.push(TabAction::OpenStreamPublish {
+                connection_id,
+                stream_name: stream_name.to_string(),
+                subject: default_publish_subject(state),
+            });
+        }
         if ui
             .add_enabled(!state.fetching, egui::Button::new(t("stream.fetch")))
             .clicked()
@@ -222,6 +226,39 @@ fn format_rfc3339_short(rfc: &str) -> Option<String> {
     let trimmed = trimmed.trim_end_matches('Z');
     // Keep up to seconds precision
     Some(trimmed.split('.').next()?.to_string())
+}
+
+fn default_publish_subject(state: &StreamState) -> String {
+    if let Some(idx) = state.selected_msg
+        && let Some(subject) = state
+            .messages
+            .get(idx)
+            .and_then(|msg| msg["subject"].as_str())
+        && is_publishable_subject(subject)
+    {
+        return subject.to_string();
+    }
+
+    let filter = state.subject_filter.trim();
+    if is_publishable_subject(filter) {
+        return filter.to_string();
+    }
+
+    if let Some(info) = &state.info
+        && let Some(subjects) = info["config"]["subjects"].as_array()
+        && let Some(subject) = subjects
+            .iter()
+            .filter_map(|item| item.as_str())
+            .find(|subject| is_publishable_subject(subject))
+    {
+        return subject.to_string();
+    }
+
+    String::new()
+}
+
+fn is_publishable_subject(subject: &str) -> bool {
+    !subject.is_empty() && !subject.contains('*') && !subject.contains('>')
 }
 
 /// Convert a `SystemTime` to an RFC3339 UTC string.
@@ -440,25 +477,21 @@ fn stream_message_detail(
 
     ui.add_space(4.0);
     ui.label(t("stream.msg_payload"));
-    egui::ScrollArea::vertical()
-        .id_salt("stream_msg_payload")
-        .show(ui, |ui| {
-            if let Some(payload_b64) = msg["payload_base64"].as_str() {
-                match base64::engine::general_purpose::STANDARD.decode(payload_b64) {
-                    Ok(data) => format::render_payload_with_proto(
-                        ui,
-                        &data,
-                        *payload_format,
-                        "stream_proto",
-                        proto_view,
-                        proto_manager,
-                    ),
-                    Err(_) => {
-                        ui.label(t("stream.invalid_base64"));
-                    }
-                }
-            } else {
-                ui.label(t("stream.no_payload"));
+    if let Some(payload_b64) = msg["payload_base64"].as_str() {
+        match base64::engine::general_purpose::STANDARD.decode(payload_b64) {
+            Ok(data) => format::render_payload_with_proto(
+                ui,
+                &data,
+                *payload_format,
+                "stream_proto",
+                proto_view,
+                proto_manager,
+            ),
+            Err(_) => {
+                ui.label(t("stream.invalid_base64"));
             }
-        });
+        }
+    } else {
+        ui.label(t("stream.no_payload"));
+    }
 }

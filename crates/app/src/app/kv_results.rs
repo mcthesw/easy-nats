@@ -35,7 +35,7 @@ impl EasyNatsApp {
                 }
                 true
             }
-            "create_kv_bucket" | "delete_kv_bucket" => {
+            "create_kv_bucket" | "delete_kv_bucket" | "update_kv_bucket" => {
                 self.toasts
                     .push(ToastLevel::Success, format!("{operation} succeeded"));
                 self.backend
@@ -114,6 +114,7 @@ impl EasyNatsApp {
             "put_kv_entry" | "delete_kv_entry" | "purge_kv_entry" => {
                 let bucket = data["bucket"].as_str().unwrap_or("").to_string();
                 let key = data["key"].as_str().unwrap_or("").to_string();
+                let is_put = operation == "put_kv_entry";
                 self.toasts
                     .push(ToastLevel::Success, format!("{operation} succeeded"));
                 if !bucket.is_empty() {
@@ -128,6 +129,10 @@ impl EasyNatsApp {
                             && *bucket_name == bucket
                         {
                             state.loading_entries = true;
+                            if is_put && !key.is_empty() {
+                                state.selected_key = Some(key.clone());
+                                state.show_history = false;
+                            }
                             if state.selected_key.as_deref() == Some(key.as_str()) {
                                 state.loading_history = true;
                             }

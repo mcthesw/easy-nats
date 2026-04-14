@@ -78,10 +78,13 @@ pub(crate) fn kv_status_to_json(
         "values": status.values(),
         "history": status.history(),
         "max_age_secs": status.max_age().as_secs(),
+        "max_age_nanos": status.max_age().as_nanos() as u64,
         "description": status.info.config.description,
         "storage": format!("{:?}", status.info.config.storage),
         "bytes": status.info.state.bytes,
         "max_bytes": status.info.config.max_bytes,
+        "max_value_size": status.info.config.max_message_size,
+        "num_replicas": status.info.config.num_replicas,
     })
 }
 

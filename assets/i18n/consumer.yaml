@@ -92,3 +92,9 @@ ack_none:
 unnamed:
   en: "(unnamed)"
   zh: "(未命名)"
+edit:
+  en: "Edit"
+  zh: "编辑"
+edit_title:
+  en: "Edit Consumer"
+  zh: "编辑消费者"

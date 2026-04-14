@@ -111,3 +111,49 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
         app.save_consumer_editor();
     }
 }
+
+pub(crate) fn render_edit(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
+    let mut save_requested = false;
+    if app.consumer_edit_editor.visible {
+        egui::Window::new(t("consumer.edit_title"))
+            .resizable(false)
+            .show(ui.ctx(), |ui| {
+                egui::Grid::new("consumer_edit_grid")
+                    .num_columns(2)
+                    .spacing([8.0, 4.0])
+                    .show(ui, |ui| {
+                        ui.label(t("consumer.stream"));
+                        ui.label(&app.consumer_edit_editor.stream_name);
+                        ui.end_row();
+
+                        ui.label(t("consumer.name"));
+                        ui.label(&app.consumer_edit_editor.consumer_name);
+                        ui.end_row();
+
+                        ui.label(t("consumer.description"));
+                        ui.text_edit_singleline(&mut app.consumer_edit_editor.description);
+                        ui.end_row();
+
+                        ui.label(t("consumer.max_deliver"));
+                        ui.text_edit_singleline(&mut app.consumer_edit_editor.max_deliver);
+                        ui.end_row();
+
+                        ui.label(t("consumer.max_ack_pending"));
+                        ui.text_edit_singleline(&mut app.consumer_edit_editor.max_ack_pending);
+                        ui.end_row();
+                    });
+                ui.add_space(8.0);
+                ui.horizontal(|ui| {
+                    if ui.button(t("common.save")).clicked() {
+                        save_requested = true;
+                    }
+                    if ui.button(t("common.cancel")).clicked() {
+                        app.consumer_edit_editor.visible = false;
+                    }
+                });
+            });
+    }
+    if save_requested {
+        app.save_consumer_edit_editor();
+    }
+}

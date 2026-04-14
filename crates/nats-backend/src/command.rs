@@ -82,6 +82,11 @@ pub enum BackendCommand {
         stream: String,
         name: String,
     },
+    UpdateConsumer {
+        connection_id: u64,
+        stream: String,
+        config: serde_json::Value,
+    },
     // KV Store
     ListKvBuckets {
         connection_id: u64,
@@ -93,6 +98,10 @@ pub enum BackendCommand {
     DeleteKvBucket {
         connection_id: u64,
         bucket: String,
+    },
+    UpdateKvBucket {
+        connection_id: u64,
+        config: serde_json::Value,
     },
     ListKvKeys {
         connection_id: u64,

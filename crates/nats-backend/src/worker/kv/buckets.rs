@@ -126,3 +126,60 @@ pub(crate) async fn handle_delete_bucket(
         Err(e) => super::send_err(evt_tx, connection_id, "delete_kv_bucket", e.to_string()),
     }
 }
+
+pub(crate) async fn handle_update_bucket(
+    state: &WorkerState,
+    connection_id: u64,
+    config: serde_json::Value,
+    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+) {
+    let Some(js) = super::jetstream(state, connection_id, evt_tx, "update_kv_bucket") else {
+        return;
+    };
+
+    let bucket = config["bucket"].as_str().unwrap_or("").trim().to_string();
+    if bucket.is_empty() {
+        super::send_err(
+            evt_tx,
+            connection_id,
+            "update_kv_bucket",
+            "Bucket name is required".to_string(),
+        );
+        return;
+    }
+
+    let storage = match config["storage"].as_str() {
+        Some("memory") | Some("Memory") => async_nats::jetstream::stream::StorageType::Memory,
+        _ => async_nats::jetstream::stream::StorageType::File,
+    };
+
+    let mut bucket_config = async_nats::jetstream::kv::Config {
+        bucket,
+        history: config["history"].as_i64().unwrap_or(1),
+        storage,
+        description: config["description"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string(),
+        max_value_size: config["max_value_size"].as_i64().unwrap_or_default() as i32,
+        max_bytes: config["max_bytes"].as_i64().unwrap_or_default(),
+        num_replicas: config["num_replicas"].as_u64().unwrap_or(1) as usize,
+        ..Default::default()
+    };
+    if let Some(max_age) = config["max_age"].as_u64() {
+        bucket_config.max_age = std::time::Duration::from_nanos(max_age);
+    }
+
+    match js.update_key_value(bucket_config).await {
+        Ok(store) => match store.status().await {
+            Ok(status) => super::send_ok(
+                evt_tx,
+                connection_id,
+                "update_kv_bucket",
+                kv_status_to_json(&status),
+            ),
+            Err(e) => super::send_err(evt_tx, connection_id, "update_kv_bucket", e.to_string()),
+        },
+        Err(e) => super::send_err(evt_tx, connection_id, "update_kv_bucket", e.to_string()),
+    }
+}

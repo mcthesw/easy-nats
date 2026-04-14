@@ -48,7 +48,7 @@ pub(crate) fn render_consumers(
                 ui.label(t("consumer.no_consumers"));
             } else {
                 for consumer in &state.consumers {
-                    consumer_card(ui, connection_id, stream_name, consumer, backend);
+                    consumer_card(ui, connection_id, stream_name, consumer, backend, actions);
                     ui.add_space(4.0);
                 }
             }
@@ -61,6 +61,7 @@ fn consumer_card(
     stream_name: &str,
     consumer: &serde_json::Value,
     backend: &BackendHandle,
+    actions: &mut Vec<TabAction>,
 ) {
     let name = consumer["name"].as_str().unwrap_or(t("consumer.unnamed"));
     let config = &consumer["config"];
@@ -128,13 +129,22 @@ fn consumer_card(
             });
 
             ui.add_space(4.0);
-            if ui.button(t("consumer.delete")).clicked() {
-                backend.send(BackendCommand::DeleteConsumer {
-                    connection_id,
-                    stream: stream_name.to_string(),
-                    name: name.to_string(),
-                });
-            }
+            ui.horizontal(|ui| {
+                if ui.button(t("consumer.edit")).clicked() {
+                    actions.push(TabAction::OpenConsumerEdit {
+                        connection_id,
+                        stream_name: stream_name.to_string(),
+                        consumer_json: consumer.clone(),
+                    });
+                }
+                if ui.button(t("consumer.delete")).clicked() {
+                    backend.send(BackendCommand::DeleteConsumer {
+                        connection_id,
+                        stream: stream_name.to_string(),
+                        name: name.to_string(),
+                    });
+                }
+            });
         });
 }
 

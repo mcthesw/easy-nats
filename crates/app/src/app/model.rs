@@ -10,8 +10,9 @@ use crate::tabs::TabKind;
 use crate::toast::Toasts;
 
 use super::editors::{
-    ConnectionEditor, ConsumerCreateEditor, KvBucketCreateEditor, ObjStoreBucketCreateEditor,
-    StreamCreateEditor,
+    ConnectionEditor, ConsumerCreateEditor, ConsumerEditEditor, KvBucketCreateEditor,
+    KvBucketEditEditor, KvEntryCreateEditor, ObjStoreBucketCreateEditor, StreamCreateEditor,
+    StreamPublishEditor,
 };
 
 /// Allocates and recycles tab instance IDs, reusing the smallest freed ID.
@@ -56,8 +57,12 @@ pub struct EasyNatsApp {
     pub(crate) selected_conn: Option<u64>,
     pub(crate) editor: ConnectionEditor,
     pub(crate) stream_editor: StreamCreateEditor,
+    pub(crate) stream_publish_editor: StreamPublishEditor,
     pub(crate) consumer_editor: ConsumerCreateEditor,
+    pub(crate) consumer_edit_editor: ConsumerEditEditor,
     pub(crate) kv_bucket_editor: KvBucketCreateEditor,
+    pub(crate) kv_bucket_edit_editor: KvBucketEditEditor,
+    pub(crate) kv_entry_create_editor: KvEntryCreateEditor,
     pub(crate) obj_store_bucket_editor: ObjStoreBucketCreateEditor,
     pub(crate) stream_lists: HashMap<u64, Vec<serde_json::Value>>,
     pub(crate) kv_lists: HashMap<u64, Vec<serde_json::Value>>,
@@ -88,8 +93,12 @@ impl EasyNatsApp {
             selected_conn: None,
             editor: ConnectionEditor::default(),
             stream_editor: StreamCreateEditor::default(),
+            stream_publish_editor: StreamPublishEditor::default(),
             consumer_editor: ConsumerCreateEditor::default(),
+            consumer_edit_editor: ConsumerEditEditor::default(),
             kv_bucket_editor: KvBucketCreateEditor::default(),
+            kv_bucket_edit_editor: KvBucketEditEditor::default(),
+            kv_entry_create_editor: KvEntryCreateEditor::default(),
             obj_store_bucket_editor: ObjStoreBucketCreateEditor::default(),
             stream_lists: HashMap::new(),
             kv_lists: HashMap::new(),

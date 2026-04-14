@@ -84,6 +84,29 @@ impl Default for StreamCreateEditor {
     }
 }
 
+#[derive(Default)]
+pub(crate) struct StreamPublishEditor {
+    pub(crate) visible: bool,
+    pub(crate) connection_id: u64,
+    pub(crate) stream_name: String,
+    pub(crate) subject: String,
+    pub(crate) payload: String,
+    pub(crate) headers: Vec<(String, String)>,
+}
+
+impl StreamPublishEditor {
+    pub(crate) fn for_stream(connection_id: u64, stream_name: String, subject: String) -> Self {
+        Self {
+            visible: true,
+            connection_id,
+            stream_name,
+            subject,
+            payload: String::new(),
+            headers: Vec::new(),
+        }
+    }
+}
+
 pub(crate) struct ConsumerCreateEditor {
     pub(crate) visible: bool,
     pub(crate) connection_id: u64,
@@ -226,6 +249,144 @@ impl RetentionSelection {
             Self::Limits => t("common.retention_limits"),
             Self::Interest => t("common.retention_interest"),
             Self::WorkQueue => t("common.retention_work_queue"),
+        }
+    }
+}
+
+pub(crate) struct ConsumerEditEditor {
+    pub(crate) visible: bool,
+    pub(crate) connection_id: u64,
+    pub(crate) stream_name: String,
+    pub(crate) consumer_name: String,
+    pub(crate) description: String,
+    pub(crate) max_deliver: String,
+    pub(crate) max_ack_pending: String,
+    /// Full original config JSON, used as base for update
+    pub(crate) original_config: serde_json::Value,
+}
+
+impl Default for ConsumerEditEditor {
+    fn default() -> Self {
+        Self {
+            visible: false,
+            connection_id: 0,
+            stream_name: String::new(),
+            consumer_name: String::new(),
+            description: String::new(),
+            max_deliver: String::new(),
+            max_ack_pending: String::new(),
+            original_config: serde_json::Value::Null,
+        }
+    }
+}
+
+impl ConsumerEditEditor {
+    pub(crate) fn from_json(
+        connection_id: u64,
+        stream_name: String,
+        json: &serde_json::Value,
+    ) -> Self {
+        let name = json["config"]["name"]
+            .as_str()
+            .or_else(|| json["config"]["durable_name"].as_str())
+            .unwrap_or_default()
+            .to_string();
+        let desc = json["config"]["description"]
+            .as_str()
+            .unwrap_or_default()
+            .to_string();
+        let max_d = json["config"]["max_deliver"]
+            .as_i64()
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        let max_a = json["config"]["max_ack_pending"]
+            .as_i64()
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        Self {
+            visible: true,
+            connection_id,
+            stream_name,
+            consumer_name: name,
+            description: desc,
+            max_deliver: max_d,
+            max_ack_pending: max_a,
+            original_config: json.clone(),
+        }
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct KvBucketEditEditor {
+    pub(crate) visible: bool,
+    pub(crate) connection_id: u64,
+    pub(crate) bucket: String,
+    pub(crate) description: String,
+    pub(crate) history: String,
+    pub(crate) max_age_secs: String,
+    pub(crate) max_value_size: String,
+    pub(crate) max_bytes: String,
+    pub(crate) num_replicas: String,
+}
+
+impl KvBucketEditEditor {
+    pub(crate) fn from_json(connection_id: u64, json: &serde_json::Value) -> Self {
+        let bucket = json["bucket"].as_str().unwrap_or_default().to_string();
+        let desc = json["description"].as_str().unwrap_or_default().to_string();
+        let history = json["history"]
+            .as_i64()
+            .map(|v| v.to_string())
+            .unwrap_or("1".to_string());
+        let max_age = json["max_age_nanos"]
+            .as_u64()
+            .filter(|&v| v > 0)
+            .map(|v| (v / 1_000_000_000).to_string())
+            .unwrap_or_default();
+        let max_vs = json["max_value_size"]
+            .as_i64()
+            .filter(|&v| v > 0)
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        let max_b = json["max_bytes"]
+            .as_i64()
+            .filter(|&v| v > 0)
+            .map(|v| v.to_string())
+            .unwrap_or_default();
+        let replicas = json["num_replicas"]
+            .as_u64()
+            .map(|v| v.to_string())
+            .unwrap_or("1".to_string());
+        Self {
+            visible: true,
+            connection_id,
+            bucket,
+            description: desc,
+            history,
+            max_age_secs: max_age,
+            max_value_size: max_vs,
+            max_bytes: max_b,
+            num_replicas: replicas,
+        }
+    }
+}
+
+#[derive(Default)]
+pub(crate) struct KvEntryCreateEditor {
+    pub(crate) visible: bool,
+    pub(crate) connection_id: u64,
+    pub(crate) bucket_name: String,
+    pub(crate) key: String,
+    pub(crate) value: String,
+}
+
+impl KvEntryCreateEditor {
+    pub(crate) fn for_bucket(connection_id: u64, bucket_name: String, initial_key: String) -> Self {
+        Self {
+            visible: true,
+            connection_id,
+            bucket_name,
+            key: initial_key,
+            value: String::new(),
         }
     }
 }

@@ -8,6 +8,9 @@ create_bucket:
 delete_bucket:
   en: "Delete Bucket"
   zh: "删除存储桶"
+edit_bucket:
+  en: "Edit Bucket"
+  zh: "编辑存储桶"
 delete_bucket_confirm_title:
   en: "Confirm KV Bucket Delete"
   zh: "确认删除 KV 存储桶"
@@ -102,8 +105,8 @@ empty_value:
   en: "<empty>"
   zh: "<空>"
 select_key_hint:
-  en: "Select a key from the list or create a new entry."
-  zh: "从列表中选择一个键或创建新条目。"
+  en: "Select a key from the list, or click New Entry to open a create dialog."
+  zh: "从列表中选择一个键，或点击“新建条目”打开创建弹窗。"
 back_to_detail:
   en: "← Back"
   zh: "← 返回"

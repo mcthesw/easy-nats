@@ -12,6 +12,7 @@ pub(crate) fn render_windows(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     connection::render(app, ui);
     stream::render(app, ui);
     consumer::render(app, ui);
+    consumer::render_edit(app, ui);
     kv::render(app, ui);
     obj_store::render(app, ui);
 }

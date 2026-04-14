@@ -285,6 +285,15 @@ impl EasyNatsApp {
         self.stream_editor.visible = false;
     }
 
+    pub(crate) fn publish_stream_editor(&mut self) {
+        self.backend.send(BackendCommand::Publish {
+            connection_id: self.stream_publish_editor.connection_id,
+            subject: self.stream_publish_editor.subject.trim().to_string(),
+            payload: self.stream_publish_editor.payload.as_bytes().to_vec(),
+            headers: collect_non_empty_headers(&self.stream_publish_editor.headers),
+        });
+    }
+
     pub(crate) fn save_consumer_editor(&mut self) {
         let mut config = serde_json::json!({
             "name": self.consumer_editor.name.trim(),
@@ -352,6 +361,65 @@ impl EasyNatsApp {
         self.kv_bucket_editor.visible = false;
     }
 
+    pub(crate) fn save_consumer_edit_editor(&mut self) {
+        let mut config = self.consumer_edit_editor.original_config["config"].clone();
+        config["description"] = serde_json::json!(self.consumer_edit_editor.description.trim());
+        if let Ok(v) = self.consumer_edit_editor.max_deliver.parse::<i64>() {
+            config["max_deliver"] = serde_json::json!(v);
+        }
+        if let Ok(v) = self.consumer_edit_editor.max_ack_pending.parse::<i64>() {
+            config["max_ack_pending"] = serde_json::json!(v);
+        }
+
+        self.backend.send(BackendCommand::UpdateConsumer {
+            connection_id: self.consumer_edit_editor.connection_id,
+            stream: self.consumer_edit_editor.stream_name.clone(),
+            config,
+        });
+        self.consumer_edit_editor.visible = false;
+    }
+
+    pub(crate) fn save_kv_bucket_edit_editor(&mut self) {
+        let ed = &self.kv_bucket_edit_editor;
+        let mut config = serde_json::json!({
+            "bucket": ed.bucket,
+            "history": ed.history.parse::<i64>().unwrap_or(1),
+        });
+
+        if let Ok(v) = ed.max_value_size.parse::<i32>() {
+            config["max_value_size"] = serde_json::json!(v);
+        }
+        if let Ok(v) = ed.max_bytes.parse::<i64>() {
+            config["max_bytes"] = serde_json::json!(v);
+        }
+        if let Ok(secs) = ed.max_age_secs.parse::<u64>() {
+            config["max_age"] = serde_json::json!(secs * 1_000_000_000_u64);
+        }
+        if let Ok(v) = ed.num_replicas.parse::<usize>() {
+            config["num_replicas"] = serde_json::json!(v);
+        }
+        if !ed.description.trim().is_empty() {
+            config["description"] = serde_json::json!(ed.description.trim());
+        }
+
+        let connection_id = ed.connection_id;
+        self.backend.send(BackendCommand::UpdateKvBucket {
+            connection_id,
+            config,
+        });
+        self.kv_bucket_edit_editor.visible = false;
+    }
+
+    pub(crate) fn save_kv_entry_create_editor(&mut self) {
+        self.backend.send(BackendCommand::PutKvEntry {
+            connection_id: self.kv_entry_create_editor.connection_id,
+            bucket: self.kv_entry_create_editor.bucket_name.clone(),
+            key: self.kv_entry_create_editor.key.trim().to_string(),
+            value: self.kv_entry_create_editor.value.as_bytes().to_vec(),
+        });
+        self.kv_entry_create_editor.visible = false;
+    }
+
     pub(crate) fn close_other_tabs(&mut self, keep_title: &str) {
         let to_remove: Vec<_> = self
             .dock_state
@@ -400,5 +468,18 @@ impl EasyNatsApp {
                 self.dock_state.remove_tab(pos);
             }
         }
+    }
+}
+
+fn collect_non_empty_headers(headers: &[(String, String)]) -> Option<Vec<(String, String)>> {
+    let non_empty: Vec<(String, String)> = headers
+        .iter()
+        .filter(|(k, v)| !k.trim().is_empty() || !v.trim().is_empty())
+        .cloned()
+        .collect();
+    if non_empty.is_empty() {
+        None
+    } else {
+        Some(non_empty)
     }
 }

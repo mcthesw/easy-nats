@@ -3,7 +3,14 @@ use egui_dock::DockArea;
 
 use crate::tabs::{AppTabViewer, TabAction, TabKind};
 
-use super::{editors::ConsumerCreateEditor, model::EasyNatsApp, sidebar, windows};
+use super::{
+    editors::{
+        ConsumerCreateEditor, ConsumerEditEditor, KvBucketEditEditor, KvEntryCreateEditor,
+        StreamPublishEditor,
+    },
+    model::EasyNatsApp,
+    sidebar, windows,
+};
 
 impl eframe::App for EasyNatsApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
@@ -63,6 +70,14 @@ impl eframe::App for EasyNatsApp {
 
         for action in tab_actions {
             match action {
+                TabAction::OpenStreamPublish {
+                    connection_id,
+                    stream_name,
+                    subject,
+                } => {
+                    self.stream_publish_editor =
+                        StreamPublishEditor::for_stream(connection_id, stream_name, subject);
+                }
                 TabAction::OpenConsumerCreate {
                     connection_id,
                     stream_name,
@@ -73,6 +88,29 @@ impl eframe::App for EasyNatsApp {
                         stream_name,
                         ..Default::default()
                     };
+                }
+                TabAction::OpenConsumerEdit {
+                    connection_id,
+                    stream_name,
+                    consumer_json,
+                } => {
+                    self.consumer_edit_editor =
+                        ConsumerEditEditor::from_json(connection_id, stream_name, &consumer_json);
+                }
+                TabAction::OpenKvBucketEdit {
+                    connection_id,
+                    bucket_json,
+                } => {
+                    self.kv_bucket_edit_editor =
+                        KvBucketEditEditor::from_json(connection_id, &bucket_json);
+                }
+                TabAction::OpenKvEntryCreate {
+                    connection_id,
+                    bucket_name,
+                    initial_key,
+                } => {
+                    self.kv_entry_create_editor =
+                        KvEntryCreateEditor::for_bucket(connection_id, bucket_name, initial_key);
                 }
                 TabAction::ConfirmDeleteKvBucket {
                     connection_id,

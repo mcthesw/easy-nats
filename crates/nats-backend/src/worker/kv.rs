@@ -7,7 +7,7 @@ use crate::event::BackendEvent;
 
 use super::state::WorkerState;
 
-pub(crate) use buckets::{handle_create_bucket, handle_delete_bucket, handle_list_buckets};
+pub(crate) use buckets::{handle_create_bucket, handle_delete_bucket, handle_list_buckets, handle_update_bucket};
 pub(crate) use entries::{
     handle_delete_entry, handle_get_entry, handle_get_history, handle_list_keys,
     handle_purge_entry, handle_put_entry,

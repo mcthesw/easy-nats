@@ -166,6 +166,14 @@ pub async fn run_worker(
                 consumers::handle_delete_consumer(&state, connection_id, stream, name, &evt_tx)
                     .await;
             }
+            BackendCommand::UpdateConsumer {
+                connection_id,
+                stream,
+                config,
+            } => {
+                consumers::handle_update_consumer(&state, connection_id, stream, config, &evt_tx)
+                    .await;
+            }
             BackendCommand::ListKvBuckets { connection_id } => {
                 kv::handle_list_buckets(&state, connection_id, &evt_tx).await;
             }
@@ -180,6 +188,12 @@ pub async fn run_worker(
                 bucket,
             } => {
                 kv::handle_delete_bucket(&state, connection_id, bucket, &evt_tx).await;
+            }
+            BackendCommand::UpdateKvBucket {
+                connection_id,
+                config,
+            } => {
+                kv::handle_update_bucket(&state, connection_id, config, &evt_tx).await;
             }
             BackendCommand::ListKvKeys {
                 connection_id,

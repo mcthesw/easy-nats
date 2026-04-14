@@ -97,7 +97,7 @@ impl EasyNatsApp {
                 }
                 true
             }
-            "create_consumer" | "delete_consumer" => {
+            "create_consumer" | "delete_consumer" | "update_consumer" => {
                 let stream_name = data["stream"]
                     .as_str()
                     .or_else(|| data["stream_name"].as_str())

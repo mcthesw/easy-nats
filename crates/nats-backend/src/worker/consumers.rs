@@ -113,6 +113,42 @@ pub(crate) async fn handle_delete_consumer(
     .await;
 }
 
+pub(crate) async fn handle_update_consumer(
+    state: &WorkerState,
+    connection_id: u64,
+    stream_name: String,
+    config: serde_json::Value,
+    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+) {
+    with_stream(
+        state,
+        connection_id,
+        &stream_name,
+        evt_tx,
+        "update_consumer",
+        |stream| async move {
+            match serde_json::from_value::<async_nats::jetstream::consumer::pull::Config>(config) {
+                Ok(consumer_config) => match stream.update_consumer(consumer_config).await {
+                    Ok(consumer) => send_ok(
+                        evt_tx,
+                        connection_id,
+                        "update_consumer",
+                        consumer_info_to_json(consumer.cached_info()),
+                    ),
+                    Err(e) => send_err(evt_tx, connection_id, "update_consumer", e.to_string()),
+                },
+                Err(e) => send_err(
+                    evt_tx,
+                    connection_id,
+                    "update_consumer",
+                    format!("Invalid consumer config: {e}"),
+                ),
+            }
+        },
+    )
+    .await;
+}
+
 async fn with_stream<F, Fut>(
     state: &WorkerState,
     connection_id: u64,

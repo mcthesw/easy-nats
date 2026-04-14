@@ -45,9 +45,28 @@ impl AutoRefresh {
 
 #[derive(Debug)]
 pub enum TabAction {
+    OpenStreamPublish {
+        connection_id: u64,
+        stream_name: String,
+        subject: String,
+    },
     OpenConsumerCreate {
         connection_id: u64,
         stream_name: String,
+    },
+    OpenConsumerEdit {
+        connection_id: u64,
+        stream_name: String,
+        consumer_json: serde_json::Value,
+    },
+    OpenKvBucketEdit {
+        connection_id: u64,
+        bucket_json: serde_json::Value,
+    },
+    OpenKvEntryCreate {
+        connection_id: u64,
+        bucket_name: String,
+        initial_key: String,
     },
     ConfirmDeleteKvBucket {
         connection_id: u64,
@@ -218,7 +237,6 @@ pub struct KvBucketState {
     pub history: Vec<serde_json::Value>,
     pub history_format: PayloadFormat,
     pub show_history: bool,
-    pub creating_new: bool,
     pub auto_refresh: AutoRefresh,
     pub editor_proto_view: ProtoViewState,
     pub history_proto_view: ProtoViewState,
@@ -242,7 +260,6 @@ impl Default for KvBucketState {
             history: Vec::new(),
             history_format: PayloadFormat::Auto,
             show_history: false,
-            creating_new: false,
             auto_refresh: AutoRefresh::default(),
             editor_proto_view: ProtoViewState::default(),
             history_proto_view: ProtoViewState::default(),
