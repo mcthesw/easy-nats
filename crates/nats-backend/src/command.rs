@@ -87,6 +87,12 @@ pub enum BackendCommand {
         stream: String,
         config: serde_json::Value,
     },
+    FetchConsumerMessages {
+        connection_id: u64,
+        stream: String,
+        consumer: String,
+        batch: usize,
+    },
     // KV Store
     ListKvBuckets {
         connection_id: u64,

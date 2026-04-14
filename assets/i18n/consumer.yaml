@@ -98,3 +98,15 @@ edit:
 edit_title:
   en: "Edit Consumer"
   zh: "编辑消费者"
+fetch:
+  en: "Preview Matches"
+  zh: "预览匹配消息"
+fetch_hint:
+  en: "Preview messages through a short-lived inspector consumer built from this consumer's filters. It does not advance the original consumer and may not exactly match its pending backlog."
+  zh: "基于当前消费者过滤条件创建短时检查器做预览；不会推进原消费者游标，但结果不保证与原消费者待处理队列完全一致。"
+fetched_messages:
+  en: "Preview results"
+  zh: "预览结果"
+fetching:
+  en: "Fetching..."
+  zh: "获取中..."

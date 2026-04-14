@@ -68,6 +68,22 @@ impl EasyNatsApp {
             }
         }
 
+        if operation == "fetch_consumer_messages"
+            && let Some(cid) = connection_id
+        {
+            for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+                if let TabKind::Stream {
+                    connection_id: tab_cid,
+                    state,
+                    ..
+                } = tab
+                    && *tab_cid == cid
+                {
+                    state.consumer_fetching.clear();
+                }
+            }
+        }
+
         if let Some(cid) = connection_id {
             self.clear_kv_loading_on_error(cid, operation);
             self.clear_obj_store_loading_on_error(cid, operation);

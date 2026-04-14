@@ -174,6 +174,22 @@ pub async fn run_worker(
                 consumers::handle_update_consumer(&state, connection_id, stream, config, &evt_tx)
                     .await;
             }
+            BackendCommand::FetchConsumerMessages {
+                connection_id,
+                stream,
+                consumer,
+                batch,
+            } => {
+                consumers::handle_fetch_consumer_messages(
+                    &state,
+                    connection_id,
+                    stream,
+                    consumer,
+                    batch,
+                    &evt_tx,
+                )
+                .await;
+            }
             BackendCommand::ListKvBuckets { connection_id } => {
                 kv::handle_list_buckets(&state, connection_id, &evt_tx).await;
             }

@@ -3,7 +3,7 @@ use tokio::sync::mpsc;
 
 use crate::event::BackendEvent;
 
-use super::helpers::consumer_info_to_json;
+use super::helpers::{consumer_info_to_json, raw_message_to_json};
 use super::state::WorkerState;
 
 pub(crate) async fn handle_list_consumers(
@@ -147,6 +147,123 @@ pub(crate) async fn handle_update_consumer(
         },
     )
     .await;
+}
+
+pub(crate) async fn handle_fetch_consumer_messages(
+    state: &WorkerState,
+    connection_id: u64,
+    stream_name: String,
+    consumer_name: String,
+    batch: usize,
+    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+) {
+    let operation = "fetch_consumer_messages";
+    let lookup = stream_name.clone();
+    with_stream(
+        state,
+        connection_id,
+        &lookup,
+        evt_tx,
+        operation,
+        |stream| async move {
+            // Get the original consumer info to read its filter subjects
+            let original = match stream.consumer_info(&consumer_name).await {
+                Ok(info) => info,
+                Err(e) => {
+                    send_err(evt_tx, connection_id, operation, e.to_string());
+                    return;
+                }
+            };
+
+            // Build an ephemeral inspector consumer mirroring the filter
+            let filter = original.config.filter_subject.clone();
+            let filters = original.config.filter_subjects.clone();
+            let inspector_config = async_nats::jetstream::consumer::pull::Config {
+                filter_subject: filter,
+                filter_subjects: filters,
+                deliver_policy: async_nats::jetstream::consumer::DeliverPolicy::All,
+                memory_storage: true,
+                inactive_threshold: std::time::Duration::from_secs(10),
+                ..Default::default()
+            };
+
+            let inspector = match stream.create_consumer(inspector_config).await {
+                Ok(c) => c,
+                Err(e) => {
+                    send_err(
+                        evt_tx,
+                        connection_id,
+                        operation,
+                        format!("Failed to create inspector consumer: {e}"),
+                    );
+                    return;
+                }
+            };
+            let inspector_name = inspector.cached_info().name.clone();
+
+            let mut fetch_stream = match inspector
+                .fetch()
+                .max_messages(batch)
+                .expires(std::time::Duration::from_secs(5))
+                .messages()
+                .await
+            {
+                Ok(s) => s,
+                Err(e) => {
+                    cleanup_inspector_consumer(&stream, &inspector_name).await;
+                    send_err(evt_tx, connection_id, operation, e.to_string());
+                    return;
+                }
+            };
+
+            let mut messages = Vec::new();
+            while let Some(result) = fetch_stream.next().await {
+                let msg = match result {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        drop(fetch_stream);
+                        cleanup_inspector_consumer(&stream, &inspector_name).await;
+                        send_err(evt_tx, connection_id, operation, e.to_string());
+                        return;
+                    }
+                };
+                match async_nats::jetstream::message::StreamMessage::try_from(msg.message.clone()) {
+                    Ok(stream_msg) => messages.push(raw_message_to_json(&stream_msg)),
+                    Err(e) => tracing::debug!(%e, "Failed to convert inspector message"),
+                }
+                if messages.len() >= batch {
+                    break;
+                }
+            }
+            drop(fetch_stream);
+            cleanup_inspector_consumer(&stream, &inspector_name).await;
+
+            send_ok(
+                evt_tx,
+                connection_id,
+                operation,
+                serde_json::json!({
+                    "stream": stream_name,
+                    "consumer": consumer_name,
+                    "messages": messages,
+                }),
+            );
+        },
+    )
+    .await;
+}
+
+async fn cleanup_inspector_consumer(
+    stream: &async_nats::jetstream::stream::Stream,
+    consumer_name: &str,
+) {
+    if let Err(e) = stream.delete_consumer(consumer_name).await {
+        tracing::warn!(
+            %e,
+            consumer_name,
+            "Failed to delete inspector consumer"
+        );
+    }
 }
 
 async fn with_stream<F, Fut>(

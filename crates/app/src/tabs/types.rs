@@ -197,6 +197,8 @@ pub struct StreamState {
     pub consumers_fetching: bool,
     pub auto_refresh: AutoRefresh,
     pub proto_view: ProtoViewState,
+    pub consumer_fetched: std::collections::HashMap<String, Vec<serde_json::Value>>,
+    pub consumer_fetching: std::collections::HashSet<String>,
 }
 
 impl Default for StreamState {
@@ -216,6 +218,8 @@ impl Default for StreamState {
             consumers_fetching: false,
             auto_refresh: AutoRefresh::default(),
             proto_view: ProtoViewState::default(),
+            consumer_fetched: std::collections::HashMap::new(),
+            consumer_fetching: std::collections::HashSet::new(),
         }
     }
 }

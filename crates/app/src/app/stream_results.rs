@@ -133,6 +133,28 @@ impl EasyNatsApp {
                     .push(ToastLevel::Success, t("toast.message_deleted").to_string());
                 true
             }
+            "fetch_consumer_messages" => {
+                let stream_name = data["stream"].as_str().unwrap_or("").to_string();
+                let consumer_name = data["consumer"].as_str().unwrap_or("").to_string();
+                let messages = data["messages"].as_array().cloned().unwrap_or_default();
+                for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+                    if let TabKind::Stream {
+                        connection_id: cid,
+                        stream_name: sname,
+                        state,
+                        ..
+                    } = tab
+                        && *cid == connection_id
+                        && *sname == stream_name
+                    {
+                        state.consumer_fetching.remove(&consumer_name);
+                        state
+                            .consumer_fetched
+                            .insert(consumer_name.clone(), messages.clone());
+                    }
+                }
+                true
+            }
             _ => false,
         }
     }
