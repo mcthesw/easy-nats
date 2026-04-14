@@ -169,8 +169,8 @@ fn render_detail_panel(
                 connection_id,
                 bucket: bucket_name.to_string(),
                 name: obj_name.clone(),
+                file_path: path,
             });
-            let _ = path; // TODO: wire save-to-file in download result handler
         }
 
         if !state.delete_confirm {

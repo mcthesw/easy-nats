@@ -87,7 +87,10 @@ impl EasyNatsApp {
                 true
             }
             "download_object" => {
-                // Download handled by the tab UI that initiated it
+                let name = data["name"].as_str().unwrap_or("?");
+                let file_path = data["file_path"].as_str().unwrap_or("?");
+                self.toasts
+                    .push(ToastLevel::Success, format!("{name} → {file_path}"));
                 true
             }
             _ => false,

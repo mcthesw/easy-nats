@@ -243,9 +243,17 @@ pub async fn run_worker(
                 connection_id,
                 bucket,
                 name,
+                file_path,
             } => {
-                object_store::handle_download_object(&state, connection_id, bucket, name, &evt_tx)
-                    .await;
+                object_store::handle_download_object(
+                    &state,
+                    connection_id,
+                    bucket,
+                    name,
+                    file_path,
+                    &evt_tx,
+                )
+                .await;
             }
             BackendCommand::DeleteObject {
                 connection_id,

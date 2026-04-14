@@ -1,6 +1,6 @@
-use base64::Engine;
+use std::path::PathBuf;
+
 use futures_util::TryStreamExt;
-use tokio::io::AsyncReadExt;
 use tokio::sync::mpsc;
 
 use crate::event::BackendEvent;
@@ -85,6 +85,7 @@ pub(crate) async fn handle_download_object(
     connection_id: u64,
     bucket: String,
     name: String,
+    file_path: PathBuf,
     evt_tx: &mpsc::UnboundedSender<BackendEvent>,
 ) {
     let Some(store) =
@@ -101,10 +102,22 @@ pub(crate) async fn handle_download_object(
         }
     };
 
-    let mut buf = Vec::new();
-    match object.read_to_end(&mut buf).await {
-        Ok(_) => {
-            let b64 = base64::engine::general_purpose::STANDARD.encode(&buf);
+    let file = match tokio::fs::File::create(&file_path).await {
+        Ok(f) => f,
+        Err(e) => {
+            super::send_err(
+                evt_tx,
+                connection_id,
+                "download_object",
+                format!("Failed to create file: {e}"),
+            );
+            return;
+        }
+    };
+    let mut writer = tokio::io::BufWriter::new(file);
+
+    match tokio::io::copy(&mut object, &mut writer).await {
+        Ok(bytes_written) => {
             super::send_ok(
                 evt_tx,
                 connection_id,
@@ -112,12 +125,16 @@ pub(crate) async fn handle_download_object(
                 serde_json::json!({
                     "bucket": bucket,
                     "name": name,
-                    "data_base64": b64,
-                    "size": buf.len(),
+                    "file_path": file_path.to_string_lossy(),
+                    "size": bytes_written,
                 }),
             );
         }
-        Err(e) => super::send_err(evt_tx, connection_id, "download_object", e.to_string()),
+        Err(e) => {
+            // Clean up partial file on failure
+            let _ = tokio::fs::remove_file(&file_path).await;
+            super::send_err(evt_tx, connection_id, "download_object", e.to_string());
+        }
     }
 }
 

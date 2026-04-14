@@ -149,6 +149,7 @@ pub enum BackendCommand {
         connection_id: u64,
         bucket: String,
         name: String,
+        file_path: std::path::PathBuf,
     },
     DeleteObject {
         connection_id: u64,
