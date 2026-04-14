@@ -39,10 +39,11 @@ pub(crate) async fn handle_publish(
 pub(crate) async fn handle_subscribe(
     state: &mut WorkerState,
     connection_id: u64,
+    subscriber_id: u32,
     subject: String,
     evt_tx: &mpsc::UnboundedSender<BackendEvent>,
 ) {
-    let key = (connection_id, subject.clone());
+    let key = (connection_id, subscriber_id, subject.clone());
     match state.subscriptions.entry(key) {
         Entry::Occupied(_) => send_err(
             evt_tx,
@@ -55,11 +56,11 @@ pub(crate) async fn handle_subscribe(
                 match client.subscribe(subject.clone()).await {
                     Ok(mut subscriber) => {
                         let tx = evt_tx.clone();
-                        let tracked_subject = subject.clone();
                         let handle = tokio::spawn(async move {
                             while let Some(msg) = subscriber.next().await {
                                 let _ = tx.send(BackendEvent::MessageReceived {
                                     connection_id,
+                                    subscriber_id,
                                     subject: msg.subject.to_string(),
                                     reply: msg.reply.map(|r| r.to_string()),
                                     headers: extract_headers(&msg.headers),
@@ -67,7 +68,6 @@ pub(crate) async fn handle_subscribe(
                                     timestamp: SystemTime::now(),
                                 });
                             }
-                            tracing::debug!(connection_id, subject = %tracked_subject, "Subscription stream ended");
                         });
                         vacant.insert(handle);
                         send_ok(
@@ -89,12 +89,14 @@ pub(crate) async fn handle_subscribe(
 pub(crate) async fn handle_unsubscribe(
     state: &mut WorkerState,
     connection_id: u64,
+    subscriber_id: u32,
     subject: String,
     evt_tx: &mpsc::UnboundedSender<BackendEvent>,
 ) {
-    if let Some(handle) = state
-        .subscriptions
-        .remove(&(connection_id, subject.clone()))
+    if let Some(handle) =
+        state
+            .subscriptions
+            .remove(&(connection_id, subscriber_id, subject.clone()))
     {
         handle.abort();
         send_ok(

@@ -10,9 +10,7 @@ use super::super::{
 pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     let mut save_requested = false;
     if app.consumer_editor.visible {
-        let mut open = true;
         egui::Window::new(t("consumer.create"))
-            .open(&mut open)
             .resizable(false)
             .show(ui.ctx(), |ui| {
                 egui::Grid::new("consumer_create_grid")
@@ -108,9 +106,6 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     }
                 });
             });
-        if !open {
-            app.consumer_editor.visible = false;
-        }
     }
     if save_requested {
         app.save_consumer_editor();

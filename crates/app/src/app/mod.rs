@@ -12,3 +12,4 @@ mod util;
 mod windows;
 
 pub use model::EasyNatsApp;
+pub use model::TabIdAllocator;

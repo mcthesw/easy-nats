@@ -6,5 +6,5 @@ use tokio::task::JoinHandle;
 #[derive(Default)]
 pub(crate) struct WorkerState {
     pub(crate) clients: HashMap<u64, Client>,
-    pub(crate) subscriptions: HashMap<(u64, String), JoinHandle<()>>,
+    pub(crate) subscriptions: HashMap<(u64, u32, String), JoinHandle<()>>,
 }

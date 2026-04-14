@@ -7,9 +7,7 @@ use super::super::model::EasyNatsApp;
 pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     let mut save_requested = false;
     if app.stream_editor.visible {
-        let mut open = true;
         egui::Window::new(t("stream.create_title"))
-            .open(&mut open)
             .resizable(false)
             .show(ui.ctx(), |ui| {
                 egui::Grid::new("stream_create_grid")
@@ -97,9 +95,6 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     }
                 });
             });
-        if !open {
-            app.stream_editor.visible = false;
-        }
     }
     if save_requested {
         app.save_stream_editor();

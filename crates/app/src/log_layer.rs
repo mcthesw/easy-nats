@@ -15,10 +15,49 @@ pub struct LogEntry {
     pub timestamp: std::time::SystemTime,
 }
 
-const RING_CAPACITY: usize = 1000;
+const RING_CAPACITY: usize = 2000;
+
+/// Crate targets that are allowed at all log levels (TRACE and above).
+const OWN_TARGETS: &[&str] = &["easy_nats", "nats_backend"];
+
+/// Ring buffer that evicts the oldest entry when full.
+pub struct LogBuffer {
+    entries: VecDeque<LogEntry>,
+    capacity: usize,
+}
+
+impl LogBuffer {
+    pub fn new(capacity: usize) -> Self {
+        Self {
+            entries: VecDeque::with_capacity(capacity),
+            capacity,
+        }
+    }
+
+    pub fn push(&mut self, entry: LogEntry) {
+        if self.entries.len() >= self.capacity {
+            self.entries.pop_front();
+        }
+        self.entries.push_back(entry);
+    }
+
+    pub fn clear(&mut self) {
+        self.entries.clear();
+    }
+
+    pub fn entries(&self) -> &VecDeque<LogEntry> {
+        &self.entries
+    }
+}
+
+impl Default for LogBuffer {
+    fn default() -> Self {
+        Self::new(RING_CAPACITY)
+    }
+}
 
 /// Shared handle to the in-memory log ring buffer.
-pub type SharedLogBuffer = Arc<Mutex<VecDeque<LogEntry>>>;
+pub type SharedLogBuffer = Arc<Mutex<LogBuffer>>;
 
 /// A `tracing_subscriber::Layer` that writes events to the shared buffer.
 pub struct AppLogLayer {
@@ -40,21 +79,28 @@ where
         event: &tracing::Event<'_>,
         _ctx: tracing_subscriber::layer::Context<'_, S>,
     ) {
+        let meta = event.metadata();
+
+        // Third-party targets are capped at INFO; only own crates get DEBUG/TRACE.
+        if *meta.level() > Level::INFO {
+            let target = meta.target();
+            if !OWN_TARGETS.iter().any(|t| target.starts_with(t)) {
+                return;
+            }
+        }
+
         let mut visitor = MessageVisitor(String::new());
         event.record(&mut visitor);
 
         let entry = LogEntry {
-            level: *event.metadata().level(),
-            target: event.metadata().target().to_string(),
+            level: *meta.level(),
+            target: meta.target().to_string(),
             message: visitor.0,
             timestamp: std::time::SystemTime::now(),
         };
 
         if let Ok(mut buf) = self.buffer.lock() {
-            if buf.len() >= RING_CAPACITY {
-                buf.pop_front();
-            }
-            buf.push_back(entry);
+            buf.push(entry);
         }
     }
 }

@@ -8,6 +8,45 @@ use super::settings::settings_ui;
 use super::types::{AppTabViewer, TabAction, TabKind};
 
 pub(crate) fn render_tab(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut TabKind) {
+    ui.push_id(tab_scope_id(tab), |ui| {
+        render_tab_body(viewer, ui, tab);
+    });
+}
+
+fn tab_scope_id(tab: &TabKind) -> String {
+    match tab {
+        TabKind::Welcome => "welcome".into(),
+        TabKind::Publisher {
+            connection_id,
+            instance_id,
+            ..
+        } => format!("pub:{connection_id}:{instance_id}"),
+        TabKind::Subscriber {
+            connection_id,
+            instance_id,
+            ..
+        } => format!("sub:{connection_id}:{instance_id}"),
+        TabKind::Stream {
+            connection_id,
+            stream_name,
+            ..
+        } => format!("stream:{connection_id}:{stream_name}"),
+        TabKind::KvBucket {
+            connection_id,
+            bucket_name,
+            ..
+        } => format!("kv:{connection_id}:{bucket_name}"),
+        TabKind::ObjectStoreBucket {
+            connection_id,
+            bucket_name,
+            ..
+        } => format!("obj:{connection_id}:{bucket_name}"),
+        TabKind::Settings => "settings".into(),
+        TabKind::LogViewer => "log-viewer".into(),
+    }
+}
+
+fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut TabKind) {
     match tab {
         TabKind::Welcome => {
             let available = ui.available_size();
@@ -52,12 +91,14 @@ pub(crate) fn render_tab(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: 
         }
         TabKind::Subscriber {
             connection_id,
+            instance_id,
             state,
             ..
         } => {
             subscriber_ui(
                 ui,
                 *connection_id,
+                *instance_id,
                 state,
                 viewer.backend,
                 viewer.proto_manager,

@@ -38,15 +38,24 @@ impl EasyNatsApp {
                             }
                         }
                         ConnectionStatusKind::Disconnected => {
-                            self.stream_lists.remove(&connection_id);
-                            self.kv_lists.remove(&connection_id);
-                            self.obj_store_lists.remove(&connection_id);
+                            if !self.user_wants_connected.contains(&connection_id) {
+                                self.stream_lists.remove(&connection_id);
+                                self.kv_lists.remove(&connection_id);
+                                self.obj_store_lists.remove(&connection_id);
+                            }
                         }
                         ConnectionStatusKind::Error(msg) => {
-                            self.toasts.push(
-                                ToastLevel::Error,
-                                format!("{}: {}", self.conn_name(connection_id), msg),
-                            );
+                            if self.user_wants_connected.contains(&connection_id) {
+                                self.toasts.push(
+                                    ToastLevel::Info,
+                                    format!("{}: {}", self.conn_name(connection_id), msg),
+                                );
+                            } else {
+                                self.toasts.push(
+                                    ToastLevel::Error,
+                                    format!("{}: {}", self.conn_name(connection_id), msg),
+                                );
+                            }
                         }
                         _ => {}
                     }
@@ -82,6 +91,7 @@ impl EasyNatsApp {
                 }
                 BackendEvent::MessageReceived {
                     connection_id,
+                    subscriber_id,
                     subject,
                     reply,
                     headers,
@@ -91,11 +101,12 @@ impl EasyNatsApp {
                     for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
                         if let TabKind::Subscriber {
                             connection_id: cid,
+                            instance_id,
                             state,
                             ..
                         } = tab
                             && *cid == connection_id
-                            && state.has_active_subscription()
+                            && *instance_id == subscriber_id
                         {
                             state.push_message(ReceivedMessage {
                                 subject: subject.clone(),

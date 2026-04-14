@@ -12,9 +12,7 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
 fn render_bucket_delete_confirmation(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     let mut do_delete = None;
     if let Some((connection_id, bucket_name)) = app.kv_bucket_delete_confirm.clone() {
-        let mut still_open = true;
         egui::Window::new(t("kv.delete_bucket_confirm_title"))
-            .open(&mut still_open)
             .resizable(false)
             .show(ui.ctx(), |ui| {
                 ui.label(format!(
@@ -31,9 +29,6 @@ fn render_bucket_delete_confirmation(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     }
                 });
             });
-        if !still_open {
-            app.kv_bucket_delete_confirm = None;
-        }
     }
     if let Some((connection_id, bucket_name)) = do_delete {
         app.backend
@@ -48,9 +43,7 @@ fn render_bucket_delete_confirmation(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
 fn render_bucket_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     let mut save_requested = false;
     if app.kv_bucket_editor.visible {
-        let mut open = true;
         egui::Window::new(t("kv.create_bucket"))
-            .open(&mut open)
             .resizable(false)
             .show(ui.ctx(), |ui| {
                 egui::Grid::new("kv_bucket_create_grid")
@@ -116,9 +109,6 @@ fn render_bucket_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     }
                 });
             });
-        if !open {
-            app.kv_bucket_editor.visible = false;
-        }
     }
     if save_requested {
         app.save_kv_bucket_editor();

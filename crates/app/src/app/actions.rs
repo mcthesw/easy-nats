@@ -7,6 +7,7 @@ use super::{model::EasyNatsApp, util::same_tab};
 impl EasyNatsApp {
     pub(crate) fn connect(&mut self, id: u64) {
         if let Some(cfg) = self.config.connections.iter().find(|c| c.id == id) {
+            self.user_wants_connected.insert(id);
             self.backend.send(BackendCommand::Connect {
                 config: cfg.clone(),
             });
@@ -14,6 +15,7 @@ impl EasyNatsApp {
     }
 
     pub(crate) fn disconnect(&mut self, id: u64) {
+        self.user_wants_connected.remove(&id);
         self.backend.send(BackendCommand::Disconnect { id });
     }
 

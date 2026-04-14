@@ -3,10 +3,13 @@ use std::time::{Instant, SystemTime};
 
 use eframe::egui;
 use egui_dock::TabViewer;
+use egui_dock::tab_viewer::OnCloseResponse;
 
 use crate::format::PayloadFormat;
 use crate::i18n::t;
 use crate::proto::{ProtoSchemaManager, ProtoViewState};
+
+use super::super::app::TabIdAllocator;
 
 /// Auto-refresh configuration for periodic data reloading.
 #[derive(Debug)]
@@ -148,10 +151,6 @@ impl Default for SubscriberState {
 }
 
 impl SubscriberState {
-    pub fn has_active_subscription(&self) -> bool {
-        self.subscriptions.iter().any(|s| s.active)
-    }
-
     pub fn push_message(&mut self, msg: ReceivedMessage) {
         if self.messages.len() >= self.max_messages {
             self.messages.pop_front();
@@ -359,6 +358,7 @@ pub struct AppTabViewer<'a> {
     pub dark_mode: &'a mut bool,
     pub log_buffer: &'a crate::log_layer::SharedLogBuffer,
     pub proto_manager: &'a ProtoSchemaManager,
+    pub tab_id_alloc: &'a mut TabIdAllocator,
 }
 
 impl TabViewer for AppTabViewer<'_> {
@@ -391,7 +391,39 @@ impl TabViewer for AppTabViewer<'_> {
         }
     }
 
-    fn closeable(&mut self, tab: &mut Self::Tab) -> bool {
+    fn is_closeable(&self, tab: &Self::Tab) -> bool {
         !matches!(tab, TabKind::Welcome)
+    }
+
+    fn allowed_in_windows(&self, tab: &mut Self::Tab) -> bool {
+        !matches!(tab, TabKind::Welcome)
+    }
+
+    fn on_close(&mut self, tab: &mut Self::Tab) -> OnCloseResponse {
+        match tab {
+            TabKind::Subscriber {
+                connection_id,
+                instance_id,
+                state,
+                ..
+            } => {
+                for sub in &state.subscriptions {
+                    if sub.active {
+                        self.backend
+                            .send(nats_backend::BackendCommand::Unsubscribe {
+                                connection_id: *connection_id,
+                                subscriber_id: *instance_id,
+                                subject: sub.subject.clone(),
+                            });
+                    }
+                }
+                self.tab_id_alloc.free(*instance_id);
+            }
+            TabKind::Publisher { instance_id, .. } => {
+                self.tab_id_alloc.free(*instance_id);
+            }
+            _ => {}
+        }
+        OnCloseResponse::Close
     }
 }

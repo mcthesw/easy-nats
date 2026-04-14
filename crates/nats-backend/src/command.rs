@@ -19,10 +19,12 @@ pub enum BackendCommand {
     },
     Subscribe {
         connection_id: u64,
+        subscriber_id: u32,
         subject: String,
     },
     Unsubscribe {
         connection_id: u64,
+        subscriber_id: u32,
         subject: String,
     },
     Request {

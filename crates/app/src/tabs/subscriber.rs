@@ -11,15 +11,16 @@ use super::types::{ReceivedMessage, SubjectSubscription, SubscriberState};
 pub fn subscriber_ui(
     ui: &mut egui::Ui,
     connection_id: u64,
+    instance_id: u32,
     state: &mut SubscriberState,
     backend: &BackendHandle,
     proto_manager: &ProtoSchemaManager,
 ) {
-    render_subscription_controls(ui, connection_id, state, backend);
+    render_subscription_controls(ui, connection_id, instance_id, state, backend);
     ui.separator();
 
     // Horizontal split: left message list, right detail
-    let panel_id = egui::Id::new(("sub_left_panel", connection_id));
+    let panel_id = egui::Id::new(("sub_left_panel", connection_id, instance_id));
     egui::Panel::left(panel_id)
         .resizable(true)
         .default_size(300.0)
@@ -51,6 +52,7 @@ pub fn subscriber_ui(
 fn render_subscription_controls(
     ui: &mut egui::Ui,
     connection_id: u64,
+    instance_id: u32,
     state: &mut SubscriberState,
     backend: &BackendHandle,
 ) {
@@ -68,6 +70,7 @@ fn render_subscription_controls(
             if !state.subscriptions.iter().any(|s| s.subject == subject) {
                 backend.send(BackendCommand::Subscribe {
                     connection_id,
+                    subscriber_id: instance_id,
                     subject: subject.clone(),
                 });
                 state.subscriptions.push(SubjectSubscription {
@@ -102,6 +105,7 @@ fn render_subscription_controls(
             let sub = &state.subscriptions[i];
             backend.send(BackendCommand::Unsubscribe {
                 connection_id,
+                subscriber_id: instance_id,
                 subject: sub.subject.clone(),
             });
             state.subscriptions.remove(i);

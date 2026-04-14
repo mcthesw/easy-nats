@@ -9,7 +9,23 @@ mod settings;
 mod tabs;
 mod toast;
 
+/// Re-attach to the parent console so log output appears in the terminal
+/// when the application is launched from cmd / PowerShell.
+#[cfg(windows)]
+fn attach_parent_console() {
+    const ATTACH_PARENT_PROCESS: u32 = 0xFFFFFFFF;
+    unsafe extern "system" {
+        fn AttachConsole(dwProcessId: u32) -> i32;
+    }
+    unsafe {
+        AttachConsole(ATTACH_PARENT_PROCESS);
+    }
+}
+
 fn main() {
+    #[cfg(windows)]
+    attach_parent_console();
+
     let log_buffer = log_layer::SharedLogBuffer::default();
     {
         use tracing_subscriber::prelude::*;

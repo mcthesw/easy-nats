@@ -39,7 +39,7 @@ pub(crate) async fn handle_disconnect(
     id: u64,
     evt_tx: &mpsc::UnboundedSender<BackendEvent>,
 ) {
-    state.subscriptions.retain(|(cid, _), handle| {
+    state.subscriptions.retain(|(cid, _, _), handle| {
         if *cid == id {
             handle.abort();
             false

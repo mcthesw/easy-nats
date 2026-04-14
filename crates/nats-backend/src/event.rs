@@ -9,6 +9,7 @@ pub enum BackendEvent {
     // Core Pub/Sub
     MessageReceived {
         connection_id: u64,
+        subscriber_id: u32,
         subject: String,
         reply: Option<String>,
         headers: Vec<(String, String)>,

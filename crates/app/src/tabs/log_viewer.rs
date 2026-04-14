@@ -32,6 +32,12 @@ pub fn log_viewer_ui(ui: &mut egui::Ui, log_buffer: &SharedLogBuffer) {
                     ui.selectable_value(&mut filter_idx, i, *label);
                 }
             });
+
+        if ui.small_button("🗑").on_hover_text("Clear").clicked()
+            && let Ok(mut buf) = log_buffer.lock()
+        {
+            buf.clear();
+        }
     });
     ui.ctx()
         .data_mut(|d| d.insert_persisted(filter_id, filter_idx));
@@ -42,10 +48,9 @@ pub fn log_viewer_ui(ui: &mut egui::Ui, log_buffer: &SharedLogBuffer) {
         log_buffer
             .lock()
             .map(|buf| {
-                buf.iter()
-                    .rev()
+                buf.entries()
+                    .iter()
                     .filter(|e| is_visible_at_level(e.level, min_level))
-                    .take(400)
                     .cloned()
                     .collect::<Vec<_>>()
             })
@@ -57,12 +62,13 @@ pub fn log_viewer_ui(ui: &mut egui::Ui, log_buffer: &SharedLogBuffer) {
         return;
     }
 
+    let row_height = 18.0;
     egui::ScrollArea::vertical()
         .auto_shrink([false; 2])
         .stick_to_bottom(true)
         .id_salt("log_viewer_scroll")
-        .show(ui, |ui| {
-            for entry in entries.iter().rev() {
+        .show_rows(ui, row_height, entries.len(), |ui, row_range| {
+            for entry in &entries[row_range] {
                 let color = level_color(entry.level, ui);
                 let level_str = match entry.level {
                     Level::ERROR => "ERROR",

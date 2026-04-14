@@ -23,7 +23,6 @@ pub async fn run_worker(
     let mut state = WorkerState::default();
 
     while let Some(cmd) = cmd_rx.recv().await {
-        tracing::debug!(?cmd, "Received command");
         match cmd {
             BackendCommand::Connect { config } => {
                 connection::handle_connect(&mut state, config, &evt_tx).await;
@@ -42,15 +41,31 @@ pub async fn run_worker(
             }
             BackendCommand::Subscribe {
                 connection_id,
+                subscriber_id,
                 subject,
             } => {
-                pubsub::handle_subscribe(&mut state, connection_id, subject, &evt_tx).await;
+                pubsub::handle_subscribe(
+                    &mut state,
+                    connection_id,
+                    subscriber_id,
+                    subject,
+                    &evt_tx,
+                )
+                .await;
             }
             BackendCommand::Unsubscribe {
                 connection_id,
+                subscriber_id,
                 subject,
             } => {
-                pubsub::handle_unsubscribe(&mut state, connection_id, subject, &evt_tx).await;
+                pubsub::handle_unsubscribe(
+                    &mut state,
+                    connection_id,
+                    subscriber_id,
+                    subject,
+                    &evt_tx,
+                )
+                .await;
             }
             BackendCommand::Request {
                 connection_id,

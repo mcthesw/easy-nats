@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use egui_dock::DockState;
 use nats_backend::{AppConfig, ConnectionStatusKind};
@@ -14,11 +14,45 @@ use super::editors::{
     StreamCreateEditor,
 };
 
+/// Allocates and recycles tab instance IDs, reusing the smallest freed ID.
+pub struct TabIdAllocator {
+    next: u32,
+    free: BTreeSet<u32>,
+}
+
+impl Default for TabIdAllocator {
+    fn default() -> Self {
+        Self {
+            next: 1,
+            free: BTreeSet::new(),
+        }
+    }
+}
+
+impl TabIdAllocator {
+    pub fn allocate(&mut self) -> u32 {
+        if let Some(&id) = self.free.iter().next() {
+            self.free.remove(&id);
+            id
+        } else {
+            let id = self.next;
+            self.next += 1;
+            id
+        }
+    }
+
+    pub fn free(&mut self, id: u32) {
+        self.free.insert(id);
+    }
+}
+
 pub struct EasyNatsApp {
     pub(crate) backend: nats_backend::BackendHandle,
     pub(crate) config: AppConfig,
     pub(crate) settings: AppSettings,
     pub(crate) conn_statuses: HashMap<u64, ConnectionStatusKind>,
+    /// Tracks explicit user intent: connections the user asked to keep alive.
+    pub(crate) user_wants_connected: HashSet<u64>,
     pub(crate) selected_conn: Option<u64>,
     pub(crate) editor: ConnectionEditor,
     pub(crate) stream_editor: StreamCreateEditor,
@@ -33,7 +67,7 @@ pub struct EasyNatsApp {
     pub(crate) dark_mode: bool,
     pub(crate) kv_bucket_delete_confirm: Option<(u64, String)>,
     pub(crate) obj_store_bucket_delete_confirm: Option<(u64, String)>,
-    pub(crate) next_tab_instance: u32,
+    pub(crate) tab_id_alloc: TabIdAllocator,
     pub(crate) log_buffer: SharedLogBuffer,
     pub(crate) proto_manager: ProtoSchemaManager,
 }
@@ -50,6 +84,7 @@ impl EasyNatsApp {
             config: AppConfig::load(),
             settings,
             conn_statuses: HashMap::new(),
+            user_wants_connected: HashSet::new(),
             selected_conn: None,
             editor: ConnectionEditor::default(),
             stream_editor: StreamCreateEditor::default(),
@@ -64,7 +99,7 @@ impl EasyNatsApp {
             dark_mode,
             kv_bucket_delete_confirm: None,
             obj_store_bucket_delete_confirm: None,
-            next_tab_instance: 1,
+            tab_id_alloc: TabIdAllocator::default(),
             log_buffer,
             proto_manager,
         }

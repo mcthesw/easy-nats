@@ -20,9 +20,7 @@ fn render_connection_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
         } else {
             t("sidebar.connection_new")
         };
-        let mut open = true;
         egui::Window::new(title)
-            .open(&mut open)
             .resizable(false)
             .show(ui.ctx(), |ui| {
                 render_editor_grid(&mut app.editor, ui);
@@ -41,9 +39,6 @@ fn render_connection_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     }
                 });
             });
-        if !open {
-            app.editor.visible = false;
-        }
     }
     if save_requested {
         app.save_editor();
@@ -141,9 +136,7 @@ fn render_delete_confirmation(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     let mut do_delete = None;
     if let Some(id) = app.editor.delete_confirm {
         let conn_name = app.conn_name(id);
-        let mut still_open = true;
         egui::Window::new(t("connection.connection_delete_confirm_title"))
-            .open(&mut still_open)
             .resizable(false)
             .show(ui.ctx(), |ui| {
                 ui.label(format!(
@@ -160,9 +153,6 @@ fn render_delete_confirmation(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     }
                 });
             });
-        if !still_open {
-            app.editor.delete_confirm = None;
-        }
     }
     if let Some(id) = do_delete {
         app.delete_connection(id);

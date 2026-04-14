@@ -115,25 +115,21 @@ fn render_connection_row(
         }
 
         ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            match status {
-                ConnectionStatusKind::Connected => {
-                    if ui
-                        .small_button("⏏")
-                        .on_hover_text(t("connection.disconnect"))
-                        .clicked()
-                    {
-                        *action = Some(SidebarAction::Disconnect(id));
-                    }
+            if app.user_wants_connected.contains(&id) {
+                if ui
+                    .small_button("⏏")
+                    .on_hover_text(t("connection.disconnect"))
+                    .clicked()
+                {
+                    *action = Some(SidebarAction::Disconnect(id));
                 }
-                ConnectionStatusKind::Connecting => {}
-                _ => {
-                    if ui
-                        .small_button("▶")
-                        .on_hover_text(t("connection.connect"))
-                        .clicked()
-                    {
-                        *action = Some(SidebarAction::Connect(id));
-                    }
+            } else {
+                if ui
+                    .small_button("▶")
+                    .on_hover_text(t("connection.connect"))
+                    .clicked()
+                {
+                    *action = Some(SidebarAction::Connect(id));
                 }
             }
 
@@ -195,8 +191,7 @@ fn render_pubsub_section(
                 .selectable_label(false, t("sidebar.open_publisher"))
                 .clicked()
             {
-                let instance_id = app.next_tab_instance;
-                app.next_tab_instance += 1;
+                let instance_id = app.tab_id_alloc.allocate();
                 *action = Some(SidebarAction::OpenTab(Box::new(TabKind::Publisher {
                     connection_id: id,
                     connection_name: name.to_string(),
@@ -208,8 +203,7 @@ fn render_pubsub_section(
                 .selectable_label(false, t("sidebar.open_subscriber"))
                 .clicked()
             {
-                let instance_id = app.next_tab_instance;
-                app.next_tab_instance += 1;
+                let instance_id = app.tab_id_alloc.allocate();
                 *action = Some(SidebarAction::OpenTab(Box::new(TabKind::Subscriber {
                     connection_id: id,
                     connection_name: name.to_string(),
