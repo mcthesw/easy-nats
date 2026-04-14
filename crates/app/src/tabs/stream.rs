@@ -1,6 +1,7 @@
 use base64::Engine;
 use eframe::egui;
 use nats_backend::{BackendCommand, BackendHandle};
+use std::time::{Duration, SystemTime};
 
 use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
@@ -61,7 +62,7 @@ pub fn stream_ui(
         });
 
     egui::CentralPanel::default().show_inside(ui, |ui| {
-        // Bottom: consumers + purge (resizable)
+        // Bottom: consumers + purge (resizable, scrollable to avoid overlap)
         egui::Panel::bottom(egui::Id::new((
             "stream_right_bottom",
             connection_id,
@@ -70,9 +71,21 @@ pub fn stream_ui(
         .resizable(true)
         .default_size(150.0)
         .show_inside(ui, |ui| {
-            render_consumers(ui, connection_id, stream_name, state, backend, actions);
-            ui.separator();
-            render_purge_controls(ui, connection_id, stream_name, state, backend);
+            egui::ScrollArea::vertical()
+                .id_salt(("stream_bottom_scroll", connection_id, stream_name))
+                .auto_shrink(false)
+                .show(ui, |ui| {
+                    render_consumers(
+                        ui,
+                        connection_id,
+                        stream_name,
+                        state,
+                        backend,
+                        actions,
+                    );
+                    ui.separator();
+                    render_purge_controls(ui, connection_id, stream_name, state, backend);
+                });
         });
 
         // Remaining space: message detail
@@ -120,16 +133,47 @@ fn render_message_controls(
         ui.add(egui::TextEdit::singleline(&mut state.subject_filter).desired_width(120.0));
         ui.label(t("stream.batch_size"));
         ui.add(egui::TextEdit::singleline(&mut state.batch_size).desired_width(60.0));
+    });
+    ui.horizontal(|ui| {
+        ui.label(t("stream.start_time"));
+        ui.add(
+            egui::TextEdit::singleline(&mut state.start_time)
+                .desired_width(220.0)
+                .hint_text("2025-01-01T00:00:00Z"),
+        );
+        for (label_key, secs) in [
+            ("stream.time_1h", 3600u64),
+            ("stream.time_24h", 86400),
+            ("stream.time_7d", 604800),
+            ("stream.time_30d", 2592000),
+        ] {
+            if ui.small_button(t(label_key)).clicked() {
+                state.start_time = system_time_to_rfc3339(
+                    SystemTime::now() - Duration::from_secs(secs),
+                );
+            }
+        }
+        if !state.start_time.is_empty() && ui.small_button(t("stream.time_clear")).clicked() {
+            state.start_time.clear();
+        }
+    });
+    ui.horizontal(|ui| {
         if ui
             .add_enabled(!state.fetching, egui::Button::new(t("stream.fetch")))
             .clicked()
         {
+            let start_time = if state.start_time.trim().is_empty() {
+                None
+            } else {
+                Some(state.start_time.trim().to_string())
+            };
             backend.send(BackendCommand::GetStreamMessages {
                 connection_id,
                 stream: stream_name.to_string(),
                 start_sequence: state.start_seq.parse().ok(),
                 subject_filter: (!state.subject_filter.is_empty())
                     .then(|| state.subject_filter.clone()),
+                start_time,
                 batch_size: state.batch_size.parse::<u64>().unwrap_or(50),
             });
             state.fetching = true;
@@ -153,7 +197,15 @@ fn render_message_list(ui: &mut egui::Ui, state: &mut StreamState) {
                 for (idx, msg) in state.messages.iter().enumerate() {
                     let seq = msg["sequence"].as_u64().unwrap_or(0);
                     let subject = msg["subject"].as_str().unwrap_or("");
-                    let label = format!("#{seq} {subject}");
+                    let time_str = msg["time"]
+                        .as_str()
+                        .and_then(format_rfc3339_short)
+                        .unwrap_or_default();
+                    let label = if time_str.is_empty() {
+                        format!("#{seq} {subject}")
+                    } else {
+                        format!("#{seq} {time_str} {subject}")
+                    };
                     let selected = state.selected_msg == Some(idx);
                     if ui.selectable_label(selected, &label).clicked() {
                         state.selected_msg = Some(idx);
@@ -161,6 +213,60 @@ fn render_message_list(ui: &mut egui::Ui, state: &mut StreamState) {
                 }
             }
         });
+}
+
+/// Format an RFC3339 timestamp to a compact local-friendly display.
+fn format_rfc3339_short(rfc: &str) -> Option<String> {
+    // Show the date+time portion only (trim timezone/nanos for compact display)
+    let trimmed = rfc.replace('T', " ");
+    let trimmed = trimmed.trim_end_matches('Z');
+    // Keep up to seconds precision
+    Some(trimmed.split('.').next()?.to_string())
+}
+
+/// Convert a `SystemTime` to an RFC3339 UTC string.
+fn system_time_to_rfc3339(time: SystemTime) -> String {
+    let dur = time
+        .duration_since(SystemTime::UNIX_EPOCH)
+        .unwrap_or_default();
+    let secs = dur.as_secs();
+    let (days, rem) = (secs / 86400, secs % 86400);
+    let (hours, rem) = (rem / 3600, rem % 3600);
+    let (mins, s) = (rem / 60, rem % 60);
+
+    // Days since 1970-01-01 → y/m/d via a simple calendar walk
+    let (y, m, d) = epoch_days_to_ymd(days);
+    format!("{y:04}-{m:02}-{d:02}T{hours:02}:{mins:02}:{s:02}Z")
+}
+
+fn epoch_days_to_ymd(mut days: u64) -> (u64, u64, u64) {
+    let mut y = 1970;
+    loop {
+        let year_days = if is_leap(y) { 366 } else { 365 };
+        if days < year_days {
+            break;
+        }
+        days -= year_days;
+        y += 1;
+    }
+    let month_days: [u64; 12] = if is_leap(y) {
+        [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    } else {
+        [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+    };
+    let mut m = 0;
+    for md in &month_days {
+        if days < *md {
+            break;
+        }
+        days -= md;
+        m += 1;
+    }
+    (y, m + 1, days + 1)
+}
+
+fn is_leap(y: u64) -> bool {
+    y.is_multiple_of(4) && (!y.is_multiple_of(100) || y.is_multiple_of(400))
 }
 
 fn render_purge_controls(
@@ -300,6 +406,13 @@ fn stream_message_detail(
             if let Some(subject) = msg["subject"].as_str() {
                 ui.label(t("stream.msg_subject"));
                 ui.label(subject);
+                ui.end_row();
+            }
+            if let Some(time) = msg["time"].as_str()
+                && !time.is_empty()
+            {
+                ui.label(t("stream.msg_time"));
+                ui.label(time);
                 ui.end_row();
             }
         });

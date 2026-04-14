@@ -41,6 +41,9 @@ subject_filter:
 batch_size:
   en: "Batch:"
   zh: "批次:"
+start_time:
+  en: "Start time:"
+  zh: "起始时间:"
 fetch:
   en: "Fetch"
   zh: "获取"
@@ -53,6 +56,9 @@ msg_sequence:
 msg_subject:
   en: "Subject:"
   zh: "主题:"
+msg_time:
+  en: "Time:"
+  zh: "时间:"
 msg_headers:
   en: "Headers:"
   zh: "头部:"
@@ -104,3 +110,18 @@ workqueue_hint:
 no_payload:
   en: "No payload"
   zh: "无载荷"
+time_1h:
+  en: "1h ago"
+  zh: "1小时前"
+time_24h:
+  en: "24h ago"
+  zh: "24小时前"
+time_7d:
+  en: "7d ago"
+  zh: "7天前"
+time_30d:
+  en: "30d ago"
+  zh: "30天前"
+time_clear:
+  en: "Clear"
+  zh: "清除"

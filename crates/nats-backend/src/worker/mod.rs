@@ -119,15 +119,19 @@ pub async fn run_worker(
                 stream,
                 start_sequence,
                 subject_filter,
+                start_time,
                 batch_size,
             } => {
                 streams::handle_get_messages(
                     &state,
                     connection_id,
-                    stream,
-                    start_sequence,
-                    subject_filter,
-                    batch_size,
+                    streams::GetMessagesParams {
+                        stream_name: stream,
+                        start_sequence,
+                        subject_filter,
+                        start_time,
+                        batch_size,
+                    },
                     &evt_tx,
                 )
                 .await;

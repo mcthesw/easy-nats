@@ -1,3 +1,4 @@
+use base64::Engine;
 use futures_util::StreamExt;
 use tokio::sync::mpsc;
 
@@ -142,19 +143,24 @@ pub(crate) async fn handle_purge_stream(
     }
 }
 
+pub(crate) struct GetMessagesParams {
+    pub stream_name: String,
+    pub start_sequence: Option<u64>,
+    pub subject_filter: Option<String>,
+    pub start_time: Option<String>,
+    pub batch_size: u64,
+}
+
 pub(crate) async fn handle_get_messages(
     state: &WorkerState,
     connection_id: u64,
-    stream_name: String,
-    start_sequence: Option<u64>,
-    subject_filter: Option<String>,
-    batch_size: u64,
+    params: GetMessagesParams,
     evt_tx: &mpsc::UnboundedSender<BackendEvent>,
 ) {
     let Some(stream) = open_stream(
         state,
         connection_id,
-        &stream_name,
+        &params.stream_name,
         evt_tx,
         "get_stream_messages",
     )
@@ -163,14 +169,29 @@ pub(crate) async fn handle_get_messages(
         return;
     };
 
+    // Time-based filtering via ephemeral pull consumer
+    if let Some(time_str) = params.start_time {
+        handle_get_messages_by_time(
+            &stream,
+            connection_id,
+            &params.stream_name,
+            &time_str,
+            params.subject_filter,
+            params.batch_size,
+            evt_tx,
+        )
+        .await;
+        return;
+    }
+
     let info = stream.cached_info();
-    let first = start_sequence.unwrap_or(info.state.first_sequence);
+    let first = params.start_sequence.unwrap_or(info.state.first_sequence);
     let last = info.state.last_sequence;
     let mut messages = Vec::new();
 
-    if let Some(filter) = subject_filter {
+    if let Some(filter) = params.subject_filter {
         let mut seq = first;
-        while (messages.len() as u64) < batch_size {
+        while (messages.len() as u64) < params.batch_size {
             match stream.get_first_raw_message_by_subject(&filter, seq).await {
                 Ok(raw) => {
                     seq = raw.sequence + 1;
@@ -181,7 +202,7 @@ pub(crate) async fn handle_get_messages(
         }
     } else {
         let mut seq = first;
-        while seq <= last && (messages.len() as u64) < batch_size {
+        while seq <= last && (messages.len() as u64) < params.batch_size {
             if let Ok(raw) = stream.get_raw_message(seq).await {
                 messages.push(raw_message_to_json(&raw));
             }
@@ -189,6 +210,110 @@ pub(crate) async fn handle_get_messages(
         }
     }
 
+    send_ok(
+        evt_tx,
+        connection_id,
+        "get_stream_messages",
+        serde_json::json!({ "stream": params.stream_name, "messages": messages }),
+    );
+}
+
+async fn handle_get_messages_by_time(
+    stream: &async_nats::jetstream::stream::Stream,
+    connection_id: u64,
+    stream_name: &str,
+    time_str: &str,
+    subject_filter: Option<String>,
+    batch_size: u64,
+    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+) {
+    use async_nats::jetstream::consumer::{self, DeliverPolicy};
+    use time::OffsetDateTime;
+    use time::format_description::well_known::Rfc3339;
+
+    let start = match OffsetDateTime::parse(time_str, &Rfc3339) {
+        Ok(t) => t,
+        Err(e) => {
+            send_err(
+                evt_tx,
+                connection_id,
+                "get_stream_messages",
+                format!("Invalid time format (use RFC3339): {e}"),
+            );
+            return;
+        }
+    };
+
+    let mut config = consumer::pull::Config {
+        deliver_policy: DeliverPolicy::ByStartTime { start_time: start },
+        inactive_threshold: std::time::Duration::from_secs(10),
+        ..Default::default()
+    };
+    if let Some(filter) = subject_filter {
+        config.filter_subject = filter;
+    }
+
+    let consumer = match stream.create_consumer(config).await {
+        Ok(c) => c,
+        Err(e) => {
+            send_err(
+                evt_tx,
+                connection_id,
+                "get_stream_messages",
+                format!("Failed to create time-filter consumer: {e}"),
+            );
+            return;
+        }
+    };
+
+    let mut messages = Vec::new();
+    let mut batch = match consumer
+        .fetch()
+        .max_messages(batch_size as usize)
+        .expires(std::time::Duration::from_secs(5))
+        .messages()
+        .await
+    {
+        Ok(b) => b,
+        Err(e) => {
+            send_err(
+                evt_tx,
+                connection_id,
+                "get_stream_messages",
+                format!("Fetch error: {e}"),
+            );
+            return;
+        }
+    };
+
+    while let Some(Ok(msg)) = batch.next().await {
+        let info = msg.info().ok();
+        let seq = info.as_ref().map(|i| i.stream_sequence).unwrap_or(0);
+        let time_val = info
+            .as_ref()
+            .map(|i| {
+                i.published
+                    .format(&Rfc3339)
+                    .unwrap_or_else(|_| i.published.to_string())
+            })
+            .unwrap_or_default();
+        let payload_b64 =
+            base64::engine::general_purpose::STANDARD.encode(msg.message.payload.as_ref());
+        let headers = super::helpers::extract_headers(&msg.message.headers);
+        let header_json: Vec<_> = headers
+            .iter()
+            .map(|(k, v)| serde_json::json!([k, v]))
+            .collect();
+        messages.push(serde_json::json!({
+            "sequence": seq,
+            "subject": msg.message.subject.to_string(),
+            "payload_base64": payload_b64,
+            "headers": header_json,
+            "time": time_val,
+        }));
+    }
+
+    // Ephemeral consumer auto-deletes on timeout; no explicit cleanup needed.
     send_ok(
         evt_tx,
         connection_id,

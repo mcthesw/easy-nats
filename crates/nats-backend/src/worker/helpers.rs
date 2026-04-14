@@ -36,6 +36,7 @@ pub(crate) fn raw_message_to_json(
         "subject": msg.subject.to_string(),
         "payload_base64": payload_b64,
         "headers": headers,
+        "time": msg.time.format(&time::format_description::well_known::Rfc3339).unwrap_or_default(),
     })
 }
 

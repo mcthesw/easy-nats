@@ -60,6 +60,7 @@ pub enum BackendCommand {
         stream: String,
         start_sequence: Option<u64>,
         subject_filter: Option<String>,
+        start_time: Option<String>,
         batch_size: u64,
     },
     DeleteStreamMessage {
