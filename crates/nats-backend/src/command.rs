@@ -156,4 +156,11 @@ pub enum BackendCommand {
         bucket: String,
         name: String,
     },
+    // Server Info
+    GetServerInfo {
+        connection_id: u64,
+    },
+    GetJetStreamAccountInfo {
+        connection_id: u64,
+    },
 }

@@ -1,0 +1,85 @@
+# Server & JetStream account info
+title:
+  en: "Server Info"
+  zh: "服务器信息"
+refresh:
+  en: "Refresh"
+  zh: "刷新"
+not_loaded:
+  en: "Click ↻ to load server info"
+  zh: "点击 ↻ 加载服务器信息"
+section_server:
+  en: "Server"
+  zh: "服务器"
+section_jetstream:
+  en: "JetStream Account"
+  zh: "JetStream 账户"
+section_limits:
+  en: "Account Limits"
+  zh: "账户限制"
+server_name:
+  en: "Server Name"
+  zh: "服务器名称"
+server_id:
+  en: "Server ID"
+  zh: "服务器 ID"
+version:
+  en: "Version"
+  zh: "版本"
+host_port:
+  en: "Host:Port"
+  zh: "主机:端口"
+go_version:
+  en: "Go Version"
+  zh: "Go 版本"
+proto:
+  en: "Protocol"
+  zh: "协议版本"
+client_id:
+  en: "Client ID"
+  zh: "客户端 ID"
+max_payload:
+  en: "Max Payload"
+  zh: "最大载荷"
+auth_required:
+  en: "Auth Required"
+  zh: "需要认证"
+tls_required:
+  en: "TLS Required"
+  zh: "需要 TLS"
+connect_urls:
+  en: "Known Cluster URLs"
+  zh: "已知集群地址"
+domain:
+  en: "Domain"
+  zh: "域"
+memory_used:
+  en: "Memory Used"
+  zh: "内存使用"
+storage_used:
+  en: "Storage Used"
+  zh: "存储使用"
+streams:
+  en: "Streams"
+  zh: "流"
+consumers:
+  en: "Consumers"
+  zh: "消费者"
+api_total:
+  en: "API Requests"
+  zh: "API 请求数"
+api_errors:
+  en: "API Errors"
+  zh: "API 错误数"
+max_memory:
+  en: "Max Memory"
+  zh: "最大内存"
+max_storage:
+  en: "Max Storage"
+  zh: "最大存储"
+max_streams:
+  en: "Max Streams"
+  zh: "最大流数"
+max_consumers:
+  en: "Max Consumers"
+  zh: "最大消费者数"

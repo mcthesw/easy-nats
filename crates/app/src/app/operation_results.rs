@@ -21,6 +21,7 @@ impl EasyNatsApp {
         if self.apply_stream_operation(connection_id, operation, &data)
             || self.apply_kv_operation(connection_id, operation, &data)
             || self.apply_obj_store_operation(connection_id, operation, &data)
+            || self.apply_server_info_operation(connection_id, operation, &data)
         {
             return;
         }
@@ -70,6 +71,7 @@ impl EasyNatsApp {
         if let Some(cid) = connection_id {
             self.clear_kv_loading_on_error(cid, operation);
             self.clear_obj_store_loading_on_error(cid, operation);
+            self.clear_server_info_loading_on_error(cid, operation);
         }
 
         self.toasts

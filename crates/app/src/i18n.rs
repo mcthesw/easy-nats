@@ -92,6 +92,10 @@ pub fn init(lang: Language) {
             "log_viewer",
             include_str!("../../../assets/i18n/log_viewer.yaml"),
         ),
+        (
+            "server_info",
+            include_str!("../../../assets/i18n/server_info.yaml"),
+        ),
     ];
 
     let mut en = HashMap::new();

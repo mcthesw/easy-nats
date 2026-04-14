@@ -19,6 +19,7 @@ pub(crate) enum SidebarAction {
     OpenStreamCreate(u64),
     OpenKvBucketCreate(u64),
     OpenObjStoreBucketCreate(u64),
+    OpenServerInfo(u64),
 }
 
 pub(crate) fn render_sidebar(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
@@ -167,13 +168,12 @@ fn render_resource_tree(
         render_streams_section(app, ui, id, name, action);
         render_kv_section(app, ui, id, name, action);
         render_obj_store_section(app, ui, id, name, action);
-        ui.add_enabled_ui(false, |ui| {
-            egui::CollapsingHeader::new(t("sidebar.section_metrics"))
-                .id_salt(format!("metrics_{id}"))
-                .show(ui, |ui| {
-                    ui.weak(t("common.coming_soon"));
-                });
-        });
+        if ui
+            .selectable_label(false, format!("ℹ  {}", t("server_info.title")))
+            .clicked()
+        {
+            *action = Some(SidebarAction::OpenServerInfo(id));
+        }
     });
 }
 
@@ -387,6 +387,22 @@ fn apply_sidebar_action(app: &mut EasyNatsApp, action: Option<SidebarAction>) {
                 connection_id,
                 ..Default::default()
             };
+        }
+        Some(SidebarAction::OpenServerInfo(id)) => {
+            let conn_name = app.conn_name(id);
+            let tab = TabKind::ServerInfo {
+                connection_id: id,
+                connection_name: conn_name,
+                state: crate::tabs::ServerInfoState {
+                    loading: true,
+                    ..Default::default()
+                },
+            };
+            app.open_or_focus_tab_kind(tab);
+            app.backend
+                .send(BackendCommand::GetServerInfo { connection_id: id });
+            app.backend
+                .send(BackendCommand::GetJetStreamAccountInfo { connection_id: id });
         }
         None => {}
     }

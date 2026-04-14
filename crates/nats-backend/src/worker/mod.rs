@@ -4,6 +4,7 @@ mod helpers;
 mod kv;
 mod object_store;
 mod pubsub;
+mod server_info;
 mod state;
 mod streams;
 
@@ -278,6 +279,13 @@ pub async fn run_worker(
                     &evt_tx,
                 )
                 .await;
+            }
+            BackendCommand::GetServerInfo { connection_id } => {
+                server_info::handle_get_server_info(&state, connection_id, &evt_tx).await;
+            }
+            BackendCommand::GetJetStreamAccountInfo { connection_id } => {
+                server_info::handle_get_jetstream_account_info(&state, connection_id, &evt_tx)
+                    .await;
             }
         }
     }

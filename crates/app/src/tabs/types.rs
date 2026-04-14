@@ -259,6 +259,13 @@ pub struct ObjectStoreBucketState {
     pub auto_refresh: AutoRefresh,
 }
 
+#[derive(Debug, Default)]
+pub struct ServerInfoState {
+    pub server_info: Option<serde_json::Value>,
+    pub account_info: Option<serde_json::Value>,
+    pub loading: bool,
+}
+
 #[derive(Debug)]
 pub enum TabKind {
     Welcome,
@@ -291,6 +298,11 @@ pub enum TabKind {
         connection_name: String,
         bucket_name: String,
         state: ObjectStoreBucketState,
+    },
+    ServerInfo {
+        connection_id: u64,
+        connection_name: String,
+        state: ServerInfoState,
     },
     Settings,
     LogViewer,
@@ -345,6 +357,11 @@ impl TabKind {
             } => {
                 format!("{bucket_name} ({connection_name})")
             }
+            TabKind::ServerInfo {
+                connection_name, ..
+            } => {
+                format!("{} ({})", t("server_info.title"), connection_name)
+            }
             TabKind::Settings => t("settings.title").to_string(),
             TabKind::LogViewer => t("log_viewer.title").to_string(),
         }
@@ -396,6 +413,9 @@ impl TabViewer for AppTabViewer<'_> {
                 bucket_name,
                 ..
             } => egui::Id::new(("tab:object-store", connection_id, bucket_name)),
+            TabKind::ServerInfo { connection_id, .. } => {
+                egui::Id::new(("tab:server-info", connection_id))
+            }
             TabKind::Settings => egui::Id::new("tab:settings"),
             TabKind::LogViewer => egui::Id::new("tab:log-viewer"),
         }
