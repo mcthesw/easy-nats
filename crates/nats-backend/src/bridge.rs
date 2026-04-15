@@ -11,16 +11,35 @@ pub struct BackendHandle {
 
 impl BackendHandle {
     /// Spawn the Tokio runtime on a background thread and return a handle.
+    ///
+    /// Panics if the Tokio runtime cannot be created (propagated from the
+    /// background thread via a oneshot channel so the failure is visible on
+    /// the calling thread).
     pub fn spawn() -> Self {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<BackendCommand>();
         let (evt_tx, evt_rx) = mpsc::unbounded_channel::<BackendEvent>();
+        let (ready_tx, ready_rx) = std::sync::mpsc::channel::<Result<(), String>>();
 
         std::thread::spawn(move || {
-            let rt = tokio::runtime::Runtime::new().expect("failed to create Tokio runtime");
+            let rt = match tokio::runtime::Runtime::new() {
+                Ok(rt) => {
+                    let _ = ready_tx.send(Ok(()));
+                    rt
+                }
+                Err(e) => {
+                    let _ = ready_tx.send(Err(e.to_string()));
+                    return;
+                }
+            };
             rt.block_on(async move {
                 crate::worker::run_worker(cmd_rx, evt_tx).await;
             });
         });
+
+        ready_rx
+            .recv()
+            .expect("backend thread terminated before reporting status")
+            .expect("failed to create Tokio runtime");
 
         Self { cmd_tx, evt_rx }
     }
