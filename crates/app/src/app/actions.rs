@@ -1,8 +1,12 @@
+use eframe::egui;
 use nats_backend::{AuthMethod, BackendCommand, ConnectionConfig};
 
 use crate::tabs::TabKind;
 
 use super::{model::EasyNatsApp, util::same_tab};
+
+/// (connection_id, backend_id, subject) for each active subscription needing cleanup.
+type UnsubInfo = Vec<(u64, u64, String)>;
 
 impl EasyNatsApp {
     pub(crate) fn connect(&mut self, id: u64) {
@@ -197,13 +201,19 @@ impl EasyNatsApp {
             connection_id,
             bucket_name,
             state,
+            guard,
             ..
         } = &mut tab
         {
+            let new_gen = crate::tabs::next_generation();
             state.loading_entries = true;
+            state.load_generation = new_gen;
+            state.keys.clear();
             self.backend.send(BackendCommand::ListKvKeys {
                 connection_id: *connection_id,
                 bucket: bucket_name.clone(),
+                cancel: guard.cancellation(),
+                generation: new_gen,
             });
         }
 
@@ -420,51 +430,98 @@ impl EasyNatsApp {
         self.kv_entry_create_editor.visible = false;
     }
 
-    pub(crate) fn close_other_tabs(&mut self, keep_title: &str) {
-        let to_remove: Vec<_> = self
+    /// Remove all tabs matching a predicate (except Welcome).
+    /// Sends Unsubscribe for any active subscriber tabs being removed.
+    pub(crate) fn remove_tabs_matching(&mut self, mut predicate: impl FnMut(&TabKind) -> bool) {
+        // Collect tab IDs + subscriber cleanup info
+        let to_remove: Vec<(egui::Id, UnsubInfo)> = self
             .dock_state
             .iter_all_tabs()
-            .filter(|(_, tab)| tab.title() != keep_title && !matches!(tab, TabKind::Welcome))
-            .map(|(surface, tab)| (surface, tab.title()))
+            .filter(|(_, tab)| !matches!(tab, TabKind::Welcome) && predicate(tab))
+            .map(|(_, tab)| {
+                let unsubs = if let TabKind::Subscriber {
+                    connection_id,
+                    backend_id,
+                    state,
+                    ..
+                } = tab
+                {
+                    state
+                        .subscriptions
+                        .iter()
+                        .filter(|s| s.active)
+                        .map(|s| (*connection_id, *backend_id, s.subject.clone()))
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                (tab.tab_id(), unsubs)
+            })
             .collect();
-        for (_, title) in to_remove {
-            if let Some(pos) = self.dock_state.find_tab_from(|t| t.title() == title) {
+        for (tid, unsubs) in to_remove {
+            for (connection_id, backend_id, subject) in unsubs {
+                self.backend.send(BackendCommand::Unsubscribe {
+                    connection_id,
+                    backend_id,
+                    subject,
+                });
+            }
+            if let Some(pos) = self.dock_state.find_tab_from(|t| t.tab_id() == tid) {
                 self.dock_state.remove_tab(pos);
             }
         }
+    }
+
+    pub(crate) fn close_other_tabs(&mut self, keep_tab_id: egui::Id) {
+        self.remove_tabs_matching(|tab| tab.tab_id() != keep_tab_id);
     }
 
     pub(crate) fn close_all_tabs(&mut self) {
-        let to_remove: Vec<String> = self
-            .dock_state
-            .iter_all_tabs()
-            .filter(|(_, tab)| !matches!(tab, TabKind::Welcome))
-            .map(|(_, tab)| tab.title())
-            .collect();
-        for title in to_remove {
-            if let Some(pos) = self.dock_state.find_tab_from(|t| t.title() == title) {
-                self.dock_state.remove_tab(pos);
-            }
-        }
+        self.remove_tabs_matching(|_| true);
     }
 
-    pub(crate) fn close_tabs_to_right(&mut self, of_title: &str) {
-        let all_titles: Vec<String> = self
+    pub(crate) fn close_tabs_to_right(&mut self, of_tab_id: egui::Id) {
+        let all_info: Vec<(egui::Id, UnsubInfo)> = self
             .dock_state
             .iter_all_tabs()
-            .map(|(_, tab)| tab.title())
+            .map(|(_, tab)| {
+                let unsubs = if let TabKind::Subscriber {
+                    connection_id,
+                    backend_id,
+                    state,
+                    ..
+                } = tab
+                {
+                    state
+                        .subscriptions
+                        .iter()
+                        .filter(|s| s.active)
+                        .map(|s| (*connection_id, *backend_id, s.subject.clone()))
+                        .collect()
+                } else {
+                    Vec::new()
+                };
+                (tab.tab_id(), unsubs)
+            })
             .collect();
         let mut found = false;
-        for title in all_titles {
-            if title == of_title {
+        for (tid, unsubs) in all_info {
+            if tid == of_tab_id {
                 found = true;
                 continue;
             }
             if found
                 && let Some(pos) = self
                     .dock_state
-                    .find_tab_from(|t| t.title() == title && !matches!(t, TabKind::Welcome))
+                    .find_tab_from(|t| t.tab_id() == tid && !matches!(t, TabKind::Welcome))
             {
+                for (connection_id, backend_id, subject) in unsubs {
+                    self.backend.send(BackendCommand::Unsubscribe {
+                        connection_id,
+                        backend_id,
+                        subject,
+                    });
+                }
                 self.dock_state.remove_tab(pos);
             }
         }

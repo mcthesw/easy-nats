@@ -105,7 +105,7 @@ fn render_object_list(
     ui.add(
         egui::TextEdit::singleline(&mut state.object_filter)
             .hint_text(t("obj_store.filter"))
-            .desired_width(f32::INFINITY),
+            .desired_width(ui.available_width()),
     );
 
     if state.loading_objects {

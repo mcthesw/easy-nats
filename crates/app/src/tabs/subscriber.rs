@@ -6,21 +6,35 @@ use crate::i18n::t;
 use crate::proto::ProtoSchemaManager;
 
 use super::common::format_timestamp;
-use super::types::{ReceivedMessage, SubjectSubscription, SubscriberState};
+use super::guard::TabGuard;
+use super::types::{ReceivedMessage, SubjectSubscription, SubscriberState, TabAction};
 
+#[allow(clippy::too_many_arguments)]
 pub fn subscriber_ui(
     ui: &mut egui::Ui,
     connection_id: u64,
-    instance_id: u32,
+    backend_id: u64,
+    guard: &TabGuard,
     state: &mut SubscriberState,
     backend: &BackendHandle,
     proto_manager: &ProtoSchemaManager,
+    actions: &mut Vec<TabAction>,
+    topic_suggestions: &[&str],
 ) {
-    render_subscription_controls(ui, connection_id, instance_id, state, backend);
+    render_subscription_controls(
+        ui,
+        connection_id,
+        backend_id,
+        guard,
+        state,
+        backend,
+        actions,
+        topic_suggestions,
+    );
     ui.separator();
 
     // Horizontal split: left message list, right detail
-    let panel_id = egui::Id::new(("sub_left_panel", connection_id, instance_id));
+    let panel_id = egui::Id::new(("sub_left_panel", connection_id, backend_id));
     egui::Panel::left(panel_id)
         .resizable(true)
         .default_size(300.0)
@@ -49,38 +63,79 @@ pub fn subscriber_ui(
     });
 }
 
+#[allow(clippy::too_many_arguments)]
 fn render_subscription_controls(
     ui: &mut egui::Ui,
     connection_id: u64,
-    instance_id: u32,
+    backend_id: u64,
+    guard: &TabGuard,
     state: &mut SubscriberState,
     backend: &BackendHandle,
+    actions: &mut Vec<TabAction>,
+    topic_suggestions: &[&str],
 ) {
     // Add new subscription input
+    let mut do_subscribe = false;
     ui.horizontal(|ui| {
         ui.label(t("subscriber.subject"));
-        ui.text_edit_singleline(&mut state.subject_input);
+        let input_resp = ui.text_edit_singleline(&mut state.subject_input);
+        let input_id = input_resp.id;
+
+        // Topic suggestion popup
+        let prefix = state.subject_input.trim();
+        let suggestions: Vec<&str> = topic_suggestions
+            .iter()
+            .filter(|s| !prefix.is_empty() && s.starts_with(prefix) && **s != prefix)
+            .copied()
+            .take(10)
+            .collect();
+        if input_resp.has_focus() && !suggestions.is_empty() {
+            let popup_id = ui.id().with("topic_suggestions");
+            let below = input_resp.rect.left_bottom();
+            egui::Area::new(popup_id)
+                .order(egui::Order::Foreground)
+                .fixed_pos(below)
+                .show(ui.ctx(), |ui| {
+                    egui::Frame::popup(ui.style()).show(ui, |ui| {
+                        for suggestion in &suggestions {
+                            if ui.selectable_label(false, *suggestion).clicked() {
+                                state.subject_input = suggestion.to_string();
+                            }
+                        }
+                    });
+                });
+        }
+
         let can_add = !state.subject_input.trim().is_empty();
+        let enter_pressed =
+            input_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
         if ui
             .add_enabled(can_add, egui::Button::new(t("subscriber.add")))
             .clicked()
+            || (enter_pressed && can_add)
         {
-            let subject = state.subject_input.trim().to_string();
-            // Avoid duplicate subscriptions
-            if !state.subscriptions.iter().any(|s| s.subject == subject) {
-                backend.send(BackendCommand::Subscribe {
-                    connection_id,
-                    subscriber_id: instance_id,
-                    subject: subject.clone(),
-                });
-                state.subscriptions.push(SubjectSubscription {
-                    subject,
-                    active: true,
-                });
-            }
-            state.subject_input.clear();
+            do_subscribe = true;
+            ui.memory_mut(|mem| mem.request_focus(input_id));
         }
     });
+
+    if do_subscribe {
+        let subject = state.subject_input.trim().to_string();
+        if !state.subscriptions.iter().any(|s| s.subject == subject) {
+            backend.send(BackendCommand::Subscribe {
+                connection_id,
+                backend_id,
+                subject: subject.clone(),
+                cancel: guard.cancellation(),
+            });
+            state.subscriptions.push(SubjectSubscription {
+                subject: subject.clone(),
+                active: true,
+            });
+            actions.push(TabAction::RecordTopic { topic: subject });
+        }
+        state.subject_input.clear();
+    }
 
     // Active subscriptions list
     if !state.subscriptions.is_empty() {
@@ -105,7 +160,7 @@ fn render_subscription_controls(
             let sub = &state.subscriptions[i];
             backend.send(BackendCommand::Unsubscribe {
                 connection_id,
-                subscriber_id: instance_id,
+                backend_id,
                 subject: sub.subject.clone(),
             });
             state.subscriptions.remove(i);

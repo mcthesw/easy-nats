@@ -42,31 +42,27 @@ pub async fn run_worker(
             }
             BackendCommand::Subscribe {
                 connection_id,
-                subscriber_id,
+                backend_id,
                 subject,
+                cancel,
             } => {
                 pubsub::handle_subscribe(
                     &mut state,
                     connection_id,
-                    subscriber_id,
+                    backend_id,
                     subject,
+                    cancel,
                     &evt_tx,
                 )
                 .await;
             }
             BackendCommand::Unsubscribe {
                 connection_id,
-                subscriber_id,
+                backend_id,
                 subject,
             } => {
-                pubsub::handle_unsubscribe(
-                    &mut state,
-                    connection_id,
-                    subscriber_id,
-                    subject,
-                    &evt_tx,
-                )
-                .await;
+                pubsub::handle_unsubscribe(&mut state, connection_id, backend_id, subject, &evt_tx)
+                    .await;
             }
             BackendCommand::Request {
                 connection_id,
@@ -214,8 +210,30 @@ pub async fn run_worker(
             BackendCommand::ListKvKeys {
                 connection_id,
                 bucket,
+                cancel,
+                generation,
             } => {
-                kv::handle_list_keys(&state, connection_id, bucket, &evt_tx).await;
+                // Cancel any previous task for the same (connection_id, bucket)
+                if let Some((_, prev_handle)) =
+                    state.kv_tasks.remove(&(connection_id, bucket.clone()))
+                {
+                    prev_handle.abort();
+                }
+                // Clean up finished tasks opportunistically
+                state.kv_tasks.retain(|_, (_, h)| !h.is_finished());
+                // Spawn new task
+                if let Some(handle) = kv::handle_list_keys(
+                    &state,
+                    connection_id,
+                    bucket.clone(),
+                    cancel,
+                    generation,
+                    &evt_tx,
+                ) {
+                    state
+                        .kv_tasks
+                        .insert((connection_id, bucket), (generation, handle));
+                }
             }
             BackendCommand::GetKvEntry {
                 connection_id,

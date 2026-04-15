@@ -210,7 +210,7 @@ fn consumer_card(
                                                     )
                                                     .desired_rows(3)
                                                     .interactive(false)
-                                                    .desired_width(f32::INFINITY),
+                                                    .desired_width(ui.available_width()),
                                                 );
                                             });
                                     }

@@ -48,6 +48,15 @@ pub(crate) async fn handle_disconnect(
         }
     });
 
+    state.kv_tasks.retain(|(cid, _), (_, handle)| {
+        if *cid == id {
+            handle.abort();
+            false
+        } else {
+            true
+        }
+    });
+
     if let Some(client) = state.clients.remove(&id)
         && let Err(e) = client.drain().await
     {

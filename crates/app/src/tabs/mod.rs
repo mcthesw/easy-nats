@@ -1,4 +1,5 @@
 mod common;
+pub(crate) mod guard;
 mod kv;
 pub(crate) mod log_viewer;
 mod object_store;
@@ -11,6 +12,7 @@ mod subscriber;
 mod types;
 mod viewer;
 
+pub use guard::{TabGuard, next_backend_id, next_generation};
 pub use kv::kv_bucket_ui;
 pub use object_store::obj_store_bucket_ui;
 pub use publisher::publisher_ui;

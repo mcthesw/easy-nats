@@ -979,6 +979,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "tokio-util",
  "tracing",
  "tracing-subscriber",
 ]
@@ -2218,6 +2219,7 @@ dependencies = [
  "serde_json",
  "time",
  "tokio",
+ "tokio-util",
  "tracing",
 ]
 

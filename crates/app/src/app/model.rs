@@ -16,34 +16,42 @@ use super::editors::{
 };
 
 /// Allocates and recycles tab instance IDs, reusing the smallest freed ID.
+/// IDs are returned via mpsc channel (from `TabGuard::drop`) and drained on `allocate()`.
 pub struct TabIdAllocator {
     next: u32,
     free: BTreeSet<u32>,
+    return_tx: std::sync::mpsc::Sender<u32>,
+    return_rx: std::sync::mpsc::Receiver<u32>,
 }
 
 impl Default for TabIdAllocator {
     fn default() -> Self {
+        let (return_tx, return_rx) = std::sync::mpsc::channel();
         Self {
             next: 1,
             free: BTreeSet::new(),
+            return_tx,
+            return_rx,
         }
     }
 }
 
 impl TabIdAllocator {
-    pub fn allocate(&mut self) -> u32 {
-        if let Some(&id) = self.free.iter().next() {
+    /// Allocate a display ID and return it along with a sender for returning the ID.
+    pub fn allocate(&mut self) -> (u32, std::sync::mpsc::Sender<u32>) {
+        // Drain any returned IDs from TabGuard drops
+        while let Ok(id) = self.return_rx.try_recv() {
+            self.free.insert(id);
+        }
+        let id = if let Some(&id) = self.free.iter().next() {
             self.free.remove(&id);
             id
         } else {
             let id = self.next;
             self.next += 1;
             id
-        }
-    }
-
-    pub fn free(&mut self, id: u32) {
-        self.free.insert(id);
+        };
+        (id, self.return_tx.clone())
     }
 }
 

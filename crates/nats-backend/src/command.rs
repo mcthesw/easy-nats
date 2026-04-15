@@ -1,3 +1,4 @@
+use crate::cancellation::TaskCancellation;
 use crate::connection::ConnectionConfig;
 
 /// Commands sent from the UI thread to the async backend worker.
@@ -19,12 +20,13 @@ pub enum BackendCommand {
     },
     Subscribe {
         connection_id: u64,
-        subscriber_id: u32,
+        backend_id: u64,
         subject: String,
+        cancel: crate::TaskCancellation,
     },
     Unsubscribe {
         connection_id: u64,
-        subscriber_id: u32,
+        backend_id: u64,
         subject: String,
     },
     Request {
@@ -112,6 +114,8 @@ pub enum BackendCommand {
     ListKvKeys {
         connection_id: u64,
         bucket: String,
+        cancel: TaskCancellation,
+        generation: u64,
     },
     GetKvEntry {
         connection_id: u64,

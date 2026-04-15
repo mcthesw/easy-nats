@@ -9,7 +9,7 @@ use crate::format::PayloadFormat;
 use crate::i18n::t;
 use crate::proto::{ProtoSchemaManager, ProtoViewState};
 
-use super::super::app::TabIdAllocator;
+use super::guard::TabGuard;
 
 /// Auto-refresh configuration for periodic data reloading.
 #[derive(Debug)]
@@ -77,11 +77,11 @@ pub enum TabAction {
         bucket_name: String,
     },
     CloseOtherTabs {
-        keep_title: String,
+        keep_tab_id: egui::Id,
     },
     CloseAllTabs,
     CloseTabsToRight {
-        of_title: String,
+        of_tab_id: egui::Id,
     },
     OpenConnectionEditor,
     ApplyTheme {
@@ -91,6 +91,9 @@ pub enum TabAction {
         dir: String,
     },
     ClearProtoSchemas,
+    RecordTopic {
+        topic: String,
+    },
 }
 
 #[derive(Debug)]
@@ -227,11 +230,13 @@ impl Default for StreamState {
 #[derive(Debug)]
 pub struct KvBucketState {
     pub info: Option<serde_json::Value>,
-    pub entries: Vec<serde_json::Value>,
+    pub keys: Vec<String>,
     pub selected_key: Option<String>,
     pub key_filter: String,
     pub loading_entries: bool,
+    pub loading_entry: bool,
     pub loading_history: bool,
+    pub load_generation: u64,
     pub entry_key: String,
     pub entry_value: String,
     pub entry_revision: Option<u64>,
@@ -250,11 +255,13 @@ impl Default for KvBucketState {
     fn default() -> Self {
         Self {
             info: None,
-            entries: Vec::new(),
+            keys: Vec::new(),
             selected_key: None,
             key_filter: String::new(),
             loading_entries: false,
+            loading_entry: false,
             loading_history: false,
+            load_generation: 0,
             entry_key: String::new(),
             entry_value: String::new(),
             entry_revision: None,
@@ -290,41 +297,47 @@ pub struct ServerInfoState {
 }
 
 #[derive(Debug)]
+#[allow(dead_code)] // guard fields exist for RAII Drop cleanup, not direct reads
 pub enum TabKind {
     Welcome,
     Publisher {
         connection_id: u64,
         connection_name: String,
-        instance_id: u32,
+        guard: TabGuard,
         state: PublisherState,
     },
     Subscriber {
         connection_id: u64,
         connection_name: String,
-        instance_id: u32,
+        guard: TabGuard,
+        backend_id: u64,
         state: SubscriberState,
     },
     Stream {
         connection_id: u64,
         connection_name: String,
         stream_name: String,
+        guard: TabGuard,
         state: StreamState,
     },
     KvBucket {
         connection_id: u64,
         connection_name: String,
         bucket_name: String,
+        guard: TabGuard,
         state: KvBucketState,
     },
     ObjectStoreBucket {
         connection_id: u64,
         connection_name: String,
         bucket_name: String,
+        guard: TabGuard,
         state: ObjectStoreBucketState,
     },
     ServerInfo {
         connection_id: u64,
         connection_name: String,
+        guard: TabGuard,
         state: ServerInfoState,
     },
     Settings,
@@ -337,27 +350,35 @@ impl TabKind {
             TabKind::Welcome => t("common.tab_welcome").to_string(),
             TabKind::Publisher {
                 connection_name,
-                instance_id,
+                guard,
                 ..
             } => {
-                format!(
-                    "{} #{} ({})",
-                    t("common.tab_publisher"),
-                    instance_id,
-                    connection_name
-                )
+                if let Some(id) = guard.display_id() {
+                    format!(
+                        "{} #{} ({})",
+                        t("common.tab_publisher"),
+                        id,
+                        connection_name
+                    )
+                } else {
+                    format!("{} ({})", t("common.tab_publisher"), connection_name)
+                }
             }
             TabKind::Subscriber {
                 connection_name,
-                instance_id,
+                guard,
                 ..
             } => {
-                format!(
-                    "{} #{} ({})",
-                    t("common.tab_subscriber"),
-                    instance_id,
-                    connection_name
-                )
+                if let Some(id) = guard.display_id() {
+                    format!(
+                        "{} #{} ({})",
+                        t("common.tab_subscriber"),
+                        id,
+                        connection_name
+                    )
+                } else {
+                    format!("{} ({})", t("common.tab_subscriber"), connection_name)
+                }
             }
             TabKind::Stream {
                 connection_name,
@@ -389,6 +410,43 @@ impl TabKind {
             TabKind::LogViewer => t("log_viewer.title").to_string(),
         }
     }
+
+    /// Structural identity for use in close actions and deduplication.
+    pub fn tab_id(&self) -> egui::Id {
+        match self {
+            TabKind::Welcome => egui::Id::new("tab:welcome"),
+            TabKind::Publisher {
+                connection_id,
+                guard,
+                ..
+            } => egui::Id::new(("tab:publisher", *connection_id, guard.display_id())),
+            TabKind::Subscriber {
+                connection_id,
+                backend_id,
+                ..
+            } => egui::Id::new(("tab:subscriber", *connection_id, *backend_id)),
+            TabKind::Stream {
+                connection_id,
+                stream_name,
+                ..
+            } => egui::Id::new(("tab:stream", *connection_id, stream_name.as_str())),
+            TabKind::KvBucket {
+                connection_id,
+                bucket_name,
+                ..
+            } => egui::Id::new(("tab:kv", *connection_id, bucket_name.as_str())),
+            TabKind::ObjectStoreBucket {
+                connection_id,
+                bucket_name,
+                ..
+            } => egui::Id::new(("tab:object-store", *connection_id, bucket_name.as_str())),
+            TabKind::ServerInfo { connection_id, .. } => {
+                egui::Id::new(("tab:server-info", *connection_id))
+            }
+            TabKind::Settings => egui::Id::new("tab:settings"),
+            TabKind::LogViewer => egui::Id::new("tab:log-viewer"),
+        }
+    }
 }
 
 pub struct AppTabViewer<'a> {
@@ -398,7 +456,6 @@ pub struct AppTabViewer<'a> {
     pub dark_mode: &'a mut bool,
     pub log_buffer: &'a crate::log_layer::SharedLogBuffer,
     pub proto_manager: &'a ProtoSchemaManager,
-    pub tab_id_alloc: &'a mut TabIdAllocator,
 }
 
 impl TabViewer for AppTabViewer<'_> {
@@ -409,39 +466,7 @@ impl TabViewer for AppTabViewer<'_> {
     }
 
     fn id(&mut self, tab: &mut Self::Tab) -> egui::Id {
-        match tab {
-            TabKind::Welcome => egui::Id::new("tab:welcome"),
-            TabKind::Publisher {
-                connection_id,
-                instance_id,
-                ..
-            } => egui::Id::new(("tab:publisher", connection_id, instance_id)),
-            TabKind::Subscriber {
-                connection_id,
-                instance_id,
-                ..
-            } => egui::Id::new(("tab:subscriber", connection_id, instance_id)),
-            TabKind::Stream {
-                connection_id,
-                stream_name,
-                ..
-            } => egui::Id::new(("tab:stream", connection_id, stream_name)),
-            TabKind::KvBucket {
-                connection_id,
-                bucket_name,
-                ..
-            } => egui::Id::new(("tab:kv", connection_id, bucket_name)),
-            TabKind::ObjectStoreBucket {
-                connection_id,
-                bucket_name,
-                ..
-            } => egui::Id::new(("tab:object-store", connection_id, bucket_name)),
-            TabKind::ServerInfo { connection_id, .. } => {
-                egui::Id::new(("tab:server-info", connection_id))
-            }
-            TabKind::Settings => egui::Id::new("tab:settings"),
-            TabKind::LogViewer => egui::Id::new("tab:log-viewer"),
-        }
+        tab.tab_id()
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab) {
@@ -449,10 +474,10 @@ impl TabViewer for AppTabViewer<'_> {
     }
 
     fn context_menu(&mut self, ui: &mut egui::Ui, tab: &mut Self::Tab, _path: egui_dock::NodePath) {
-        let title = tab.title();
+        let tab_id = self.id(tab);
         if ui.button(t("common.close_others")).clicked() {
             self.actions.push(TabAction::CloseOtherTabs {
-                keep_title: title.clone(),
+                keep_tab_id: tab_id,
             });
             ui.close();
         }
@@ -462,7 +487,7 @@ impl TabViewer for AppTabViewer<'_> {
         }
         if ui.button(t("common.close_to_right")).clicked() {
             self.actions
-                .push(TabAction::CloseTabsToRight { of_title: title });
+                .push(TabAction::CloseTabsToRight { of_tab_id: tab_id });
             ui.close();
         }
     }
@@ -476,29 +501,25 @@ impl TabViewer for AppTabViewer<'_> {
     }
 
     fn on_close(&mut self, tab: &mut Self::Tab) -> OnCloseResponse {
-        match tab {
-            TabKind::Subscriber {
-                connection_id,
-                instance_id,
-                state,
-                ..
-            } => {
-                for sub in &state.subscriptions {
-                    if sub.active {
-                        self.backend
-                            .send(nats_backend::BackendCommand::Unsubscribe {
-                                connection_id: *connection_id,
-                                subscriber_id: *instance_id,
-                                subject: sub.subject.clone(),
-                            });
-                    }
+        // Send explicit Unsubscribe to clean up worker state.
+        // TabGuard Drop handles cancellation + display ID recycling automatically.
+        if let TabKind::Subscriber {
+            connection_id,
+            backend_id,
+            state,
+            ..
+        } = tab
+        {
+            for sub in &state.subscriptions {
+                if sub.active {
+                    self.backend
+                        .send(nats_backend::BackendCommand::Unsubscribe {
+                            connection_id: *connection_id,
+                            backend_id: *backend_id,
+                            subject: sub.subject.clone(),
+                        });
                 }
-                self.tab_id_alloc.free(*instance_id);
             }
-            TabKind::Publisher { instance_id, .. } => {
-                self.tab_id_alloc.free(*instance_id);
-            }
-            _ => {}
         }
         OnCloseResponse::Close
     }

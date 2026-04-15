@@ -14,6 +14,8 @@ pub struct AppSettings {
     pub dark_mode: bool,
     #[serde(default)]
     pub proto_schema_dir: Option<String>,
+    #[serde(default)]
+    pub topic_history: Vec<String>,
 }
 
 fn default_true() -> bool {
@@ -26,6 +28,7 @@ impl Default for AppSettings {
             language: Language::En,
             dark_mode: true,
             proto_schema_dir: None,
+            topic_history: Vec::new(),
         }
     }
 }
@@ -77,5 +80,31 @@ impl AppSettings {
             .unwrap_or_else(|| PathBuf::from("."))
             .join("easy-nats")
             .join("settings.json")
+    }
+
+    const MAX_TOPIC_HISTORY: usize = 50;
+
+    /// Record a topic as most-recently-used. Deduplicates and caps at MAX_TOPIC_HISTORY.
+    pub fn record_topic(&mut self, topic: &str) {
+        let topic = topic.trim().to_string();
+        if topic.is_empty() {
+            return;
+        }
+        self.topic_history.retain(|t| t != &topic);
+        self.topic_history.insert(0, topic);
+        self.topic_history.truncate(Self::MAX_TOPIC_HISTORY);
+    }
+
+    /// Return topics matching a prefix (MRU order).
+    pub fn topic_suggestions(&self, prefix: &str) -> Vec<&str> {
+        let prefix = prefix.trim();
+        if prefix.is_empty() {
+            return self.topic_history.iter().map(|s| s.as_str()).collect();
+        }
+        self.topic_history
+            .iter()
+            .filter(|t| t.starts_with(prefix))
+            .map(|s| s.as_str())
+            .collect()
     }
 }

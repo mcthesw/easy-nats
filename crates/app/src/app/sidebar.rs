@@ -1,9 +1,11 @@
 use eframe::egui;
 use nats_backend::{BackendCommand, ConnectionStatusKind};
+use tokio_util::sync::CancellationToken;
 
 use crate::i18n::t;
 use crate::tabs::{
-    KvBucketState, ObjectStoreBucketState, PublisherState, StreamState, SubscriberState, TabKind,
+    KvBucketState, ObjectStoreBucketState, PublisherState, StreamState, SubscriberState, TabGuard,
+    TabKind, next_backend_id,
 };
 
 use super::{
@@ -191,11 +193,13 @@ fn render_pubsub_section(
                 .selectable_label(false, t("sidebar.open_publisher"))
                 .clicked()
             {
-                let instance_id = app.tab_id_alloc.allocate();
+                let (display_id, id_return) = app.tab_id_alloc.allocate();
+                let cancel = CancellationToken::new();
+                let guard = TabGuard::new(cancel.clone(), display_id, id_return);
                 *action = Some(SidebarAction::OpenTab(Box::new(TabKind::Publisher {
                     connection_id: id,
                     connection_name: name.to_string(),
-                    instance_id,
+                    guard,
                     state: PublisherState::default(),
                 })));
             }
@@ -203,11 +207,15 @@ fn render_pubsub_section(
                 .selectable_label(false, t("sidebar.open_subscriber"))
                 .clicked()
             {
-                let instance_id = app.tab_id_alloc.allocate();
+                let (display_id, id_return) = app.tab_id_alloc.allocate();
+                let cancel = CancellationToken::new();
+                let guard = TabGuard::new(cancel.clone(), display_id, id_return);
+                let bid = next_backend_id();
                 *action = Some(SidebarAction::OpenTab(Box::new(TabKind::Subscriber {
                     connection_id: id,
                     connection_name: name.to_string(),
-                    instance_id,
+                    guard,
+                    backend_id: bid,
                     state: SubscriberState::default(),
                 })));
             }
@@ -246,10 +254,13 @@ fn render_streams_section(
                     if let Some(stream_name) = info["config"]["name"].as_str()
                         && ui.selectable_label(false, stream_name).clicked()
                     {
+                        let cancel = CancellationToken::new();
+                        let guard = TabGuard::new_without_id(cancel);
                         *action = Some(SidebarAction::OpenTab(Box::new(TabKind::Stream {
                             connection_id: id,
                             connection_name: name.to_string(),
                             stream_name: stream_name.to_string(),
+                            guard,
                             state: StreamState {
                                 info: Some(info.clone()),
                                 ..Default::default()
@@ -294,10 +305,13 @@ fn render_kv_section(
                     if let Some(bucket_name) = info["bucket"].as_str()
                         && ui.selectable_label(false, bucket_name).clicked()
                     {
+                        let cancel = CancellationToken::new();
+                        let guard = TabGuard::new_without_id(cancel);
                         *action = Some(SidebarAction::OpenTab(Box::new(TabKind::KvBucket {
                             connection_id: id,
                             connection_name: name.to_string(),
                             bucket_name: bucket_name.to_string(),
+                            guard,
                             state: KvBucketState {
                                 info: Some(info.clone()),
                                 loading_entries: true,
@@ -343,11 +357,14 @@ fn render_obj_store_section(
                     if let Some(bucket_name) = info["bucket"].as_str()
                         && ui.selectable_label(false, bucket_name).clicked()
                     {
+                        let cancel = CancellationToken::new();
+                        let guard = TabGuard::new_without_id(cancel);
                         *action = Some(SidebarAction::OpenTab(Box::new(
                             TabKind::ObjectStoreBucket {
                                 connection_id: id,
                                 connection_name: name.to_string(),
                                 bucket_name: bucket_name.to_string(),
+                                guard,
                                 state: ObjectStoreBucketState {
                                     info: Some(info.clone()),
                                     loading_objects: true,
@@ -390,9 +407,12 @@ fn apply_sidebar_action(app: &mut EasyNatsApp, action: Option<SidebarAction>) {
         }
         Some(SidebarAction::OpenServerInfo(id)) => {
             let conn_name = app.conn_name(id);
+            let cancel = CancellationToken::new();
+            let guard = TabGuard::new_without_id(cancel);
             let tab = TabKind::ServerInfo {
                 connection_id: id,
                 connection_name: conn_name,
+                guard,
                 state: crate::tabs::ServerInfoState {
                     loading: true,
                     ..Default::default()

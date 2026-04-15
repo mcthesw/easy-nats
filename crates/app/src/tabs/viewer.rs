@@ -20,14 +20,14 @@ fn tab_scope_id(tab: &TabKind) -> String {
         TabKind::Welcome => "welcome".into(),
         TabKind::Publisher {
             connection_id,
-            instance_id,
+            guard,
             ..
-        } => format!("pub:{connection_id}:{instance_id}"),
+        } => format!("pub:{connection_id}:{}", guard.display_id().unwrap_or(0)),
         TabKind::Subscriber {
             connection_id,
-            instance_id,
+            backend_id,
             ..
-        } => format!("sub:{connection_id}:{instance_id}"),
+        } => format!("sub:{connection_id}:{backend_id}"),
         TabKind::Stream {
             connection_id,
             stream_name,
@@ -94,17 +94,22 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
         }
         TabKind::Subscriber {
             connection_id,
-            instance_id,
+            backend_id,
+            guard,
             state,
             ..
         } => {
+            let suggestions = viewer.settings.topic_suggestions(&state.subject_input);
             subscriber_ui(
                 ui,
                 *connection_id,
-                *instance_id,
+                *backend_id,
+                guard,
                 state,
                 viewer.backend,
                 viewer.proto_manager,
+                viewer.actions,
+                &suggestions,
             );
         }
         TabKind::Stream {
@@ -127,6 +132,7 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
             connection_id,
             bucket_name,
             state,
+            guard,
             ..
         } => {
             kv_bucket_ui(
@@ -137,6 +143,7 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
                 viewer.backend,
                 viewer.actions,
                 viewer.proto_manager,
+                guard,
             );
         }
         TabKind::ObjectStoreBucket {

@@ -48,6 +48,12 @@ impl EasyNatsApp {
             "delete_stream" => {
                 self.toasts
                     .push(ToastLevel::Success, t("toast.stream_deleted").to_string());
+                if let Some(name) = data["name"].as_str() {
+                    self.remove_tabs_matching(|tab| {
+                        matches!(tab, TabKind::Stream { connection_id: cid, stream_name, .. }
+                            if *cid == connection_id && stream_name == name)
+                    });
+                }
                 self.backend
                     .send(BackendCommand::ListStreams { connection_id });
                 true

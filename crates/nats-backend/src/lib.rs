@@ -1,4 +1,5 @@
 pub mod bridge;
+pub mod cancellation;
 pub mod command;
 pub mod config;
 pub mod connection;
@@ -6,6 +7,7 @@ pub mod event;
 pub mod worker;
 
 pub use bridge::BackendHandle;
+pub use cancellation::TaskCancellation;
 pub use command::BackendCommand;
 pub use config::AppConfig;
 pub use connection::{AuthMethod, ConnectionConfig, ConnectionStatus};

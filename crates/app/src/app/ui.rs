@@ -57,7 +57,6 @@ impl eframe::App for EasyNatsApp {
                     dark_mode: &mut self.dark_mode,
                     log_buffer: &self.log_buffer,
                     proto_manager: &self.proto_manager,
-                    tab_id_alloc: &mut self.tab_id_alloc,
                 },
             );
 
@@ -124,14 +123,14 @@ impl eframe::App for EasyNatsApp {
                 } => {
                     self.obj_store_bucket_delete_confirm = Some((connection_id, bucket_name));
                 }
-                TabAction::CloseOtherTabs { keep_title } => {
-                    self.close_other_tabs(&keep_title);
+                TabAction::CloseOtherTabs { keep_tab_id } => {
+                    self.close_other_tabs(keep_tab_id);
                 }
                 TabAction::CloseAllTabs => {
                     self.close_all_tabs();
                 }
-                TabAction::CloseTabsToRight { of_title } => {
-                    self.close_tabs_to_right(&of_title);
+                TabAction::CloseTabsToRight { of_tab_id } => {
+                    self.close_tabs_to_right(of_tab_id);
                 }
                 TabAction::OpenConnectionEditor => {
                     self.editor.visible = true;
@@ -145,6 +144,10 @@ impl eframe::App for EasyNatsApp {
                 }
                 TabAction::ClearProtoSchemas => {
                     self.proto_manager.clear();
+                }
+                TabAction::RecordTopic { topic } => {
+                    self.settings.record_topic(&topic);
+                    self.settings.save();
                 }
             }
         }

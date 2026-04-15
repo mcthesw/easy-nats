@@ -59,6 +59,9 @@ new_entry:
 loading_keys:
   en: "Loading keys..."
   zh: "加载键列表中..."
+loading_entry:
+  en: "Loading entry..."
+  zh: "加载条目中..."
 keys:
   en: "Keys"
   zh: "键"

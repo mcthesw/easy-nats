@@ -4,10 +4,12 @@ use nats_backend::{BackendCommand, BackendHandle};
 use crate::format;
 use crate::i18n::t;
 use crate::proto::ProtoSchemaManager;
+use crate::tabs::guard::TabGuard;
 
 use super::common::{auto_refresh_ui, decode_base64_payload, format_bytes};
 use super::types::{KvBucketState, TabAction};
 
+#[allow(clippy::too_many_arguments)]
 pub fn kv_bucket_ui(
     ui: &mut egui::Ui,
     connection_id: u64,
@@ -16,6 +18,7 @@ pub fn kv_bucket_ui(
     backend: &BackendHandle,
     actions: &mut Vec<TabAction>,
     proto_manager: &ProtoSchemaManager,
+    guard: &TabGuard,
 ) {
     ui.horizontal(|ui| {
         ui.heading(bucket_name);
@@ -40,9 +43,14 @@ pub fn kv_bucket_ui(
         auto_refresh_ui(ui, "kv_auto_refresh", &mut state.auto_refresh);
     });
     if state.auto_refresh.should_refresh() {
+        let new_gen = crate::tabs::next_generation();
+        state.load_generation = new_gen;
+        state.keys.clear();
         backend.send(BackendCommand::ListKvKeys {
             connection_id,
             bucket: bucket_name.to_string(),
+            cancel: guard.cancellation(),
+            generation: new_gen,
         });
         state.loading_entries = true;
         state.auto_refresh.mark_refreshed();
@@ -68,7 +76,15 @@ pub fn kv_bucket_ui(
         .default_size(300.0)
         .size_range(200.0..=f32::INFINITY)
         .show_inside(ui, |ui| {
-            render_key_list(ui, connection_id, bucket_name, state, backend, actions);
+            render_key_list(
+                ui,
+                connection_id,
+                bucket_name,
+                state,
+                backend,
+                actions,
+                guard,
+            );
         });
 
     // Right panel: detail or history
@@ -95,6 +111,7 @@ fn render_key_list(
     state: &mut KvBucketState,
     backend: &BackendHandle,
     actions: &mut Vec<TabAction>,
+    guard: &TabGuard,
 ) {
     // Toolbar row: refresh + new entry
     ui.horizontal(|ui| {
@@ -103,9 +120,14 @@ fn render_key_list(
             .on_hover_text(t("kv.refresh"))
             .clicked()
         {
+            let new_gen = crate::tabs::next_generation();
+            state.load_generation = new_gen;
+            state.keys.clear();
             backend.send(BackendCommand::ListKvKeys {
                 connection_id,
                 bucket: bucket_name.to_string(),
+                cancel: guard.cancellation(),
+                generation: new_gen,
             });
             state.loading_entries = true;
         }
@@ -121,7 +143,7 @@ fn render_key_list(
     ui.add(
         egui::TextEdit::singleline(&mut state.key_filter)
             .hint_text(t("kv.key_filter"))
-            .desired_width(f32::INFINITY),
+            .desired_width(ui.available_width()),
     );
 
     if state.loading_entries {
@@ -134,28 +156,30 @@ fn render_key_list(
     egui::ScrollArea::vertical()
         .id_salt(("kv_keys", connection_id, bucket_name))
         .show(ui, |ui| {
-            let filtered: Vec<serde_json::Value> = state
-                .entries
+            let filtered: Vec<&str> = state
+                .keys
                 .iter()
-                .filter(|entry| {
-                    let key = entry["key"].as_str().unwrap_or("");
-                    state.key_filter.is_empty() || key.starts_with(&state.key_filter)
-                })
-                .cloned()
+                .filter(|key| state.key_filter.is_empty() || key.starts_with(&state.key_filter))
+                .map(|s| s.as_str())
                 .collect();
 
             if filtered.is_empty() {
                 ui.label(t("kv.no_keys"));
             } else {
-                for entry in &filtered {
-                    let key = entry["key"].as_str().unwrap_or("");
+                for key in &filtered {
                     if ui
-                        .selectable_label(state.selected_key.as_deref() == Some(key), key)
+                        .selectable_label(state.selected_key.as_deref() == Some(*key), *key)
                         .clicked()
                     {
                         state.selected_key = Some(key.to_string());
                         state.show_history = false;
-                        load_kv_entry_into_editor(state, entry);
+                        // Clear editor state and request entry details
+                        state.entry_key.clear();
+                        state.entry_value.clear();
+                        state.entry_revision = None;
+                        state.entry_operation = None;
+                        state.entry_created = None;
+                        state.loading_entry = true;
                         backend.send(BackendCommand::GetKvEntry {
                             connection_id,
                             bucket: bucket_name.to_string(),
@@ -184,6 +208,14 @@ fn render_detail_panel(
     if state.selected_key.is_none() {
         ui.centered_and_justified(|ui| {
             ui.label(t("kv.select_key_hint"));
+        });
+        return;
+    }
+
+    if state.loading_entry {
+        ui.horizontal(|ui| {
+            ui.spinner();
+            ui.label(t("kv.loading_entry"));
         });
         return;
     }
@@ -379,13 +411,4 @@ fn kv_bucket_info_panel(ui: &mut egui::Ui, info: &serde_json::Value) {
                 ui.end_row();
             }
         });
-}
-
-fn load_kv_entry_into_editor(state: &mut KvBucketState, entry: &serde_json::Value) {
-    state.entry_key = entry["key"].as_str().unwrap_or("").to_string();
-    state.entry_value =
-        String::from_utf8_lossy(&decode_base64_payload(entry["value_base64"].as_str())).to_string();
-    state.entry_revision = entry["revision"].as_u64();
-    state.entry_operation = entry["operation"].as_str().map(str::to_owned);
-    state.entry_created = entry["created"].as_str().map(str::to_owned);
 }

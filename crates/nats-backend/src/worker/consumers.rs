@@ -1,3 +1,5 @@
+use std::sync::atomic::{AtomicU64, Ordering};
+
 use futures_util::StreamExt;
 use tokio::sync::mpsc;
 
@@ -5,6 +7,8 @@ use crate::event::BackendEvent;
 
 use super::helpers::{consumer_info_to_json, raw_message_to_json};
 use super::state::WorkerState;
+
+static INSPECTOR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
 pub(crate) async fn handle_list_consumers(
     state: &WorkerState,
@@ -178,7 +182,9 @@ pub(crate) async fn handle_fetch_consumer_messages(
             // Build an ephemeral inspector consumer mirroring the filter
             let filter = original.config.filter_subject.clone();
             let filters = original.config.filter_subjects.clone();
+            let unique_id = INSPECTOR_COUNTER.fetch_add(1, Ordering::Relaxed);
             let inspector_config = async_nats::jetstream::consumer::pull::Config {
+                name: Some(format!("_easynats_inspect_{unique_id}")),
                 filter_subject: filter,
                 filter_subjects: filters,
                 deliver_policy: async_nats::jetstream::consumer::DeliverPolicy::All,

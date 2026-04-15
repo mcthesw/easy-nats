@@ -38,6 +38,14 @@ impl EasyNatsApp {
             "create_object_store_bucket" | "delete_object_store_bucket" => {
                 self.toasts
                     .push(ToastLevel::Success, format!("{operation} succeeded"));
+                if operation == "delete_object_store_bucket"
+                    && let Some(bucket) = data["bucket"].as_str()
+                {
+                    self.remove_tabs_matching(|tab| {
+                        matches!(tab, TabKind::ObjectStoreBucket { connection_id: cid, bucket_name, .. }
+                            if *cid == connection_id && bucket_name == bucket)
+                    });
+                }
                 self.backend
                     .send(BackendCommand::ListObjectStoreBuckets { connection_id });
                 true

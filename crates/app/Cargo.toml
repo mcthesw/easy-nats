@@ -20,3 +20,4 @@ serde_json = "1"
 serde_yaml = "0.9.34+deprecated"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "registry", "fmt"] }
+tokio-util = "0.7"
