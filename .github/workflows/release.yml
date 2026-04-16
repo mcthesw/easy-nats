@@ -260,10 +260,21 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-assets
-          find staging -type f \( \
+          while IFS= read -r -d '' src; do
+            name="$(basename "$src")"
+            case "$name" in
+              *aarch64*.dmg)
+                dest="easy-nats-macos-aarch64.dmg"
+                ;;
+              *)
+                dest="$name"
+                ;;
+            esac
+            cp -v "$src" "release-assets/$dest"
+          done < <(find staging -type f \( \
             -name '*.dmg' -o -name '*.deb' -o -name '*.rpm' -o \
             -name '*.AppImage' -o -name '*.zip' -o -name '*.tar.gz' \
-          \) -exec cp -v {} release-assets/ \;
+          \) -print0)
           ls -la release-assets
 
       - name: Generate checksums
