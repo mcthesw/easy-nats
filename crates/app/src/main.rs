@@ -40,6 +40,11 @@ fn main() {
             .init();
     }
 
+    // Resolve platform-standard paths early and migrate any files from the
+    // legacy layout before subsystems try to load them.
+    let paths = nats_backend::ProjectPaths::resolve();
+    nats_backend::migrate_legacy_on_startup(&paths);
+
     let app_settings = settings::AppSettings::load();
     i18n::init(app_settings.language);
 

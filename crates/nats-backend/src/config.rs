@@ -3,6 +3,7 @@ use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
 
 use crate::connection::ConnectionConfig;
+use crate::paths::ProjectPaths;
 
 /// Persisted application configuration (connection profiles + settings).
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -64,10 +65,7 @@ impl AppConfig {
     }
 
     fn config_path() -> PathBuf {
-        dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("easy-nats")
-            .join("config.json")
+        ProjectPaths::resolve().config_file("config.json")
     }
 }
 

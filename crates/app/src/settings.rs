@@ -2,6 +2,7 @@
 
 use std::path::PathBuf;
 
+use nats_backend::ProjectPaths;
 use serde::{Deserialize, Serialize};
 
 use crate::i18n::Language;
@@ -76,10 +77,7 @@ impl AppSettings {
     }
 
     fn path() -> PathBuf {
-        dirs::config_dir()
-            .unwrap_or_else(|| PathBuf::from("."))
-            .join("easy-nats")
-            .join("settings.json")
+        ProjectPaths::resolve().config_file("settings.json")
     }
 
     const MAX_TOPIC_HISTORY: usize = 50;
