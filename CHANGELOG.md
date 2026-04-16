@@ -1,1 +1,69 @@
 # Changelog
+
+## [0.1.1](https://github.com/mcthesw/easy-nats/compare/v0.1.0...v0.1.1) (2026-04-16)
+
+
+### Features
+
+* add Docker Compose setup and seed scripts for NATS server and traffic generation ([04a63d6](https://github.com/mcthesw/easy-nats/commit/04a63d644bcae665caad59f050ebf6f101223e3e))
+* add main menu image to README and update layout ([0191f1b](https://github.com/mcthesw/easy-nats/commit/0191f1b9fdba900de1993090a97b06bf5242ca77))
+* add object store backend ([6a940f7](https://github.com/mcthesw/easy-nats/commit/6a940f72d250cf8ba023b4d99f949d66e4300f4e))
+* add protobuf support and object store UI ([ce255af](https://github.com/mcthesw/easy-nats/commit/ce255af3122116d3034dd49e9b174c56aeb31b73))
+* add settings tab and filtered log viewer ([9d4b474](https://github.com/mcthesw/easy-nats/commit/9d4b4743500289b175fd60b6b69714994400dd6b))
+* **app:** add auto-refresh for stream consumers and KV keys ([778062e](https://github.com/mcthesw/easy-nats/commit/778062e2153927c4ecdbe6daa742a6656dccbdc2))
+* **app:** add WorkQueue retention warning in stream browser ([f95b3d0](https://github.com/mcthesw/easy-nats/commit/f95b3d0c94a78b15708198e646e10c8bd7bf1d00))
+* **app:** enhance Welcome tab with centered layout and quick actions ([21ba11a](https://github.com/mcthesw/easy-nats/commit/21ba11a39dede1bb6880019d3558c8fed71d7390))
+* bundle Inter and LXGW UI fonts ([dbb9ff2](https://github.com/mcthesw/easy-nats/commit/dbb9ff2ee14915194c0e0a92227f4fbe618bd328))
+* centralize all UI strings and add project README ([54193e9](https://github.com/mcthesw/easy-nats/commit/54193e91b77014f0dafcbb5cc4916bf0377f7155))
+* **consumer:** add pull consumer message peek ([5fc4bdf](https://github.com/mcthesw/easy-nats/commit/5fc4bdffd95604502642caaa75ac9a7b293000c9))
+* **editor:** add consumer and KV bucket config editing ([ccc4dea](https://github.com/mcthesw/easy-nats/commit/ccc4dead927a0be6a690f96095eedd3e0c05f3fe))
+* **editor:** add Format JSON button to publisher and KV value editor ([72c5329](https://github.com/mcthesw/easy-nats/commit/72c53295c43537b21a3d6c5a5ed015151968d26a))
+* **i18n:** add YAML-based i18n system with en/zh support ([7c94a79](https://github.com/mcthesw/easy-nats/commit/7c94a7925b014e46374b2ec47c8409b2f0ceb374))
+* implement async runtime bridge with Tokio worker ([b374e20](https://github.com/mcthesw/easy-nats/commit/b374e20a501be818a6facd45eab4ecc8bfd1ece6))
+* implement connection management with auth, persistence, and UI ([fa0735c](https://github.com/mcthesw/easy-nats/commit/fa0735c52a77562e9653ed5b63445a043d5f2e1d))
+* implement core NATS publisher with request-reply, headers, timeout, and publisher tab UI ([91b34cc](https://github.com/mcthesw/easy-nats/commit/91b34cc827917983416581ee69d1cf0273b87767))
+* implement core NATS subscriber with subscription management, ring buffer, and subscriber tab UI ([4ac7b2b](https://github.com/mcthesw/easy-nats/commit/4ac7b2b1a5881eb5f799aa07357d7fbf95f84521))
+* implement JetStream stream management with CRUD, message browsing, and stream tab UI ([3687efa](https://github.com/mcthesw/easy-nats/commit/3687efaa0a186913a29c19dd51eaa8ae27f88639))
+* implement message formatting with auto-detect, JSON syntax highlighting, hex dump, and Base64 ([09983c2](https://github.com/mcthesw/easy-nats/commit/09983c28ad3b8e9d5c7208d1a14b7ee689319e66))
+* implement workspace UI shell with egui_dock, theme toggle, toast notifications, and resource tree ([ea99133](https://github.com/mcthesw/easy-nats/commit/ea99133c6f551b1868e5a0f6c38c3679d4b07f2f))
+* **kv:** redesign KV browser with horizontal split and detail/history toggle ([75de7ef](https://github.com/mcthesw/easy-nats/commit/75de7ef9c2f4377810cfe68877adeed730086212))
+* **layout:** resizable message-list/detail split in subscriber and stream tabs ([479a88a](https://github.com/mcthesw/easy-nats/commit/479a88a8ccfb4f976f51700da649e09e865021b1))
+* restore emoji fallbacks and toast controls ([098abc4](https://github.com/mcthesw/easy-nats/commit/098abc4fdafe1806ae3916a7be9e6218762751ac))
+* scaffold Cargo workspace with app and nats-backend crates ([6534229](https://github.com/mcthesw/easy-nats/commit/65342293f8f584ffa8663edf3ca7da0799a11530))
+* **server-info:** add server & JetStream account info panel ([46f1f21](https://github.com/mcthesw/easy-nats/commit/46f1f216540eec688adb63f95301669036817786))
+* **stream:** add message timestamps and time-based filtering ([feab95c](https://github.com/mcthesw/easy-nats/commit/feab95c2b3eba7acbfeaca8429c1c39cf0d43202))
+* streamline settings and tab focusing ([8e6df2d](https://github.com/mcthesw/easy-nats/commit/8e6df2db01fb99c34a502d9a84dc0645edade21f))
+* **subscriber:** support multi-topic subscriptions with subject filter ([eb30ddb](https://github.com/mcthesw/easy-nats/commit/eb30ddb31a3217da55b1d5db1d02011e82dcdde6))
+* support TLS First mode for connections ([ee088b1](https://github.com/mcthesw/easy-nats/commit/ee088b1f44d8672b6a4e2737917dc6de56645748))
+* **tabs:** add context menu with Close Others, Close All, Close to Right ([0b1bcb4](https://github.com/mcthesw/easy-nats/commit/0b1bcb466dd652df13a4ce6e6d6302962154df37))
+* **tabs:** allow multiple publisher/subscriber instances per connection ([46d42df](https://github.com/mcthesw/easy-nats/commit/46d42df7af0572021b01556a957e87d4e928023f))
+* unify stream subscriber and kv browsers ([632cce1](https://github.com/mcthesw/easy-nats/commit/632cce1f8d1850c75d438080b651e33e120ca634))
+
+
+### Bug Fixes
+
+* **ci:** remove cargo-workspace plugin and fix collapsible_match lint ([fcdf7a1](https://github.com/mcthesw/easy-nats/commit/fcdf7a1b1ea7820a83def3ad6402d90863f189e3))
+* **gui:** route tracing output to log file when no terminal is attached ([ce962bf](https://github.com/mcthesw/easy-nats/commit/ce962bf53888bdf491b8f24bb744e05d57829c77))
+* isolate splitter state per tab ([b052197](https://github.com/mcthesw/easy-nats/commit/b0521970a93032237a1a97f406852b8d2434e04a))
+* keep connection toasts visible and unique ([973598b](https://github.com/mcthesw/easy-nats/commit/973598b0c2b4d358a05cfcf0f63b09bf5c1ef0e9))
+* multi-bugfix batch  TabGuard RAII, KV cancellation, scrollbar, topic history ([05e0f82](https://github.com/mcthesw/easy-nats/commit/05e0f82861254c95b529add946460379dfcbaa87))
+* **object-store:** stream download directly to disk ([135718d](https://github.com/mcthesw/easy-nats/commit/135718db3be00c561331777d31d6c6d2a509c60d))
+* patch egui_dock undock ids via fork ([f4e870e](https://github.com/mcthesw/easy-nats/commit/f4e870e02f7b6403e6b4883cfdd81ed2c1b9b327))
+* **release:** use simple release-type for workspace compatibility ([6e53ccb](https://github.com/mcthesw/easy-nats/commit/6e53ccbaf239de8d08c25429d194c49db20d7eee))
+* surface Tokio runtime startup failure on calling thread ([f06870f](https://github.com/mcthesw/easy-nats/commit/f06870fbec478166ef40eb1eb7f6b74547b7e88c))
+* window defaults, theme toggle persistence, and icon rendering ([12f8335](https://github.com/mcthesw/easy-nats/commit/12f83357fb03c1919fdb15a53505578cba082629))
+
+
+### Code Refactoring
+
+* modularize app shell, tabs, and backend worker into domain-based modules ([edd5d53](https://github.com/mcthesw/easy-nats/commit/edd5d531dcae42c4db1f0ce400923e5e298443fe))
+* overhaul logging, subscriber isolation, connection state, and UI ([1546eff](https://github.com/mcthesw/easy-nats/commit/1546effea505d5ab42f3805e226135159c4a9165))
+* **paths:** add platform-paths helper with legacy migration ([8372442](https://github.com/mcthesw/easy-nats/commit/837244259b41d6f0d56c8f11412062a120d568bd))
+* streamline connection actions in sidebar ([8b500bb](https://github.com/mcthesw/easy-nats/commit/8b500bb43183f1b761cc76185d75930a7198788d))
+
+
+### Documentation
+
+* add future groundwork placeholders and architecture notes ([9669c5c](https://github.com/mcthesw/easy-nats/commit/9669c5cd37d02e03d7ef9281844d9820bde22e92))
+
+## Changelog
