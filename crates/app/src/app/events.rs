@@ -22,27 +22,26 @@ impl EasyNatsApp {
                     tracing::info!(connection_id, ?status, "Connection status changed");
                     let prev = self.conn_statuses.get(&connection_id).cloned();
                     match &status {
-                        ConnectionStatusKind::Connected => {
-                            // Guard against duplicate Connected events from the NATS event_callback
-                            if !matches!(prev, Some(ConnectionStatusKind::Connected)) {
-                                self.toasts.push(
-                                    ToastLevel::Success,
-                                    format!("Connected to {}", self.conn_name(connection_id)),
-                                );
-                                self.backend
-                                    .send(BackendCommand::ListStreams { connection_id });
-                                self.backend
-                                    .send(BackendCommand::ListKvBuckets { connection_id });
-                                self.backend
-                                    .send(BackendCommand::ListObjectStoreBuckets { connection_id });
-                            }
+                        ConnectionStatusKind::Connected
+                            if !matches!(prev, Some(ConnectionStatusKind::Connected)) =>
+                        {
+                            self.toasts.push(
+                                ToastLevel::Success,
+                                format!("Connected to {}", self.conn_name(connection_id)),
+                            );
+                            self.backend
+                                .send(BackendCommand::ListStreams { connection_id });
+                            self.backend
+                                .send(BackendCommand::ListKvBuckets { connection_id });
+                            self.backend
+                                .send(BackendCommand::ListObjectStoreBuckets { connection_id });
                         }
-                        ConnectionStatusKind::Disconnected => {
-                            if !self.user_wants_connected.contains(&connection_id) {
-                                self.stream_lists.remove(&connection_id);
-                                self.kv_lists.remove(&connection_id);
-                                self.obj_store_lists.remove(&connection_id);
-                            }
+                        ConnectionStatusKind::Disconnected
+                            if !self.user_wants_connected.contains(&connection_id) =>
+                        {
+                            self.stream_lists.remove(&connection_id);
+                            self.kv_lists.remove(&connection_id);
+                            self.obj_store_lists.remove(&connection_id);
                         }
                         ConnectionStatusKind::Error(msg) => {
                             if self.user_wants_connected.contains(&connection_id) {
