@@ -26,24 +26,15 @@ fn main() {
     #[cfg(windows)]
     attach_parent_console();
 
-    let log_buffer = log_layer::SharedLogBuffer::default();
-    {
-        use tracing_subscriber::prelude::*;
-        tracing_subscriber::registry()
-            .with(
-                tracing_subscriber::fmt::layer().with_filter(
-                    tracing_subscriber::EnvFilter::try_from_default_env()
-                        .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info")),
-                ),
-            )
-            .with(log_layer::AppLogLayer::new(log_buffer.clone()))
-            .init();
-    }
-
     // Resolve platform-standard paths early and migrate any files from the
     // legacy layout before subsystems try to load them.
     let paths = nats_backend::ProjectPaths::resolve();
     nats_backend::migrate_legacy_on_startup(&paths);
+
+    let log_buffer = log_layer::SharedLogBuffer::default();
+    // Keep the file-appender guard alive for the lifetime of the process so
+    // buffered log output is flushed when the app exits.
+    let _log_guard = install_tracing(&paths, log_buffer.clone());
 
     let app_settings = settings::AppSettings::load();
     i18n::init(app_settings.language);
@@ -104,5 +95,69 @@ pub(crate) fn apply_theme(ctx: &eframe::egui::Context, dark: bool) {
         ctx.set_visuals(Visuals::dark());
     } else {
         ctx.set_visuals(Visuals::light());
+    }
+}
+
+/// Initialise the tracing subscriber.
+///
+/// When any of the standard I/O streams is attached to a terminal (interactive
+/// terminal launch, `cargo run`, CI logs) the formatted layer writes to
+/// stderr so developers and power users see log output immediately. When no
+/// stream is a terminal — typical for packaged GUI launches through
+/// Start-Menu shortcuts, `.app` bundles, or `.desktop` entries — the
+/// formatted layer is redirected to a daily-rolled file under the platform
+/// log directory instead, so release builds never keep a terminal window
+/// visible by writing to stdout/stderr.
+///
+/// The returned `WorkerGuard` MUST be held for the lifetime of the process so
+/// buffered records are flushed on exit; the caller binds it to `_log_guard`.
+fn install_tracing(
+    paths: &nats_backend::ProjectPaths,
+    log_buffer: log_layer::SharedLogBuffer,
+) -> Option<tracing_appender::non_blocking::WorkerGuard> {
+    use std::io::IsTerminal;
+    use tracing_subscriber::prelude::*;
+
+    let env_filter = || {
+        tracing_subscriber::EnvFilter::try_from_default_env()
+            .unwrap_or_else(|_| tracing_subscriber::EnvFilter::new("info"))
+    };
+    let mem_layer = log_layer::AppLogLayer::new(log_buffer);
+
+    let has_terminal = std::io::stderr().is_terminal() || std::io::stdout().is_terminal();
+
+    if has_terminal {
+        tracing_subscriber::registry()
+            .with(
+                tracing_subscriber::fmt::layer()
+                    .with_writer(std::io::stderr)
+                    .with_filter(env_filter()),
+            )
+            .with(mem_layer)
+            .init();
+        return None;
+    }
+
+    match std::fs::create_dir_all(paths.log_dir()) {
+        Ok(()) => {
+            let appender = tracing_appender::rolling::daily(paths.log_dir(), "easy-nats.log");
+            let (non_blocking, guard) = tracing_appender::non_blocking(appender);
+            tracing_subscriber::registry()
+                .with(
+                    tracing_subscriber::fmt::layer()
+                        .with_ansi(false)
+                        .with_writer(non_blocking)
+                        .with_filter(env_filter()),
+                )
+                .with(mem_layer)
+                .init();
+            Some(guard)
+        }
+        Err(_) => {
+            // No terminal and no writable log dir — install only the in-memory
+            // layer so the UI still sees events and no output lands on stdio.
+            tracing_subscriber::registry().with(mem_layer).init();
+            None
+        }
     }
 }
