@@ -19,7 +19,33 @@ A cross-platform desktop GUI for [NATS](https://nats.io/) messaging, built with 
 
 ## Install
 
-Pre-built binaries are available on the [Releases](https://github.com/mcthesw/easy-nats/releases) page. Package manager install options and future distribution plans are tracked in [roadmap.md](roadmap.md).
+Pre-built binaries are available on the [Releases](https://github.com/mcthesw/easy-nats/releases) page.
+
+**Windows (Scoop)**
+
+```powershell
+scoop bucket add sworld https://github.com/mcthesw/scoop-bucket
+scoop install easy-nats
+```
+
+**macOS (Homebrew)**
+
+```bash
+brew install mcthesw/tap/easy-nats
+```
+
+**Linux**
+
+```bash
+echo "deb [trusted=yes] https://mcthesw.github.io/sworld-apt stable main" | \
+  sudo tee /etc/apt/sources.list.d/mcthesw.list
+sudo apt update
+sudo apt install easy-nats
+```
+
+For `.rpm` and `.AppImage`, use the [Releases](https://github.com/mcthesw/easy-nats/releases) page.
+
+See [roadmap.md](roadmap.md) for additional distribution channels (Flathub, AUR, etc.).
 
 ## Build
 

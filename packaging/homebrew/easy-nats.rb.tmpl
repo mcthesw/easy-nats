@@ -1,15 +1,8 @@
 cask "easy-nats" do
   version "@VERSION@"
 
-  on_arm do
-    url "https://github.com/mcthesw/easy-nats/releases/download/v#{version}/@FILE_ARM64@"
-    sha256 "@SHA_ARM64@"
-  end
-
-  on_intel do
-    url "https://github.com/mcthesw/easy-nats/releases/download/v#{version}/@FILE_X86_64@"
-    sha256 "@SHA_X86_64@"
-  end
+  url "https://github.com/mcthesw/easy-nats/releases/download/v#{version}/@FILE_ARM64@"
+  sha256 "@SHA_ARM64@"
 
   name "Easy NATS"
   desc "Desktop GUI client for NATS servers, JetStream, KV, and Object Store"

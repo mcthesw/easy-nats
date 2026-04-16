@@ -1,4 +1,4 @@
-name: Publish Homebrew
+name: Publish Scoop
 
 on:
   workflow_call:
@@ -39,40 +39,38 @@ jobs:
           gh release download "${TAG}" --repo "${GITHUB_REPOSITORY}" \
             --pattern manifest.json --dir release-meta
 
-      - name: Render cask
+      - name: Render manifest
         env:
           VERSION: ${{ steps.v.outputs.version }}
         run: |
           set -euo pipefail
-          arm_file=$(jq -r '.assets[] | select(.name | test("(aarch64|arm64).*\\.dmg$")) | .name' release-meta/manifest.json | head -n 1)
-          test -n "${arm_file}" && test "${arm_file}" != "null"
-          arm_sha=$(jq -r --arg name "${arm_file}" '.assets[] | select(.name == $name) | .sha256' release-meta/manifest.json)
+          win_sha=$(jq -r '.assets[] | select(.name == "easy-nats-windows-x86_64.zip") | .sha256' release-meta/manifest.json)
+          test -n "${win_sha}" && test "${win_sha}" != "null"
           mkdir -p out
           sed -e "s|@VERSION@|${VERSION}|g" \
-              -e "s|@FILE_ARM64@|${arm_file}|g" \
-              -e "s|@SHA_ARM64@|${arm_sha}|g" \
-              packaging/homebrew/easy-nats.rb.tmpl > out/easy-nats.rb
+              -e "s|@SHA_X86_64@|${win_sha}|g" \
+              packaging/scoop/easy-nats.json.tmpl > out/easy-nats.json
 
-      - name: Checkout tap
+      - name: Checkout bucket
         uses: actions/checkout@v4
         with:
-          repository: mcthesw/homebrew-tap
-          token: ${{ secrets.TAP_REPO_TOKEN }}
-          path: tap
+          repository: mcthesw/scoop-bucket
+          token: ${{ secrets.SCOOP_BUCKET_TOKEN }}
+          path: bucket-repo
 
-      - name: Commit cask
-        working-directory: tap
+      - name: Commit manifest
+        working-directory: bucket-repo
         env:
           VERSION: ${{ steps.v.outputs.version }}
         run: |
           set -euo pipefail
-          mkdir -p Casks
-          cp ../out/easy-nats.rb Casks/easy-nats.rb
+          mkdir -p bucket
+          cp ../out/easy-nats.json bucket/easy-nats.json
           git config user.name "easy-nats-release-bot"
           git config user.email "actions@github.com"
-          git add Casks/easy-nats.rb
+          git add bucket/easy-nats.json
           if git diff --cached --quiet; then
-            echo "No Homebrew changes"
+            echo "No Scoop changes"
             exit 0
           fi
           git commit -m "easy-nats ${VERSION}"

@@ -25,6 +25,7 @@ jobs:
     outputs:
       tag: ${{ steps.resolve.outputs.tag }}
       ref: ${{ steps.resolve.outputs.ref }}
+      version: ${{ steps.resolve.outputs.version }}
     steps:
       - id: resolve
         shell: bash
@@ -41,6 +42,7 @@ jobs:
           fi
           echo "tag=${tag}" >>"${GITHUB_OUTPUT}"
           echo "ref=refs/tags/${tag}" >>"${GITHUB_OUTPUT}"
+          echo "version=${tag#v}" >>"${GITHUB_OUTPUT}"
 
   package:
     name: Package ${{ matrix.target }}
@@ -56,13 +58,6 @@ jobs:
             packager: false
             bin: easy-nats.exe
             portable_name: easy-nats-windows-x86_64.zip
-          - target: x86_64-apple-darwin
-            os: macos-13
-            platform: macos
-            packager: true
-            formats: dmg
-            bin: easy-nats
-            portable_name: easy-nats-macos-x86_64.tar.gz
           - target: aarch64-apple-darwin
             os: macos-latest
             platform: macos
@@ -170,17 +165,14 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p dist
-          extra=()
+          args=(--release --manifest-path crates/app/Cargo.toml
+                --target ${{ matrix.target }} --out-dir dist)
           if [[ "${{ matrix.platform }}" == "macos" && -n "${APPLE_SIGNING_IDENTITY}" ]]; then
-            extra+=(--config "{\"macos\":{\"signing-identity\":\"${APPLE_SIGNING_IDENTITY}\"}}")
+            args+=(--config "{\"macos\":{\"signing-identity\":\"${APPLE_SIGNING_IDENTITY}\"}}")
           fi
-          cargo packager \
-            --release \
-            --manifest-path crates/app/Cargo.toml \
-            --target ${{ matrix.target }} \
-            --out-dir dist \
-            --formats ${{ matrix.formats }} \
-            "${extra[@]}"
+          for fmt in ${{ matrix.formats }}; do
+            cargo packager "${args[@]}" --formats "${fmt}"
+          done
 
       - name: List dist directory
         shell: bash
@@ -371,7 +363,6 @@ jobs:
           echo "--- expected platforms ---"
           for pat in \
             'easy-nats-windows-x86_64.zip' \
-            'easy-nats-macos-x86_64.tar.gz' \
             'easy-nats-macos-aarch64.tar.gz' \
             'easy-nats-linux-x86_64.tar.gz' \
             '.*\.deb$' \
@@ -384,3 +375,24 @@ jobs:
             fi
           done
           echo "All release assets validated."
+
+  publish-homebrew:
+    needs: [setup, validate]
+    uses: ./.github/workflows/publish-homebrew.yml
+    with:
+      version: ${{ needs.setup.outputs.version }}
+    secrets: inherit
+
+  publish-scoop:
+    needs: [setup, validate]
+    uses: ./.github/workflows/publish-scoop.yml
+    with:
+      version: ${{ needs.setup.outputs.version }}
+    secrets: inherit
+
+  publish-apt:
+    needs: [setup, validate]
+    uses: ./.github/workflows/publish-apt.yml
+    with:
+      version: ${{ needs.setup.outputs.version }}
+    secrets: inherit

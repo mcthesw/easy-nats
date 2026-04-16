@@ -60,11 +60,11 @@ depends = [
 ]
 
 [package.metadata.packager.deb.files]
-"/usr/share/applications/easy-nats.desktop" = "../../packaging/easy-nats.desktop"
+"../../packaging/easy-nats.desktop" = "/usr/share/applications/easy-nats.desktop"
 
 [package.metadata.packager.appimage]
 [package.metadata.packager.appimage.files]
-"usr/share/applications/easy-nats.desktop" = "../../packaging/easy-nats.desktop"
+"../../packaging/easy-nats.desktop" = "usr/share/applications/easy-nats.desktop"
 
 [package.metadata.packager.macos]
 minimum-system-version = "10.15"

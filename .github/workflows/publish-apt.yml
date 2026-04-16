@@ -1,8 +1,11 @@
 name: Publish APT
 
 on:
-  release:
-    types: [published]
+  workflow_call:
+    inputs:
+      version:
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       version:
@@ -14,7 +17,7 @@ permissions:
   contents: read
 
 env:
-  APT_REPO: mcthesw/easy-nats-apt
+  APT_REPO: mcthesw/sworld-apt
   DIST: stable
   COMPONENT: main
   ARCH: amd64
@@ -28,13 +31,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            ver="${{ inputs.version }}"
-          else
-            ver="${GITHUB_REF_NAME#v}"
-          fi
-          echo "version=${ver}" >>"${GITHUB_OUTPUT}"
-          echo "tag=v${ver}" >>"${GITHUB_OUTPUT}"
+          echo "version=${{ inputs.version }}" >>"${GITHUB_OUTPUT}"
+          echo "tag=v${{ inputs.version }}" >>"${GITHUB_OUTPUT}"
 
       - name: Install APT tooling
         run: |
@@ -80,13 +78,13 @@ jobs:
 
           release_file="apt-repo/dists/${DIST}/Release"
           {
-            echo "Origin: easy-nats"
-            echo "Label: easy-nats"
+            echo "Origin: sworld"
+            echo "Label: sworld"
             echo "Suite: ${DIST}"
             echo "Codename: ${DIST}"
             echo "Architectures: ${ARCH}"
             echo "Components: ${COMPONENT}"
-            echo "Description: easy-nats APT repository"
+            echo "Description: APT repository for Sworld projects"
             echo "Date: $(date -Ru)"
           } > "${release_file}"
           ( cd "apt-repo/dists/${DIST}" && apt-ftparchive release . >> Release )
@@ -114,7 +112,7 @@ jobs:
           VERSION: ${{ steps.v.outputs.version }}
         run: |
           set -euo pipefail
-          git config user.name "easy-nats-release-bot"
+          git config user.name "sworld-release-bot"
           git config user.email "actions@github.com"
           git add -A
           if git diff --cached --quiet; then
