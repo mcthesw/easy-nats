@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.2](https://github.com/mcthesw/easy-nats/compare/v0.1.1...v0.1.2) (2026-04-16)
+
+
+### Bug Fixes
+
+* **release:** stabilize self-hosted publishing ([36e4039](https://github.com/mcthesw/easy-nats/commit/36e40393f35aaa0b87d6f2f46ab957d46a06714f))
+
 ## [0.1.1](https://github.com/mcthesw/easy-nats/compare/v0.1.0...v0.1.1) (2026-04-16)
 
 
