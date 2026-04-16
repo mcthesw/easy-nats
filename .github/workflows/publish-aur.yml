@@ -1,0 +1,71 @@
+name: Publish AUR
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to publish (e.g. 0.2.0, without the leading 'v')"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  AUR_PACKAGE: easy-nats-bin
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ver="${{ inputs.version }}"
+          else
+            ver="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=${ver}" >>"${GITHUB_OUTPUT}"
+          echo "tag=v${ver}" >>"${GITHUB_OUTPUT}"
+
+      - name: Download release manifest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release download "${TAG}" --repo "${GITHUB_REPOSITORY}" \
+            --pattern manifest.json --dir release-meta
+
+      - name: Render PKGBUILD
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          sha=$(jq -r '.assets[] | select(.name=="easy-nats-linux-x86_64.tar.gz") | .sha256' release-meta/manifest.json)
+          test -n "${sha}" && test "${sha}" != "null"
+          mkdir -p out
+          sed -e "s|@VERSION@|${VERSION}|g" \
+              -e "s|@SHA_X86_64@|${sha}|g" \
+              packaging/aur/PKGBUILD.tmpl > out/PKGBUILD
+          cat out/PKGBUILD
+
+      - name: Publish to AUR
+        uses: KSXGitHub/github-actions-deploy-aur@v2.7.2
+        with:
+          pkgname: ${{ env.AUR_PACKAGE }}
+          pkgbuild: out/PKGBUILD
+          commit_username: ${{ secrets.AUR_USERNAME }}
+          commit_email: ${{ secrets.AUR_EMAIL }}
+          ssh_private_key: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+          commit_message: "easy-nats ${{ steps.v.outputs.version }}"
+          allow_empty_commits: false
+          updpkgsums: false
+          test: false

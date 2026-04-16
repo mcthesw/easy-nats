@@ -1,0 +1,86 @@
+name: Publish Homebrew
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version (e.g. 0.2.0, without leading 'v')"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ver="${{ inputs.version }}"
+          else
+            ver="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=${ver}" >>"${GITHUB_OUTPUT}"
+          echo "tag=v${ver}" >>"${GITHUB_OUTPUT}"
+
+      - name: Download release manifest
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          set -euo pipefail
+          gh release download "${TAG}" --repo "${GITHUB_REPOSITORY}" \
+            --pattern manifest.json --dir release-meta
+
+      - name: Render cask
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          arm_file=$(jq -r '.assets[] | select(.name | test("(aarch64|arm64).*\\.dmg$")) | .name' release-meta/manifest.json | head -n 1)
+          x86_file=$(jq -r '.assets[] | select(.name | test("x86_64.*\\.dmg$")) | .name' release-meta/manifest.json | head -n 1)
+          test -n "${arm_file}" && test "${arm_file}" != "null"
+          test -n "${x86_file}" && test "${x86_file}" != "null"
+          arm_sha=$(jq -r --arg name "${arm_file}" '.assets[] | select(.name == $name) | .sha256' release-meta/manifest.json)
+          x86_sha=$(jq -r --arg name "${x86_file}" '.assets[] | select(.name == $name) | .sha256' release-meta/manifest.json)
+          mkdir -p out
+          sed -e "s|@VERSION@|${VERSION}|g" \
+              -e "s|@FILE_ARM64@|${arm_file}|g" \
+              -e "s|@SHA_ARM64@|${arm_sha}|g" \
+              -e "s|@FILE_X86_64@|${x86_file}|g" \
+              -e "s|@SHA_X86_64@|${x86_sha}|g" \
+              packaging/homebrew/easy-nats.rb.tmpl > out/easy-nats.rb
+
+      - name: Checkout tap
+        uses: actions/checkout@v4
+        with:
+          repository: mcthesw/homebrew-tap
+          token: ${{ secrets.TAP_REPO_TOKEN }}
+          path: tap
+
+      - name: Commit cask
+        working-directory: tap
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p Casks
+          cp ../out/easy-nats.rb Casks/easy-nats.rb
+          git config user.name "easy-nats-release-bot"
+          git config user.email "actions@github.com"
+          git add Casks/easy-nats.rb
+          if git diff --cached --quiet; then
+            echo "No Homebrew changes"
+            exit 0
+          fi
+          git commit -m "easy-nats ${VERSION}"
+          git push

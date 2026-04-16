@@ -17,6 +17,10 @@ A cross-platform desktop GUI for [NATS](https://nats.io/) messaging, built with 
 - **Dark / Light Theme** — Follow system preference or toggle manually. Preference is persisted.
 - **Toast Notifications** — Non-blocking feedback for operation outcomes.
 
+## Install
+
+Pre-built binaries are available on the [Releases](https://github.com/mcthesw/easy-nats/releases) page. Package manager install options and future distribution plans are tracked in [roadmap.md](roadmap.md).
+
 ## Build
 
 Requires **Rust 2024 edition** (rustc 1.85+).
@@ -26,7 +30,6 @@ cargo build --release
 ```
 
 The binary is output to `target/release/easy-nats` (or `easy-nats.exe` on Windows).
-
 
 ## License
 

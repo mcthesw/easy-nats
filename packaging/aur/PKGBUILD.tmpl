@@ -1,0 +1,23 @@
+# Maintainer: mcthesw <mcthesw@users.noreply.github.com>
+pkgname=easy-nats-bin
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc="Desktop GUI client for NATS servers, JetStream, KV, and Object Store"
+arch=('x86_64')
+url="https://github.com/mcthesw/easy-nats"
+license=('MIT')
+provides=('easy-nats')
+conflicts=('easy-nats')
+depends=('gcc-libs' 'libxkbcommon' 'libxcb' 'openssl' 'libglvnd')
+source_x86_64=("easy-nats-$pkgver-x86_64.tar.gz::https://github.com/mcthesw/easy-nats/releases/download/v$pkgver/easy-nats-linux-x86_64.tar.gz"
+               "easy-nats.desktop::https://raw.githubusercontent.com/mcthesw/easy-nats/v$pkgver/packaging/easy-nats.desktop"
+               "easy-nats.png::https://raw.githubusercontent.com/mcthesw/easy-nats/v$pkgver/packaging/icon.png")
+sha256sums_x86_64=('@SHA_X86_64@'
+                   'SKIP'
+                   'SKIP')
+
+package() {
+    install -Dm755 "$srcdir/easy-nats" "$pkgdir/usr/bin/easy-nats"
+    install -Dm644 "$srcdir/easy-nats.desktop" "$pkgdir/usr/share/applications/easy-nats.desktop"
+    install -Dm644 "$srcdir/easy-nats.png" "$pkgdir/usr/share/icons/hicolor/512x512/apps/easy-nats.png"
+}

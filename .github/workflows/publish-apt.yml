@@ -1,0 +1,125 @@
+name: Publish APT
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Release version to publish (e.g. 0.2.0, without the leading 'v')"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+env:
+  APT_REPO: mcthesw/easy-nats-apt
+  DIST: stable
+  COMPONENT: main
+  ARCH: amd64
+
+jobs:
+  publish:
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Resolve version
+        id: v
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            ver="${{ inputs.version }}"
+          else
+            ver="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=${ver}" >>"${GITHUB_OUTPUT}"
+          echo "tag=v${ver}" >>"${GITHUB_OUTPUT}"
+
+      - name: Install APT tooling
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y dpkg-dev apt-utils gnupg
+
+      - name: Download release .deb
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ steps.v.outputs.tag }}
+        run: |
+          set -euo pipefail
+          mkdir -p incoming
+          gh release download "${TAG}" --repo "${GITHUB_REPOSITORY}" \
+            --pattern '*.deb' --dir incoming
+          ls -la incoming
+
+      - name: Checkout apt repo (gh-pages branch)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.APT_REPO }}
+          token: ${{ secrets.TAP_REPO_TOKEN }}
+          ref: gh-pages
+          path: apt-repo
+          fetch-depth: 1
+
+      - name: Ingest new .deb
+        env:
+          DIST: ${{ env.DIST }}
+          COMPONENT: ${{ env.COMPONENT }}
+          ARCH: ${{ env.ARCH }}
+        run: |
+          set -euo pipefail
+          pool="apt-repo/pool/${COMPONENT}"
+          mkdir -p "${pool}"
+          cp incoming/*.deb "${pool}/"
+
+          bin_dir="apt-repo/dists/${DIST}/${COMPONENT}/binary-${ARCH}"
+          mkdir -p "${bin_dir}"
+          ( cd apt-repo && \
+            dpkg-scanpackages --multiversion "pool/${COMPONENT}" > "dists/${DIST}/${COMPONENT}/binary-${ARCH}/Packages" )
+          gzip -9kf "${bin_dir}/Packages"
+
+          release_file="apt-repo/dists/${DIST}/Release"
+          {
+            echo "Origin: easy-nats"
+            echo "Label: easy-nats"
+            echo "Suite: ${DIST}"
+            echo "Codename: ${DIST}"
+            echo "Architectures: ${ARCH}"
+            echo "Components: ${COMPONENT}"
+            echo "Description: easy-nats APT repository"
+            echo "Date: $(date -Ru)"
+          } > "${release_file}"
+          ( cd "apt-repo/dists/${DIST}" && apt-ftparchive release . >> Release )
+
+      - name: Sign Release (optional)
+        if: env.APT_GPG_PRIVATE_KEY != ''
+        env:
+          APT_GPG_PRIVATE_KEY: ${{ secrets.APT_GPG_PRIVATE_KEY }}
+          APT_GPG_PASSPHRASE: ${{ secrets.APT_GPG_PASSPHRASE }}
+          DIST: ${{ env.DIST }}
+        run: |
+          set -euo pipefail
+          echo "${APT_GPG_PRIVATE_KEY}" | gpg --batch --import
+          cd "apt-repo/dists/${DIST}"
+          gpg --batch --yes --pinentry-mode loopback \
+              --passphrase "${APT_GPG_PASSPHRASE}" \
+              -abs -o Release.gpg Release
+          gpg --batch --yes --pinentry-mode loopback \
+              --passphrase "${APT_GPG_PASSPHRASE}" \
+              --clearsign -o InRelease Release
+
+      - name: Commit and push APT index
+        working-directory: apt-repo
+        env:
+          VERSION: ${{ steps.v.outputs.version }}
+        run: |
+          set -euo pipefail
+          git config user.name "easy-nats-release-bot"
+          git config user.email "actions@github.com"
+          git add -A
+          if git diff --cached --quiet; then
+            echo "No APT index changes"
+            exit 0
+          fi
+          git commit -m "easy-nats ${VERSION}"
+          git push

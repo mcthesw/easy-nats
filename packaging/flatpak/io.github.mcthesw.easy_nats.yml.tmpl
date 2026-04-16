@@ -1,0 +1,38 @@
+app-id: io.github.mcthesw.easy_nats
+runtime: org.gnome.Platform
+runtime-version: "47"
+sdk: org.gnome.Sdk
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+command: easy-nats
+finish-args:
+  - --device=dri
+  - --share=ipc
+  - --share=network
+  - --socket=fallback-x11
+  - --socket=wayland
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  prepend-ld-library-path: /usr/lib/sdk/rust-stable/lib
+  env:
+    CARGO_HOME: /run/build/easy-nats/cargo
+    CARGO_NET_OFFLINE: "true"
+modules:
+  - name: easy-nats
+    buildsystem: simple
+    build-commands:
+      - cargo --offline build --release -p easy-nats
+      - install -Dm755 target/release/easy-nats /app/bin/easy-nats
+      - install -Dm644 packaging/flatpak/io.github.mcthesw.easy_nats.desktop /app/share/applications/io.github.mcthesw.easy_nats.desktop
+      - install -Dm644 packaging/flatpak/io.github.mcthesw.easy_nats.metainfo.xml /app/share/metainfo/io.github.mcthesw.easy_nats.metainfo.xml
+      - install -Dm644 packaging/icon.png /app/share/icons/hicolor/512x512/apps/io.github.mcthesw.easy_nats.png
+    sources:
+      - type: archive
+        url: https://github.com/@REPO@/archive/refs/tags/@TAG@.tar.gz
+        sha256: @SOURCE_SHA256@
+        strip-components: 1
+        x-checker-data:
+          type: github
+          repo: @REPO@
+          tag-template: v{version}
+      - cargo-sources.json
