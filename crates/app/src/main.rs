@@ -9,8 +9,7 @@ mod settings;
 mod tabs;
 mod toast;
 
-/// Re-attach to the parent console so log output appears in the terminal
-/// when the application is launched from cmd / PowerShell.
+/// Attach to the parent console when launched from a terminal.
 #[cfg(windows)]
 fn attach_parent_console() {
     const ATTACH_PARENT_PROCESS: u32 = 0xFFFFFFFF;
@@ -26,14 +25,12 @@ fn main() {
     #[cfg(windows)]
     attach_parent_console();
 
-    // Resolve platform-standard paths early and migrate any files from the
-    // legacy layout before subsystems try to load them.
+    // Migrate legacy files before loading app state.
     let paths = nats_backend::ProjectPaths::resolve();
     nats_backend::migrate_legacy_on_startup(&paths);
 
     let log_buffer = log_layer::SharedLogBuffer::default();
-    // Keep the file-appender guard alive for the lifetime of the process so
-    // buffered log output is flushed when the app exits.
+    // Keep the appender guard alive so buffered logs flush on exit.
     let _log_guard = install_tracing(&paths, log_buffer.clone());
 
     let app_settings = settings::AppSettings::load();

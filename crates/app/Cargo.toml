@@ -31,15 +31,7 @@ tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "registry", "fmt"] }
 tokio-util = "0.7"
 
-# -----------------------------------------------------------------------------
-# cargo-packager configuration
-#
-# Platform-packaging metadata consumed by `cargo packager`. Fields not set
-# explicitly fall back to the matching `[package]` fields above, so version,
-# description, authors, and license stay in sync with the rest of the crate.
-# Workflow-driven overrides (e.g. which formats to build) are passed on the
-# command line by the release workflow.
-# -----------------------------------------------------------------------------
+# Package metadata for cargo-packager.
 [package.metadata.packager]
 product-name = "Easy NATS"
 identifier = "io.github.mcthesw.easy-nats"
@@ -54,7 +46,18 @@ JetStream streams and consumers, and inspecting KV and Object Store buckets.
 [package.metadata.packager.deb]
 section = "net"
 priority = "optional"
-depends = ["libc6", "libgcc-s1", "libxkbcommon0"]
+depends = [
+    "libc6",
+    "libgcc-s1",
+    "libxkbcommon0",
+    "libxcb1",
+    "libxcb-render0",
+    "libxcb-shape0",
+    "libxcb-xfixes0",
+    "libgl1",
+    "libwayland-client0",
+    "libssl3 | libssl1.1",
+]
 
 [package.metadata.packager.deb.files]
 "/usr/share/applications/easy-nats.desktop" = "../../packaging/easy-nats.desktop"
@@ -66,19 +69,7 @@ depends = ["libc6", "libgcc-s1", "libxkbcommon0"]
 [package.metadata.packager.macos]
 minimum-system-version = "10.15"
 
-[package.metadata.packager.windows]
-digest-algorithm = "sha256"
-
-[package.metadata.packager.nsis]
-install-mode = "currentUser"
-
-# -----------------------------------------------------------------------------
-# cargo-generate-rpm configuration
-#
-# `cargo-packager` currently does not emit RPM packages, so the release
-# workflow uses `cargo-generate-rpm` alongside it for `.rpm` output. The
-# metadata here is read by that tool directly.
-# -----------------------------------------------------------------------------
+# RPM metadata for cargo-generate-rpm.
 [package.metadata.generate-rpm]
 assets = [
     { source = "target/release/easy-nats", dest = "/usr/bin/easy-nats", mode = "755" },
