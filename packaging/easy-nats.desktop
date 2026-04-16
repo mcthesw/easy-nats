@@ -1,0 +1,12 @@
+[Desktop Entry]
+Type=Application
+Name=Easy NATS
+GenericName=NATS Client
+Comment=Desktop GUI client for NATS servers, JetStream, KV, and Object Store
+Exec=easy-nats %U
+Icon=easy-nats
+Terminal=false
+Categories=Network;Development;
+StartupNotify=true
+StartupWMClass=Easy NATS
+Keywords=nats;jetstream;messaging;pubsub;

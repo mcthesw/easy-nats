@@ -3,6 +3,15 @@ name = "easy-nats"
 version.workspace = true
 edition.workspace = true
 license.workspace = true
+description = "Desktop GUI client for NATS servers, JetStream, KV, and Object Store"
+homepage = "https://github.com/mcthesw/easy-nats"
+repository.workspace = true
+authors = ["mcthesw"]
+readme = "../../README.md"
+
+[[bin]]
+name = "easy-nats"
+path = "src/main.rs"
 
 [dependencies]
 nats-backend = { path = "../nats-backend" }
@@ -21,3 +30,60 @@ tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "registry", "fmt"] }
 tokio-util = "0.7"
+
+# -----------------------------------------------------------------------------
+# cargo-packager configuration
+#
+# Platform-packaging metadata consumed by `cargo packager`. Fields not set
+# explicitly fall back to the matching `[package]` fields above, so version,
+# description, authors, and license stay in sync with the rest of the crate.
+# Workflow-driven overrides (e.g. which formats to build) are passed on the
+# command line by the release workflow.
+# -----------------------------------------------------------------------------
+[package.metadata.packager]
+product-name = "Easy NATS"
+identifier = "io.github.mcthesw.easy-nats"
+category = "DeveloperTool"
+icons = ["../../packaging/icon.png"]
+long-description = """
+Easy NATS is a cross-platform desktop client for NATS. It provides a tabbed UI \
+for managing connections, publishing and subscribing to subjects, browsing \
+JetStream streams and consumers, and inspecting KV and Object Store buckets.
+"""
+
+[package.metadata.packager.deb]
+section = "net"
+priority = "optional"
+depends = ["libc6", "libgcc-s1", "libxkbcommon0"]
+
+[package.metadata.packager.deb.files]
+"/usr/share/applications/easy-nats.desktop" = "../../packaging/easy-nats.desktop"
+
+[package.metadata.packager.appimage]
+[package.metadata.packager.appimage.files]
+"usr/share/applications/easy-nats.desktop" = "../../packaging/easy-nats.desktop"
+
+[package.metadata.packager.macos]
+minimum-system-version = "10.15"
+
+[package.metadata.packager.windows]
+digest-algorithm = "sha256"
+
+[package.metadata.packager.nsis]
+install-mode = "currentUser"
+
+# -----------------------------------------------------------------------------
+# cargo-generate-rpm configuration
+#
+# `cargo-packager` currently does not emit RPM packages, so the release
+# workflow uses `cargo-generate-rpm` alongside it for `.rpm` output. The
+# metadata here is read by that tool directly.
+# -----------------------------------------------------------------------------
+[package.metadata.generate-rpm]
+assets = [
+    { source = "target/release/easy-nats", dest = "/usr/bin/easy-nats", mode = "755" },
+    { source = "packaging/easy-nats.desktop", dest = "/usr/share/applications/easy-nats.desktop", mode = "644" },
+    { source = "packaging/icon.png", dest = "/usr/share/icons/hicolor/512x512/apps/easy-nats.png", mode = "644" },
+    { source = "LICENSE", dest = "/usr/share/licenses/easy-nats/LICENSE", mode = "644" },
+]
+
