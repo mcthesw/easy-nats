@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.3](https://github.com/mcthesw/easy-nats/compare/v0.1.2...v0.1.3) (2026-04-16)
+
+
+### Bug Fixes
+
+* **release:** handle spaces in packaged asset names ([04a1726](https://github.com/mcthesw/easy-nats/commit/04a17262154d81c00f67393817574ce09ee65bca))
+* **release:** normalize macOS asset names before upload ([c06a161](https://github.com/mcthesw/easy-nats/commit/c06a1612d2843f07d9f52a32d18d895d1c1ead9d))
+
 ## [0.1.2](https://github.com/mcthesw/easy-nats/compare/v0.1.1...v0.1.2) (2026-04-16)
 
 
