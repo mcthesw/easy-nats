@@ -1,4 +1,4 @@
-name: CI
+name: Check Code
 
 on:
   pull_request:
@@ -26,6 +26,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev libxkbcommon-dev libssl-dev
 
+      - name: Install cargo-nextest
+        uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-nextest
+
       - name: Check formatting
         run: cargo fmt --all -- --check
 
@@ -33,4 +38,4 @@ jobs:
         run: cargo clippy --all-targets --all-features -- -D warnings
 
       - name: Test
-        run: cargo test --all
+        run: cargo nextest run --all
