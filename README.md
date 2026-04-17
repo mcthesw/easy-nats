@@ -32,6 +32,7 @@ scoop install easy-nats
 
 ```bash
 brew install mcthesw/tap/easy-nats
+xattr -dr com.apple.quarantine "/Applications/Easy NATS.app"
 ```
 
 **Linux**
