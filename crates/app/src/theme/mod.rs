@@ -5,7 +5,7 @@ mod id;
 
 use eframe::egui;
 
-pub use catalog::{ThemeDefinition, theme_catalog, theme_definition};
+pub use catalog::{theme_catalog, theme_definition};
 pub use id::ThemeId;
 
 pub fn resolve_theme(saved_theme: Option<ThemeId>, system_prefers_dark: Option<bool>) -> ThemeId {
