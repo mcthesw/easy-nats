@@ -7,6 +7,7 @@ mod log_layer;
 mod proto;
 mod settings;
 mod tabs;
+mod theme;
 mod toast;
 
 /// Attach to the parent console when launched from a terminal.
@@ -47,13 +48,17 @@ fn main() {
         native_options,
         Box::new(move |cc| {
             setup_fonts(&cc.egui_ctx);
-            let dark = cc
-                .egui_ctx
-                .system_theme()
-                .map(|t| t == eframe::egui::Theme::Dark)
-                .unwrap_or(app_settings.dark_mode);
-            apply_theme(&cc.egui_ctx, dark);
-            Ok(Box::new(app::EasyNatsApp::new(dark, log_buffer)))
+            let theme_id = app_settings.resolved_theme(
+                cc.egui_ctx
+                    .system_theme()
+                    .map(|t| t == eframe::egui::Theme::Dark),
+            );
+            theme::apply_theme(&cc.egui_ctx, theme_id);
+            Ok(Box::new(app::EasyNatsApp::new(
+                app_settings,
+                theme_id,
+                log_buffer,
+            )))
         }),
     ) {
         tracing::error!("Failed to start application: {e}");
@@ -84,15 +89,6 @@ fn setup_fonts(ctx: &eframe::egui::Context) {
     proportional.insert(0, "Inter".to_owned());
 
     ctx.set_fonts(fonts);
-}
-
-pub(crate) fn apply_theme(ctx: &eframe::egui::Context, dark: bool) {
-    use eframe::egui::Visuals;
-    if dark {
-        ctx.set_visuals(Visuals::dark());
-    } else {
-        ctx.set_visuals(Visuals::light());
-    }
 }
 
 /// Initialise the tracing subscriber.

@@ -6,28 +6,39 @@ use nats_backend::ProjectPaths;
 use serde::{Deserialize, Serialize};
 
 use crate::i18n::Language;
+use crate::theme::ThemeId;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     #[serde(default)]
     pub language: Language,
-    #[serde(default = "default_true")]
-    pub dark_mode: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub theme: Option<ThemeId>,
     #[serde(default)]
     pub proto_schema_dir: Option<String>,
     #[serde(default)]
     pub topic_history: Vec<String>,
 }
 
-fn default_true() -> bool {
-    true
+#[derive(Debug, Deserialize)]
+struct StoredAppSettings {
+    #[serde(default)]
+    language: Language,
+    #[serde(default)]
+    theme: Option<ThemeId>,
+    #[serde(default)]
+    dark_mode: Option<bool>,
+    #[serde(default)]
+    proto_schema_dir: Option<String>,
+    #[serde(default)]
+    topic_history: Vec<String>,
 }
 
 impl Default for AppSettings {
     fn default() -> Self {
         Self {
             language: Language::En,
-            dark_mode: true,
+            theme: None,
             proto_schema_dir: None,
             topic_history: Vec::new(),
         }
@@ -39,7 +50,7 @@ impl AppSettings {
         let path = Self::path();
         if path.exists() {
             match std::fs::read_to_string(&path) {
-                Ok(content) => match serde_json::from_str(&content) {
+                Ok(content) => match Self::parse(&content) {
                     Ok(s) => {
                         tracing::info!(?path, "Loaded app settings");
                         return s;
@@ -54,6 +65,18 @@ impl AppSettings {
             }
         }
         Self::default()
+    }
+
+    fn parse(content: &str) -> Result<Self, serde_json::Error> {
+        let stored: StoredAppSettings = serde_json::from_str(content)?;
+        Ok(Self {
+            language: stored.language,
+            theme: stored
+                .theme
+                .or_else(|| stored.dark_mode.map(ThemeId::from_legacy_dark_mode)),
+            proto_schema_dir: stored.proto_schema_dir,
+            topic_history: stored.topic_history,
+        })
     }
 
     pub fn save(&self) {
@@ -80,6 +103,10 @@ impl AppSettings {
         ProjectPaths::resolve().config_file("settings.json")
     }
 
+    pub fn resolved_theme(&self, system_prefers_dark: Option<bool>) -> ThemeId {
+        crate::theme::resolve_theme(self.theme, system_prefers_dark)
+    }
+
     const MAX_TOPIC_HISTORY: usize = 50;
 
     /// Record a topic as most-recently-used. Deduplicates and caps at MAX_TOPIC_HISTORY.
@@ -104,5 +131,53 @@ impl AppSettings {
             .filter(|t| t.starts_with(prefix))
             .map(|s| s.as_str())
             .collect()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::AppSettings;
+    use crate::theme::ThemeId;
+
+    #[test]
+    fn explicit_theme_wins_over_legacy_dark_mode() {
+        let settings = AppSettings::parse(
+            r#"{
+                "theme": "catppuccin-macchiato",
+                "dark_mode": false
+            }"#,
+        )
+        .unwrap();
+
+        assert_eq!(settings.theme, Some(ThemeId::CatppuccinMacchiato));
+    }
+
+    #[test]
+    fn legacy_dark_mode_migrates_to_theme_id() {
+        let settings = AppSettings::parse(r#"{ "dark_mode": false }"#).unwrap();
+
+        assert_eq!(settings.theme, Some(ThemeId::EguiLight));
+    }
+
+    #[test]
+    fn startup_resolution_prefers_saved_theme() {
+        let settings = AppSettings {
+            theme: Some(ThemeId::CatppuccinMocha),
+            ..Default::default()
+        };
+
+        assert_eq!(
+            settings.resolved_theme(Some(false)),
+            ThemeId::CatppuccinMocha
+        );
+    }
+
+    #[test]
+    fn startup_resolution_falls_back_to_system_preference() {
+        let settings = AppSettings::default();
+
+        assert_eq!(settings.resolved_theme(Some(false)), ThemeId::EguiLight);
+        assert_eq!(settings.resolved_theme(Some(true)), ThemeId::EguiDark);
+        assert_eq!(settings.resolved_theme(None), ThemeId::EguiDark);
     }
 }
