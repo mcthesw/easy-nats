@@ -15,13 +15,29 @@ theme:
   en: "Theme"
   zh: "主题"
 
-theme_dark:
-  en: "Dark"
-  zh: "深色"
+theme_egui_dark:
+  en: "egui-dark"
+  zh: "egui-深色"
 
-theme_light:
-  en: "Light"
-  zh: "浅色"
+theme_egui_light:
+  en: "egui-light"
+  zh: "egui-浅色"
+
+theme_catppuccin_latte:
+  en: "Catppuccin Latte"
+  zh: "Catppuccin Latte"
+
+theme_catppuccin_frappe:
+  en: "Catppuccin Frappé"
+  zh: "Catppuccin Frappé"
+
+theme_catppuccin_macchiato:
+  en: "Catppuccin Macchiato"
+  zh: "Catppuccin Macchiato"
+
+theme_catppuccin_mocha:
+  en: "Catppuccin Mocha"
+  zh: "Catppuccin Mocha"
 
 section_protobuf:
   en: "Protobuf Schemas"

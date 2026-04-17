@@ -169,7 +169,7 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
             server_info_ui(ui, *connection_id, state, viewer.backend);
         }
         TabKind::Settings => {
-            settings_ui(ui, viewer.settings, viewer.dark_mode, viewer.actions);
+            settings_ui(ui, viewer.settings, viewer.theme_id, viewer.actions);
         }
         TabKind::LogViewer => {
             log_viewer_ui(ui, viewer.log_buffer);

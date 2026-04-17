@@ -8,6 +8,7 @@ use egui_dock::tab_viewer::OnCloseResponse;
 use crate::format::PayloadFormat;
 use crate::i18n::t;
 use crate::proto::{ProtoSchemaManager, ProtoViewState};
+use crate::theme::ThemeId;
 
 use super::guard::TabGuard;
 
@@ -85,7 +86,7 @@ pub enum TabAction {
     },
     OpenConnectionEditor,
     ApplyTheme {
-        dark: bool,
+        theme_id: ThemeId,
     },
     LoadProtoSchemas {
         dir: String,
@@ -453,7 +454,7 @@ pub struct AppTabViewer<'a> {
     pub backend: &'a nats_backend::BackendHandle,
     pub actions: &'a mut Vec<TabAction>,
     pub settings: &'a mut crate::settings::AppSettings,
-    pub dark_mode: &'a mut bool,
+    pub theme_id: &'a mut ThemeId,
     pub log_buffer: &'a crate::log_layer::SharedLogBuffer,
     pub proto_manager: &'a ProtoSchemaManager,
 }
