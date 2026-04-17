@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.4](https://github.com/mcthesw/easy-nats/compare/v0.1.3...v0.1.4) (2026-04-17)
+
+
+### Bug Fixes
+
+* **release:** align release-please PR title parsing ([#6](https://github.com/mcthesw/easy-nats/issues/6)) ([80d8ae0](https://github.com/mcthesw/easy-nats/commit/80d8ae03a43e1b2ad98e52db12d7f35810147b39))
+* **release:** avoid grouped release PR parsing ([#7](https://github.com/mcthesw/easy-nats/issues/7)) ([848427b](https://github.com/mcthesw/easy-nats/commit/848427bbed56b48a1227ebd5802ec56c1f8633b4))
+* **release:** simplify single-package title parsing ([#9](https://github.com/mcthesw/easy-nats/issues/9)) ([3cd88f2](https://github.com/mcthesw/easy-nats/commit/3cd88f21f2f980ef47ec5532d9ff9f454ccc98b1))
+
 ## [0.1.3](https://github.com/mcthesw/easy-nats/compare/v0.1.2...v0.1.3) (2026-04-16)
 
 
