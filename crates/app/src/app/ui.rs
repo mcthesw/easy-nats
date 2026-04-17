@@ -54,7 +54,7 @@ impl eframe::App for EasyNatsApp {
                     backend: &self.backend,
                     actions: &mut tab_actions,
                     settings: &mut self.settings,
-                    dark_mode: &mut self.dark_mode,
+                    theme_id: &mut self.theme_id,
                     log_buffer: &self.log_buffer,
                     proto_manager: &self.proto_manager,
                 },
@@ -135,8 +135,9 @@ impl eframe::App for EasyNatsApp {
                 TabAction::OpenConnectionEditor => {
                     self.editor.visible = true;
                 }
-                TabAction::ApplyTheme { dark } => {
-                    crate::apply_theme(ui.ctx(), dark);
+                TabAction::ApplyTheme { theme_id } => {
+                    self.theme_id = theme_id;
+                    crate::theme::apply_theme(ui.ctx(), theme_id);
                 }
                 TabAction::LoadProtoSchemas { dir } => {
                     self.proto_manager

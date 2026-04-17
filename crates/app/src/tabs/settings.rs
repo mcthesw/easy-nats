@@ -2,13 +2,14 @@ use eframe::egui;
 
 use crate::i18n::{self, Language, t};
 use crate::settings::AppSettings;
+use crate::theme::{ThemeId, theme_catalog, theme_definition};
 
 use super::types::TabAction;
 
 pub fn settings_ui(
     ui: &mut egui::Ui,
     settings: &mut AppSettings,
-    dark_mode: &mut bool,
+    theme_id: &mut ThemeId,
     actions: &mut Vec<TabAction>,
 ) {
     ui.heading(t("settings.title"));
@@ -34,23 +35,23 @@ pub fn settings_ui(
             });
     });
 
-    // Theme toggle
+    // Theme selector
     ui.horizontal(|ui| {
         ui.label(t("settings.theme"));
-        let dark_label = t("settings.theme_dark");
-        let light_label = t("settings.theme_light");
-        if ui.selectable_label(*dark_mode, dark_label).clicked() && !*dark_mode {
-            *dark_mode = true;
-            settings.dark_mode = true;
-            settings.save();
-            actions.push(TabAction::ApplyTheme { dark: true });
-        }
-        if ui.selectable_label(!*dark_mode, light_label).clicked() && *dark_mode {
-            *dark_mode = false;
-            settings.dark_mode = false;
-            settings.save();
-            actions.push(TabAction::ApplyTheme { dark: false });
-        }
+        egui::ComboBox::from_id_salt("settings_theme")
+            .selected_text(t(theme_definition(*theme_id).label_key))
+            .show_ui(ui, |ui| {
+                for theme in theme_catalog().iter().copied() {
+                    if ui
+                        .selectable_value(theme_id, theme.id, t(theme.label_key))
+                        .changed()
+                    {
+                        settings.theme = Some(theme.id);
+                        settings.save();
+                        actions.push(TabAction::ApplyTheme { theme_id: theme.id });
+                    }
+                }
+            });
     });
 
     ui.add_space(12.0);

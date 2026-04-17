@@ -7,6 +7,7 @@ use crate::log_layer::SharedLogBuffer;
 use crate::proto::ProtoSchemaManager;
 use crate::settings::AppSettings;
 use crate::tabs::TabKind;
+use crate::theme::ThemeId;
 use crate::toast::Toasts;
 
 use super::editors::{
@@ -77,7 +78,7 @@ pub struct EasyNatsApp {
     pub(crate) obj_store_lists: HashMap<u64, Vec<serde_json::Value>>,
     pub(crate) dock_state: DockState<TabKind>,
     pub(crate) toasts: Toasts,
-    pub(crate) dark_mode: bool,
+    pub(crate) theme_id: ThemeId,
     pub(crate) kv_bucket_delete_confirm: Option<(u64, String)>,
     pub(crate) obj_store_bucket_delete_confirm: Option<(u64, String)>,
     pub(crate) tab_id_alloc: TabIdAllocator,
@@ -86,8 +87,7 @@ pub struct EasyNatsApp {
 }
 
 impl EasyNatsApp {
-    pub fn new(dark_mode: bool, log_buffer: SharedLogBuffer) -> Self {
-        let settings = AppSettings::load();
+    pub fn new(settings: AppSettings, theme_id: ThemeId, log_buffer: SharedLogBuffer) -> Self {
         let mut proto_manager = ProtoSchemaManager::default();
         if let Some(dir) = &settings.proto_schema_dir {
             proto_manager.set_schema_dir(std::path::PathBuf::from(dir));
@@ -113,7 +113,7 @@ impl EasyNatsApp {
             obj_store_lists: HashMap::new(),
             dock_state: DockState::new(vec![TabKind::Welcome]),
             toasts: Toasts::default(),
-            dark_mode,
+            theme_id,
             kv_bucket_delete_confirm: None,
             obj_store_bucket_delete_confirm: None,
             tab_id_alloc: TabIdAllocator::default(),
