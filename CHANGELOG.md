@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.7](https://github.com/mcthesw/easy-nats/compare/v0.1.6...v0.1.7) (2026-04-18)
+
+
+### Build System
+
+* add app icon pipeline and cargo workspace release support ([e505e6f](https://github.com/mcthesw/easy-nats/commit/e505e6ffef9ec60e60937f15062a838a480b4afd))
+
 ## [0.1.6](https://github.com/mcthesw/easy-nats/compare/v0.1.5...v0.1.6) (2026-04-18)
 
 
