@@ -7,10 +7,10 @@ use super::state::WorkerState;
 pub(crate) async fn handle_get_server_info(
     state: &WorkerState,
     connection_id: u64,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(client) = state.clients.get(&connection_id) else {
-        send_err(evt_tx, connection_id, "server_info", "Not connected");
+        send_err(evt_tx, connection_id, "server_info", "Not connected").await;
         return;
     };
 
@@ -29,13 +29,13 @@ pub(crate) async fn handle_get_server_info(
         "tls_required": info.tls_required,
         "connect_urls": info.connect_urls,
     });
-    send_ok(evt_tx, connection_id, "server_info", data);
+    send_ok(evt_tx, connection_id, "server_info", data).await;
 }
 
 pub(crate) async fn handle_get_jetstream_account_info(
     state: &WorkerState,
     connection_id: u64,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(client) = state.clients.get(&connection_id) else {
         send_err(
@@ -43,7 +43,8 @@ pub(crate) async fn handle_get_jetstream_account_info(
             connection_id,
             "jetstream_account_info",
             "Not connected",
-        );
+        )
+        .await;
         return;
     };
 
@@ -69,39 +70,46 @@ pub(crate) async fn handle_get_jetstream_account_info(
                 "api_total": account.requests.total,
                 "api_errors": account.requests.errors,
             });
-            send_ok(evt_tx, connection_id, "jetstream_account_info", data);
+            send_ok(evt_tx, connection_id, "jetstream_account_info", data).await;
         }
-        Err(e) => send_err(
-            evt_tx,
-            connection_id,
-            "jetstream_account_info",
-            &e.to_string(),
-        ),
+        Err(e) => {
+            send_err(
+                evt_tx,
+                connection_id,
+                "jetstream_account_info",
+                &e.to_string(),
+            )
+            .await
+        }
     }
 }
 
-fn send_ok(
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+async fn send_ok(
+    evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
     operation: &str,
     data: serde_json::Value,
 ) {
-    let _ = evt_tx.send(BackendEvent::OperationResult {
-        connection_id,
-        operation: operation.to_string(),
-        data,
-    });
+    let _ = evt_tx
+        .send(BackendEvent::OperationResult {
+            connection_id,
+            operation: operation.to_string(),
+            data,
+        })
+        .await;
 }
 
-fn send_err(
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+async fn send_err(
+    evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
     operation: &str,
     message: &str,
 ) {
-    let _ = evt_tx.send(BackendEvent::Error {
-        connection_id: Some(connection_id),
-        operation: operation.to_string(),
-        message: message.to_string(),
-    });
+    let _ = evt_tx
+        .send(BackendEvent::Error {
+            connection_id: Some(connection_id),
+            operation: operation.to_string(),
+            message: message.to_string(),
+        })
+        .await;
 }

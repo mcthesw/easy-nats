@@ -6,7 +6,7 @@ use crate::event::BackendEvent;
 /// Handle to communicate with the async backend from the UI thread.
 pub struct BackendHandle {
     cmd_tx: mpsc::UnboundedSender<BackendCommand>,
-    evt_rx: mpsc::UnboundedReceiver<BackendEvent>,
+    evt_rx: mpsc::Receiver<BackendEvent>,
 }
 
 impl BackendHandle {
@@ -17,7 +17,7 @@ impl BackendHandle {
     /// the calling thread).
     pub fn spawn() -> Self {
         let (cmd_tx, cmd_rx) = mpsc::unbounded_channel::<BackendCommand>();
-        let (evt_tx, evt_rx) = mpsc::unbounded_channel::<BackendEvent>();
+        let (evt_tx, evt_rx) = mpsc::channel::<BackendEvent>(4096);
         let (ready_tx, ready_rx) = std::sync::mpsc::channel::<Result<(), String>>();
 
         std::thread::spawn(move || {

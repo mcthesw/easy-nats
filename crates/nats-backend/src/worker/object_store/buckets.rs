@@ -8,9 +8,10 @@ use super::super::state::WorkerState;
 pub(crate) async fn handle_list_buckets(
     state: &WorkerState,
     connection_id: u64,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) = super::jetstream(state, connection_id, evt_tx, "list_object_store_buckets")
+    let Some(js) =
+        super::jetstream(state, connection_id, evt_tx, "list_object_store_buckets").await
     else {
         return;
     };
@@ -51,7 +52,8 @@ pub(crate) async fn handle_list_buckets(
                     connection_id,
                     "list_object_store_buckets",
                     e.to_string(),
-                );
+                )
+                .await;
                 return;
             }
         }
@@ -63,16 +65,18 @@ pub(crate) async fn handle_list_buckets(
         connection_id,
         "list_object_store_buckets",
         serde_json::Value::Array(buckets),
-    );
+    )
+    .await;
 }
 
 pub(crate) async fn handle_create_bucket(
     state: &WorkerState,
     connection_id: u64,
     config: serde_json::Value,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) = super::jetstream(state, connection_id, evt_tx, "create_object_store_bucket")
+    let Some(js) =
+        super::jetstream(state, connection_id, evt_tx, "create_object_store_bucket").await
     else {
         return;
     };
@@ -84,7 +88,8 @@ pub(crate) async fn handle_create_bucket(
             connection_id,
             "create_object_store_bucket",
             "Bucket name is required".to_string(),
-        );
+        )
+        .await;
         return;
     }
 
@@ -103,18 +108,24 @@ pub(crate) async fn handle_create_bucket(
     };
 
     match js.create_object_store(bucket_config).await {
-        Ok(_store) => super::send_ok(
-            evt_tx,
-            connection_id,
-            "create_object_store_bucket",
-            serde_json::json!({ "bucket": bucket }),
-        ),
-        Err(e) => super::send_err(
-            evt_tx,
-            connection_id,
-            "create_object_store_bucket",
-            e.to_string(),
-        ),
+        Ok(_store) => {
+            super::send_ok(
+                evt_tx,
+                connection_id,
+                "create_object_store_bucket",
+                serde_json::json!({ "bucket": bucket }),
+            )
+            .await
+        }
+        Err(e) => {
+            super::send_err(
+                evt_tx,
+                connection_id,
+                "create_object_store_bucket",
+                e.to_string(),
+            )
+            .await
+        }
     }
 }
 
@@ -122,25 +133,32 @@ pub(crate) async fn handle_delete_bucket(
     state: &WorkerState,
     connection_id: u64,
     bucket: String,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) = super::jetstream(state, connection_id, evt_tx, "delete_object_store_bucket")
+    let Some(js) =
+        super::jetstream(state, connection_id, evt_tx, "delete_object_store_bucket").await
     else {
         return;
     };
 
     match js.delete_object_store(&bucket).await {
-        Ok(_) => super::send_ok(
-            evt_tx,
-            connection_id,
-            "delete_object_store_bucket",
-            serde_json::json!({ "bucket": bucket }),
-        ),
-        Err(e) => super::send_err(
-            evt_tx,
-            connection_id,
-            "delete_object_store_bucket",
-            e.to_string(),
-        ),
+        Ok(_) => {
+            super::send_ok(
+                evt_tx,
+                connection_id,
+                "delete_object_store_bucket",
+                serde_json::json!({ "bucket": bucket }),
+            )
+            .await
+        }
+        Err(e) => {
+            super::send_err(
+                evt_tx,
+                connection_id,
+                "delete_object_store_bucket",
+                e.to_string(),
+            )
+            .await
+        }
     }
 }

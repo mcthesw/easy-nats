@@ -1,14 +1,16 @@
 use std::collections::hash_map::Entry;
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
 
 use bytes::Bytes;
 use futures_util::StreamExt;
 use tokio::sync::mpsc;
 
-use crate::event::BackendEvent;
+use crate::event::{BackendEvent, MessageData};
 
 use super::helpers::{build_header_map, extract_headers};
 use super::state::WorkerState;
+
+const MAX_BATCH_SIZE: usize = 256;
 
 pub(crate) async fn handle_publish(
     state: &WorkerState,
@@ -16,7 +18,7 @@ pub(crate) async fn handle_publish(
     subject: String,
     payload: Vec<u8>,
     headers: Option<Vec<(String, String)>>,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     if let Some(client) = state.clients.get(&connection_id) {
         let payload = Bytes::from(payload);
@@ -28,11 +30,11 @@ pub(crate) async fn handle_publish(
             client.publish(subject, payload).await
         };
         match result {
-            Ok(()) => send_ok(evt_tx, connection_id, "publish", serde_json::Value::Null),
-            Err(e) => send_err(evt_tx, connection_id, "publish", e.to_string()),
+            Ok(()) => send_ok(evt_tx, connection_id, "publish", serde_json::Value::Null).await,
+            Err(e) => send_err(evt_tx, connection_id, "publish", e.to_string()).await,
         }
     } else {
-        send_not_connected(evt_tx, connection_id, "publish");
+        send_not_connected(evt_tx, connection_id, "publish").await;
     }
 }
 
@@ -42,16 +44,19 @@ pub(crate) async fn handle_subscribe(
     backend_id: u64,
     subject: String,
     cancel: crate::TaskCancellation,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let key = (connection_id, backend_id, subject.clone());
     match state.subscriptions.entry(key) {
-        Entry::Occupied(_) => send_err(
-            evt_tx,
-            connection_id,
-            "subscribe",
-            format!("Already subscribed to {subject}"),
-        ),
+        Entry::Occupied(_) => {
+            send_err(
+                evt_tx,
+                connection_id,
+                "subscribe",
+                format!("Already subscribed to {subject}"),
+            )
+            .await
+        }
         Entry::Vacant(vacant) => {
             if let Some(client) = state.clients.get(&connection_id) {
                 match client.subscribe(subject.clone()).await {
@@ -64,15 +69,39 @@ pub(crate) async fn handle_subscribe(
                                     msg = subscriber.next() => {
                                         match msg {
                                             Some(msg) => {
-                                                let _ = tx.send(BackendEvent::MessageReceived {
+                                                let mut messages = vec![to_message_data(msg)];
+                                                let deadline = tokio::time::Instant::now() + Duration::from_millis(5);
+                                                let mut stream_ended = false;
+                                                loop {
+                                                    tokio::select! {
+                                                        _ = token.cancelled() => return,
+                                                        next = tokio::time::timeout_at(deadline, subscriber.next()) => {
+                                                            match next {
+                                                                Ok(Some(msg)) => {
+                                                    messages.push(to_message_data(msg));
+                                                    if messages.len() >= MAX_BATCH_SIZE {
+                                                        break;
+                                                    }
+                                                }
+                                                                Ok(None) => {
+                                                                    stream_ended = true;
+                                                                    break;
+                                                                }
+                                                                Err(_) => break,
+                                                            }
+                                                        }
+                                                    }
+                                                }
+                                                if tx.send(BackendEvent::MessageBatch {
                                                     connection_id,
                                                     backend_id,
-                                                    subject: msg.subject.to_string(),
-                                                    reply: msg.reply.map(|r| r.to_string()),
-                                                    headers: extract_headers(&msg.headers),
-                                                    payload: msg.payload.to_vec(),
-                                                    timestamp: SystemTime::now(),
-                                                });
+                                                    messages,
+                                                }).await.is_err() {
+                                                    break;
+                                                }
+                                                if stream_ended {
+                                                    break;
+                                                }
                                             }
                                             None => break, // stream ended
                                         }
@@ -87,12 +116,13 @@ pub(crate) async fn handle_subscribe(
                             connection_id,
                             "subscribe",
                             serde_json::json!({ "subject": subject }),
-                        );
+                        )
+                        .await;
                     }
-                    Err(e) => send_err(evt_tx, connection_id, "subscribe", e.to_string()),
+                    Err(e) => send_err(evt_tx, connection_id, "subscribe", e.to_string()).await,
                 }
             } else {
-                send_not_connected(evt_tx, connection_id, "subscribe");
+                send_not_connected(evt_tx, connection_id, "subscribe").await;
             }
         }
     }
@@ -103,7 +133,7 @@ pub(crate) async fn handle_unsubscribe(
     connection_id: u64,
     backend_id: u64,
     subject: String,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     if let Some(handle) = state
         .subscriptions
@@ -115,14 +145,16 @@ pub(crate) async fn handle_unsubscribe(
             connection_id,
             "unsubscribe",
             serde_json::json!({ "subject": subject }),
-        );
+        )
+        .await;
     } else {
         send_err(
             evt_tx,
             connection_id,
             "unsubscribe",
             format!("Not subscribed to {subject}"),
-        );
+        )
+        .await;
     }
 }
 
@@ -133,7 +165,7 @@ pub(crate) async fn handle_request(
     payload: Vec<u8>,
     headers: Option<Vec<(String, String)>>,
     timeout_ms: u64,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     if let Some(client) = state.clients.get(&connection_id) {
         let payload = Bytes::from(payload);
@@ -150,53 +182,72 @@ pub(crate) async fn handle_request(
         .await;
         match result {
             Ok(Ok(msg)) => {
-                let _ = evt_tx.send(BackendEvent::RequestResponse {
-                    connection_id,
-                    payload: msg.payload.to_vec(),
-                    headers: extract_headers(&msg.headers),
-                });
+                let _ = evt_tx
+                    .send(BackendEvent::RequestResponse {
+                        connection_id,
+                        payload: msg.payload.to_vec(),
+                        headers: extract_headers(&msg.headers),
+                    })
+                    .await;
             }
-            Ok(Err(e)) => send_err(evt_tx, connection_id, "request", e.to_string()),
-            Err(_) => send_err(
-                evt_tx,
-                connection_id,
-                "request",
-                "Request timed out".to_string(),
-            ),
+            Ok(Err(e)) => send_err(evt_tx, connection_id, "request", e.to_string()).await,
+            Err(_) => {
+                send_err(
+                    evt_tx,
+                    connection_id,
+                    "request",
+                    "Request timed out".to_string(),
+                )
+                .await
+            }
         }
     } else {
-        send_not_connected(evt_tx, connection_id, "request");
+        send_not_connected(evt_tx, connection_id, "request").await;
     }
 }
 
-fn send_ok(
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+fn to_message_data(msg: async_nats::Message) -> MessageData {
+    MessageData {
+        subject: msg.subject.to_string(),
+        reply: msg.reply.map(|reply| reply.to_string()),
+        headers: extract_headers(&msg.headers),
+        payload: msg.payload.to_vec(),
+        timestamp: SystemTime::now(),
+    }
+}
+
+async fn send_ok(
+    evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
     operation: &str,
     data: serde_json::Value,
 ) {
-    let _ = evt_tx.send(BackendEvent::OperationResult {
-        connection_id,
-        operation: operation.to_string(),
-        data,
-    });
+    let _ = evt_tx
+        .send(BackendEvent::OperationResult {
+            connection_id,
+            operation: operation.to_string(),
+            data,
+        })
+        .await;
 }
 
-fn send_err(
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+async fn send_err(
+    evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
     operation: &str,
     message: String,
 ) {
-    let _ = evt_tx.send(BackendEvent::Error {
-        connection_id: Some(connection_id),
-        operation: operation.to_string(),
-        message,
-    });
+    let _ = evt_tx
+        .send(BackendEvent::Error {
+            connection_id: Some(connection_id),
+            operation: operation.to_string(),
+            message,
+        })
+        .await;
 }
 
-fn send_not_connected(
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+async fn send_not_connected(
+    evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
     operation: &str,
 ) {
@@ -205,5 +256,6 @@ fn send_not_connected(
         connection_id,
         operation,
         "Not connected".to_string(),
-    );
+    )
+    .await;
 }

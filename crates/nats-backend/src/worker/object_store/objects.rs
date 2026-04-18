@@ -11,7 +11,7 @@ pub(crate) async fn handle_list_objects(
     state: &WorkerState,
     connection_id: u64,
     bucket: String,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(store) =
         super::open_store(state, connection_id, &bucket, evt_tx, "list_objects").await
@@ -23,7 +23,7 @@ pub(crate) async fn handle_list_objects(
     let mut items = match list_result {
         Ok(list) => list,
         Err(e) => {
-            super::send_err(evt_tx, connection_id, "list_objects", e.to_string());
+            super::send_err(evt_tx, connection_id, "list_objects", e.to_string()).await;
             return;
         }
     };
@@ -39,7 +39,7 @@ pub(crate) async fn handle_list_objects(
             }
             Ok(None) => break,
             Err(e) => {
-                super::send_err(evt_tx, connection_id, "list_objects", e.to_string());
+                super::send_err(evt_tx, connection_id, "list_objects", e.to_string()).await;
                 return;
             }
         }
@@ -51,7 +51,8 @@ pub(crate) async fn handle_list_objects(
         connection_id,
         "list_objects",
         serde_json::json!({ "bucket": bucket, "objects": objects }),
-    );
+    )
+    .await;
 }
 
 pub(crate) async fn handle_upload_object(
@@ -60,7 +61,7 @@ pub(crate) async fn handle_upload_object(
     bucket: String,
     name: String,
     data: Vec<u8>,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(store) =
         super::open_store(state, connection_id, &bucket, evt_tx, "upload_object").await
@@ -70,13 +71,16 @@ pub(crate) async fn handle_upload_object(
 
     let mut cursor = tokio::io::BufReader::new(std::io::Cursor::new(data));
     match store.put(name.as_str(), &mut cursor).await {
-        Ok(info) => super::send_ok(
-            evt_tx,
-            connection_id,
-            "upload_object",
-            obj_info_to_json(&info),
-        ),
-        Err(e) => super::send_err(evt_tx, connection_id, "upload_object", e.to_string()),
+        Ok(info) => {
+            super::send_ok(
+                evt_tx,
+                connection_id,
+                "upload_object",
+                obj_info_to_json(&info),
+            )
+            .await
+        }
+        Err(e) => super::send_err(evt_tx, connection_id, "upload_object", e.to_string()).await,
     }
 }
 
@@ -86,7 +90,7 @@ pub(crate) async fn handle_download_object(
     bucket: String,
     name: String,
     file_path: PathBuf,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(store) =
         super::open_store(state, connection_id, &bucket, evt_tx, "download_object").await
@@ -97,7 +101,7 @@ pub(crate) async fn handle_download_object(
     let mut object = match store.get(&name).await {
         Ok(obj) => obj,
         Err(e) => {
-            super::send_err(evt_tx, connection_id, "download_object", e.to_string());
+            super::send_err(evt_tx, connection_id, "download_object", e.to_string()).await;
             return;
         }
     };
@@ -110,7 +114,8 @@ pub(crate) async fn handle_download_object(
                 connection_id,
                 "download_object",
                 format!("Failed to create file: {e}"),
-            );
+            )
+            .await;
             return;
         }
     };
@@ -128,12 +133,13 @@ pub(crate) async fn handle_download_object(
                     "file_path": file_path.to_string_lossy(),
                     "size": bytes_written,
                 }),
-            );
+            )
+            .await;
         }
         Err(e) => {
             // Clean up partial file on failure
             let _ = tokio::fs::remove_file(&file_path).await;
-            super::send_err(evt_tx, connection_id, "download_object", e.to_string());
+            super::send_err(evt_tx, connection_id, "download_object", e.to_string()).await;
         }
     }
 }
@@ -143,7 +149,7 @@ pub(crate) async fn handle_delete_object(
     connection_id: u64,
     bucket: String,
     name: String,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(store) =
         super::open_store(state, connection_id, &bucket, evt_tx, "delete_object").await
@@ -152,13 +158,16 @@ pub(crate) async fn handle_delete_object(
     };
 
     match store.delete(&name).await {
-        Ok(_) => super::send_ok(
-            evt_tx,
-            connection_id,
-            "delete_object",
-            serde_json::json!({ "bucket": bucket, "name": name }),
-        ),
-        Err(e) => super::send_err(evt_tx, connection_id, "delete_object", e.to_string()),
+        Ok(_) => {
+            super::send_ok(
+                evt_tx,
+                connection_id,
+                "delete_object",
+                serde_json::json!({ "bucket": bucket, "name": name }),
+            )
+            .await
+        }
+        Err(e) => super::send_err(evt_tx, connection_id, "delete_object", e.to_string()).await,
     }
 }
 
