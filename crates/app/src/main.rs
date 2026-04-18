@@ -40,10 +40,12 @@ fn main() {
     let app_settings = settings::AppSettings::load();
     i18n::init(app_settings.language);
 
+    let icon = load_app_icon();
     let native_options = eframe::NativeOptions {
         viewport: eframe::egui::ViewportBuilder::default()
             .with_inner_size([1400.0, 900.0])
-            .with_min_inner_size([900.0, 600.0]),
+            .with_min_inner_size([900.0, 600.0])
+            .with_icon(icon),
         renderer: eframe::Renderer::Glow,
         ..Default::default()
     };
@@ -68,6 +70,18 @@ fn main() {
         }),
     ) {
         tracing::error!("Failed to start application: {e}");
+    }
+}
+
+fn load_app_icon() -> eframe::egui::viewport::IconData {
+    let bytes = include_bytes!("../../../assets/icons/easy-nats-256.png");
+    let image = image::load_from_memory(bytes).expect("valid PNG icon");
+    let rgba = image.into_rgba8();
+    let (w, h) = rgba.dimensions();
+    eframe::egui::viewport::IconData {
+        rgba: rgba.into_raw(),
+        width: w,
+        height: h,
     }
 }
 
