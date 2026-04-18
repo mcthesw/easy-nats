@@ -10,6 +10,9 @@ mod tabs;
 mod theme;
 mod toast;
 
+#[global_allocator]
+static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
 /// Attach to the parent console when launched from a terminal.
 #[cfg(windows)]
 fn attach_parent_console() {
@@ -41,12 +44,15 @@ fn main() {
         viewport: eframe::egui::ViewportBuilder::default()
             .with_inner_size([1400.0, 900.0])
             .with_min_inner_size([900.0, 600.0]),
+        renderer: eframe::Renderer::Glow,
         ..Default::default()
     };
     if let Err(e) = eframe::run_native(
         "Easy NATS",
         native_options,
         Box::new(move |cc| {
+            cc.egui_ctx
+                .options_mut(|options| options.reduce_texture_memory = true);
             setup_fonts(&cc.egui_ctx);
             let theme_id = app_settings.resolved_theme(
                 cc.egui_ctx

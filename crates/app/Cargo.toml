@@ -16,8 +16,9 @@ path = "src/main.rs"
 [dependencies]
 nats-backend = { path = "../nats-backend" }
 base64 = "0.22"
-eframe = "0.34"
+eframe = { version = "0.34", features = ["glow"] }
 egui_dock = "0.19"
+mimalloc = "0.1"
 protox = "0.9"
 prost = "0.14"
 prost-reflect = { version = "0.16", features = ["serde"] }
