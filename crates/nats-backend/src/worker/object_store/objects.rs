@@ -3,7 +3,7 @@ use std::path::PathBuf;
 use futures_util::TryStreamExt;
 use tokio::sync::mpsc;
 
-use crate::event::BackendEvent;
+use crate::event::{BackendEvent, BackendOperation};
 
 use super::super::state::WorkerState;
 
@@ -13,8 +13,14 @@ pub(crate) async fn handle_list_objects(
     bucket: String,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(store) =
-        super::open_store(state, connection_id, &bucket, evt_tx, "list_objects").await
+    let Some(store) = super::open_store(
+        state,
+        connection_id,
+        &bucket,
+        evt_tx,
+        BackendOperation::ListObjects,
+    )
+    .await
     else {
         return;
     };
@@ -23,7 +29,13 @@ pub(crate) async fn handle_list_objects(
     let mut items = match list_result {
         Ok(list) => list,
         Err(e) => {
-            super::send_err(evt_tx, connection_id, "list_objects", e.to_string()).await;
+            super::send_err(
+                evt_tx,
+                connection_id,
+                BackendOperation::ListObjects,
+                e.to_string(),
+            )
+            .await;
             return;
         }
     };
@@ -39,7 +51,13 @@ pub(crate) async fn handle_list_objects(
             }
             Ok(None) => break,
             Err(e) => {
-                super::send_err(evt_tx, connection_id, "list_objects", e.to_string()).await;
+                super::send_err(
+                    evt_tx,
+                    connection_id,
+                    BackendOperation::ListObjects,
+                    e.to_string(),
+                )
+                .await;
                 return;
             }
         }
@@ -49,7 +67,7 @@ pub(crate) async fn handle_list_objects(
     super::send_ok(
         evt_tx,
         connection_id,
-        "list_objects",
+        BackendOperation::ListObjects,
         serde_json::json!({ "bucket": bucket, "objects": objects }),
     )
     .await;
@@ -63,8 +81,14 @@ pub(crate) async fn handle_upload_object(
     data: Vec<u8>,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(store) =
-        super::open_store(state, connection_id, &bucket, evt_tx, "upload_object").await
+    let Some(store) = super::open_store(
+        state,
+        connection_id,
+        &bucket,
+        evt_tx,
+        BackendOperation::UploadObject,
+    )
+    .await
     else {
         return;
     };
@@ -75,12 +99,20 @@ pub(crate) async fn handle_upload_object(
             super::send_ok(
                 evt_tx,
                 connection_id,
-                "upload_object",
+                BackendOperation::UploadObject,
                 obj_info_to_json(&info),
             )
             .await
         }
-        Err(e) => super::send_err(evt_tx, connection_id, "upload_object", e.to_string()).await,
+        Err(e) => {
+            super::send_err(
+                evt_tx,
+                connection_id,
+                BackendOperation::UploadObject,
+                e.to_string(),
+            )
+            .await
+        }
     }
 }
 
@@ -92,8 +124,14 @@ pub(crate) async fn handle_download_object(
     file_path: PathBuf,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(store) =
-        super::open_store(state, connection_id, &bucket, evt_tx, "download_object").await
+    let Some(store) = super::open_store(
+        state,
+        connection_id,
+        &bucket,
+        evt_tx,
+        BackendOperation::DownloadObject,
+    )
+    .await
     else {
         return;
     };
@@ -101,7 +139,13 @@ pub(crate) async fn handle_download_object(
     let mut object = match store.get(&name).await {
         Ok(obj) => obj,
         Err(e) => {
-            super::send_err(evt_tx, connection_id, "download_object", e.to_string()).await;
+            super::send_err(
+                evt_tx,
+                connection_id,
+                BackendOperation::DownloadObject,
+                e.to_string(),
+            )
+            .await;
             return;
         }
     };
@@ -112,7 +156,7 @@ pub(crate) async fn handle_download_object(
             super::send_err(
                 evt_tx,
                 connection_id,
-                "download_object",
+                BackendOperation::DownloadObject,
                 format!("Failed to create file: {e}"),
             )
             .await;
@@ -126,7 +170,7 @@ pub(crate) async fn handle_download_object(
             super::send_ok(
                 evt_tx,
                 connection_id,
-                "download_object",
+                BackendOperation::DownloadObject,
                 serde_json::json!({
                     "bucket": bucket,
                     "name": name,
@@ -139,7 +183,13 @@ pub(crate) async fn handle_download_object(
         Err(e) => {
             // Clean up partial file on failure
             let _ = tokio::fs::remove_file(&file_path).await;
-            super::send_err(evt_tx, connection_id, "download_object", e.to_string()).await;
+            super::send_err(
+                evt_tx,
+                connection_id,
+                BackendOperation::DownloadObject,
+                e.to_string(),
+            )
+            .await;
         }
     }
 }
@@ -151,8 +201,14 @@ pub(crate) async fn handle_delete_object(
     name: String,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(store) =
-        super::open_store(state, connection_id, &bucket, evt_tx, "delete_object").await
+    let Some(store) = super::open_store(
+        state,
+        connection_id,
+        &bucket,
+        evt_tx,
+        BackendOperation::DeleteObject,
+    )
+    .await
     else {
         return;
     };
@@ -162,12 +218,20 @@ pub(crate) async fn handle_delete_object(
             super::send_ok(
                 evt_tx,
                 connection_id,
-                "delete_object",
+                BackendOperation::DeleteObject,
                 serde_json::json!({ "bucket": bucket, "name": name }),
             )
             .await
         }
-        Err(e) => super::send_err(evt_tx, connection_id, "delete_object", e.to_string()).await,
+        Err(e) => {
+            super::send_err(
+                evt_tx,
+                connection_id,
+                BackendOperation::DeleteObject,
+                e.to_string(),
+            )
+            .await
+        }
     }
 }
 

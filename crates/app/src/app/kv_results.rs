@@ -1,4 +1,4 @@
-use nats_backend::BackendCommand;
+use nats_backend::{BackendCommand, BackendOperation};
 
 use crate::tabs::TabKind;
 use crate::toast::ToastLevel;
@@ -9,11 +9,11 @@ impl EasyNatsApp {
     pub(crate) fn apply_kv_operation(
         &mut self,
         connection_id: u64,
-        operation: &str,
+        operation: BackendOperation,
         data: &serde_json::Value,
     ) -> bool {
         match operation {
-            "list_kv_buckets" => {
+            BackendOperation::ListKvBuckets => {
                 if let Some(arr) = data.as_array() {
                     let infos = arr.clone();
                     for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
@@ -35,10 +35,12 @@ impl EasyNatsApp {
                 }
                 true
             }
-            "create_kv_bucket" | "delete_kv_bucket" | "update_kv_bucket" => {
+            BackendOperation::CreateKvBucket
+            | BackendOperation::DeleteKvBucket
+            | BackendOperation::UpdateKvBucket => {
                 self.toasts
                     .push(ToastLevel::Success, format!("{operation} succeeded"));
-                if operation == "delete_kv_bucket"
+                if operation == BackendOperation::DeleteKvBucket
                     && let Some(bucket) = data["bucket"].as_str()
                 {
                     self.remove_tabs_matching(|tab| {
@@ -50,7 +52,7 @@ impl EasyNatsApp {
                     .send(BackendCommand::ListKvBuckets { connection_id });
                 true
             }
-            "list_kv_keys" => {
+            BackendOperation::ListKvKeys => {
                 let bucket = data["bucket"].as_str().unwrap_or("").to_string();
                 let generation = data["generation"].as_u64().unwrap_or(0);
                 let done = data["done"].as_bool().unwrap_or(true);
@@ -83,7 +85,7 @@ impl EasyNatsApp {
                 }
                 true
             }
-            "get_kv_entry" => {
+            BackendOperation::GetKvEntry => {
                 let bucket = data["bucket"].as_str().unwrap_or("").to_string();
                 let entry = data["entry"].clone();
                 let entry_key = entry["key"].as_str().unwrap_or("");
@@ -108,7 +110,7 @@ impl EasyNatsApp {
                 }
                 true
             }
-            "get_kv_history" => {
+            BackendOperation::GetKvHistory => {
                 let bucket = data["bucket"].as_str().unwrap_or("").to_string();
                 let key = data["key"].as_str().unwrap_or("");
                 let history = data["history"].as_array().cloned().unwrap_or_default();
@@ -129,10 +131,12 @@ impl EasyNatsApp {
                 }
                 true
             }
-            "put_kv_entry" | "delete_kv_entry" | "purge_kv_entry" => {
+            BackendOperation::PutKvEntry
+            | BackendOperation::DeleteKvEntry
+            | BackendOperation::PurgeKvEntry => {
                 let bucket = data["bucket"].as_str().unwrap_or("").to_string();
                 let key = data["key"].as_str().unwrap_or("").to_string();
-                let is_put = operation == "put_kv_entry";
+                let is_put = operation == BackendOperation::PutKvEntry;
                 self.toasts
                     .push(ToastLevel::Success, format!("{operation} succeeded"));
                 if !bucket.is_empty() {
@@ -189,9 +193,13 @@ impl EasyNatsApp {
         }
     }
 
-    pub(crate) fn clear_kv_loading_on_error(&mut self, connection_id: u64, operation: &str) {
+    pub(crate) fn clear_kv_loading_on_error(
+        &mut self,
+        connection_id: u64,
+        operation: BackendOperation,
+    ) {
         match operation {
-            "list_kv_keys" => {
+            BackendOperation::ListKvKeys => {
                 for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
                     if let TabKind::KvBucket {
                         connection_id: tab_cid,
@@ -204,7 +212,7 @@ impl EasyNatsApp {
                     }
                 }
             }
-            "get_kv_history" => {
+            BackendOperation::GetKvHistory => {
                 for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
                     if let TabKind::KvBucket {
                         connection_id: tab_cid,
@@ -217,7 +225,7 @@ impl EasyNatsApp {
                     }
                 }
             }
-            "get_kv_entry" => {
+            BackendOperation::GetKvEntry => {
                 for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
                     if let TabKind::KvBucket {
                         connection_id: tab_cid,

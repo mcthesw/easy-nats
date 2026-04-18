@@ -2,7 +2,7 @@ use base64::Engine;
 use futures_util::StreamExt;
 use tokio::sync::mpsc;
 
-use crate::event::BackendEvent;
+use crate::event::{BackendEvent, BackendOperation};
 
 use super::helpers::{raw_message_to_json, stream_info_to_json};
 use super::state::WorkerState;
@@ -12,7 +12,8 @@ pub(crate) async fn handle_list_streams(
     connection_id: u64,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) = jetstream(state, connection_id, evt_tx, "list_streams").await else {
+    let Some(js) = jetstream(state, connection_id, evt_tx, BackendOperation::ListStreams).await
+    else {
         return;
     };
 
@@ -30,7 +31,7 @@ pub(crate) async fn handle_list_streams(
     send_ok(
         evt_tx,
         connection_id,
-        "list_streams",
+        BackendOperation::ListStreams,
         serde_json::Value::Array(list),
     )
     .await;
@@ -42,7 +43,8 @@ pub(crate) async fn handle_create_stream(
     config: serde_json::Value,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) = jetstream(state, connection_id, evt_tx, "create_stream").await else {
+    let Some(js) = jetstream(state, connection_id, evt_tx, BackendOperation::CreateStream).await
+    else {
         return;
     };
 
@@ -52,18 +54,26 @@ pub(crate) async fn handle_create_stream(
                 send_ok(
                     evt_tx,
                     connection_id,
-                    "create_stream",
+                    BackendOperation::CreateStream,
                     stream_info_to_json(stream.cached_info()),
                 )
                 .await
             }
-            Err(e) => send_err(evt_tx, connection_id, "create_stream", e.to_string()).await,
+            Err(e) => {
+                send_err(
+                    evt_tx,
+                    connection_id,
+                    BackendOperation::CreateStream,
+                    e.to_string(),
+                )
+                .await
+            }
         },
         Err(e) => {
             send_err(
                 evt_tx,
                 connection_id,
-                "create_stream",
+                BackendOperation::CreateStream,
                 format!("Invalid stream config: {e}"),
             )
             .await
@@ -77,7 +87,8 @@ pub(crate) async fn handle_update_stream(
     config: serde_json::Value,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) = jetstream(state, connection_id, evt_tx, "update_stream").await else {
+    let Some(js) = jetstream(state, connection_id, evt_tx, BackendOperation::UpdateStream).await
+    else {
         return;
     };
 
@@ -87,18 +98,26 @@ pub(crate) async fn handle_update_stream(
                 send_ok(
                     evt_tx,
                     connection_id,
-                    "update_stream",
+                    BackendOperation::UpdateStream,
                     stream_info_to_json(&info),
                 )
                 .await
             }
-            Err(e) => send_err(evt_tx, connection_id, "update_stream", e.to_string()).await,
+            Err(e) => {
+                send_err(
+                    evt_tx,
+                    connection_id,
+                    BackendOperation::UpdateStream,
+                    e.to_string(),
+                )
+                .await
+            }
         },
         Err(e) => {
             send_err(
                 evt_tx,
                 connection_id,
-                "update_stream",
+                BackendOperation::UpdateStream,
                 format!("Invalid stream config: {e}"),
             )
             .await
@@ -112,7 +131,8 @@ pub(crate) async fn handle_delete_stream(
     name: String,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) = jetstream(state, connection_id, evt_tx, "delete_stream").await else {
+    let Some(js) = jetstream(state, connection_id, evt_tx, BackendOperation::DeleteStream).await
+    else {
         return;
     };
 
@@ -121,12 +141,20 @@ pub(crate) async fn handle_delete_stream(
             send_ok(
                 evt_tx,
                 connection_id,
-                "delete_stream",
+                BackendOperation::DeleteStream,
                 serde_json::json!({ "name": name }),
             )
             .await
         }
-        Err(e) => send_err(evt_tx, connection_id, "delete_stream", e.to_string()).await,
+        Err(e) => {
+            send_err(
+                evt_tx,
+                connection_id,
+                BackendOperation::DeleteStream,
+                e.to_string(),
+            )
+            .await
+        }
     }
 }
 
@@ -137,7 +165,14 @@ pub(crate) async fn handle_purge_stream(
     filter: Option<String>,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(stream) = open_stream(state, connection_id, &name, evt_tx, "purge_stream").await
+    let Some(stream) = open_stream(
+        state,
+        connection_id,
+        &name,
+        evt_tx,
+        BackendOperation::PurgeStream,
+    )
+    .await
     else {
         return;
     };
@@ -153,12 +188,20 @@ pub(crate) async fn handle_purge_stream(
             send_ok(
                 evt_tx,
                 connection_id,
-                "purge_stream",
+                BackendOperation::PurgeStream,
                 serde_json::json!({ "name": name, "purged": resp.purged }),
             )
             .await
         }
-        Err(e) => send_err(evt_tx, connection_id, "purge_stream", e.to_string()).await,
+        Err(e) => {
+            send_err(
+                evt_tx,
+                connection_id,
+                BackendOperation::PurgeStream,
+                e.to_string(),
+            )
+            .await
+        }
     }
 }
 
@@ -181,7 +224,7 @@ pub(crate) async fn handle_get_messages(
         connection_id,
         &params.stream_name,
         evt_tx,
-        "get_stream_messages",
+        BackendOperation::GetStreamMessages,
     )
     .await
     else {
@@ -232,7 +275,7 @@ pub(crate) async fn handle_get_messages(
     send_ok(
         evt_tx,
         connection_id,
-        "get_stream_messages",
+        BackendOperation::GetStreamMessages,
         serde_json::json!({ "stream": params.stream_name, "messages": messages }),
     )
     .await;
@@ -257,7 +300,7 @@ async fn handle_get_messages_by_time(
             send_err(
                 evt_tx,
                 connection_id,
-                "get_stream_messages",
+                BackendOperation::GetStreamMessages,
                 format!("Invalid time format (use RFC3339): {e}"),
             )
             .await;
@@ -280,7 +323,7 @@ async fn handle_get_messages_by_time(
             send_err(
                 evt_tx,
                 connection_id,
-                "get_stream_messages",
+                BackendOperation::GetStreamMessages,
                 format!("Failed to create time-filter consumer: {e}"),
             )
             .await;
@@ -301,7 +344,7 @@ async fn handle_get_messages_by_time(
             send_err(
                 evt_tx,
                 connection_id,
-                "get_stream_messages",
+                BackendOperation::GetStreamMessages,
                 format!("Fetch error: {e}"),
             )
             .await;
@@ -340,7 +383,7 @@ async fn handle_get_messages_by_time(
     send_ok(
         evt_tx,
         connection_id,
-        "get_stream_messages",
+        BackendOperation::GetStreamMessages,
         serde_json::json!({ "stream": stream_name, "messages": messages }),
     )
     .await;
@@ -358,7 +401,7 @@ pub(crate) async fn handle_delete_message(
         connection_id,
         &stream_name,
         evt_tx,
-        "delete_stream_message",
+        BackendOperation::DeleteStreamMessage,
     )
     .await
     else {
@@ -370,7 +413,7 @@ pub(crate) async fn handle_delete_message(
             send_ok(
                 evt_tx,
                 connection_id,
-                "delete_stream_message",
+                BackendOperation::DeleteStreamMessage,
                 serde_json::json!({ "stream": stream_name, "sequence": sequence }),
             )
             .await
@@ -379,7 +422,7 @@ pub(crate) async fn handle_delete_message(
             send_err(
                 evt_tx,
                 connection_id,
-                "delete_stream_message",
+                BackendOperation::DeleteStreamMessage,
                 e.to_string(),
             )
             .await
@@ -391,7 +434,7 @@ async fn jetstream(
     state: &WorkerState,
     connection_id: u64,
     evt_tx: &mpsc::Sender<BackendEvent>,
-    operation: &str,
+    operation: BackendOperation,
 ) -> Option<async_nats::jetstream::Context> {
     match state.clients.get(&connection_id) {
         Some(client) => Some(async_nats::jetstream::new(client.clone())),
@@ -407,7 +450,7 @@ async fn open_stream(
     connection_id: u64,
     stream_name: &str,
     evt_tx: &mpsc::Sender<BackendEvent>,
-    operation: &str,
+    operation: BackendOperation,
 ) -> Option<async_nats::jetstream::stream::Stream> {
     let js = jetstream(state, connection_id, evt_tx, operation).await?;
     match js.get_stream(stream_name).await {
@@ -422,13 +465,13 @@ async fn open_stream(
 async fn send_ok(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
-    operation: &str,
+    operation: BackendOperation,
     data: serde_json::Value,
 ) {
     let _ = evt_tx
         .send(BackendEvent::OperationResult {
             connection_id,
-            operation: operation.to_string(),
+            operation,
             data,
         })
         .await;
@@ -437,14 +480,14 @@ async fn send_ok(
 async fn send_err(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
-    operation: &str,
+    operation: BackendOperation,
     message: String,
 ) {
     let _ = evt_tx
         .send(BackendEvent::Error {
             connection_id: Some(connection_id),
             backend_id: None,
-            operation: operation.to_string(),
+            operation,
             message,
         })
         .await;
@@ -453,7 +496,7 @@ async fn send_err(
 async fn send_not_connected(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
-    operation: &str,
+    operation: BackendOperation,
 ) {
     send_err(
         evt_tx,

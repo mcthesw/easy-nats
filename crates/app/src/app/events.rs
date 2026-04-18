@@ -65,7 +65,7 @@ impl EasyNatsApp {
                     operation,
                     data,
                 } => {
-                    self.handle_operation_result(connection_id, &operation, data);
+                    self.handle_operation_result(connection_id, operation, data);
                 }
                 BackendEvent::RequestResponse {
                     connection_id,
@@ -125,7 +125,7 @@ impl EasyNatsApp {
                     operation,
                     message,
                 } => {
-                    self.handle_error(connection_id, backend_id, &operation, &message);
+                    self.handle_error(connection_id, backend_id, operation, &message);
                 }
             }
         }
