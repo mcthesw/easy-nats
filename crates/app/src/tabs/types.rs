@@ -139,6 +139,9 @@ pub struct ReceivedMessage {
     pub timestamp: SystemTime,
 }
 
+pub type SubscriberListRow = (usize, String, String);
+pub type CachedSubscriberRows = (u64, Option<String>, Vec<SubscriberListRow>);
+
 #[derive(Debug)]
 pub struct SubjectSubscription {
     pub subject: String,
@@ -155,6 +158,8 @@ pub struct SubscriberState {
     pub payload_format: PayloadFormat,
     /// When set, only display messages matching this subject.
     pub subject_filter: Option<String>,
+    pub cache_generation: u64,
+    pub cached_filtered: Option<CachedSubscriberRows>,
     pub proto_view: ProtoViewState,
 }
 
@@ -168,6 +173,8 @@ impl Default for SubscriberState {
             selected_idx: None,
             payload_format: PayloadFormat::Auto,
             subject_filter: None,
+            cache_generation: 0,
+            cached_filtered: None,
             proto_view: ProtoViewState::default(),
         }
     }
@@ -182,6 +189,18 @@ impl SubscriberState {
             }
         }
         self.messages.push_back(msg);
+        self.invalidate_filtered_cache();
+    }
+
+    pub fn clear_messages(&mut self) {
+        self.messages.clear();
+        self.selected_idx = None;
+        self.invalidate_filtered_cache();
+    }
+
+    pub fn invalidate_filtered_cache(&mut self) {
+        self.cache_generation = self.cache_generation.wrapping_add(1);
+        self.cached_filtered = None;
     }
 }
 

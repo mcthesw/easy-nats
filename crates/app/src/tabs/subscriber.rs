@@ -44,9 +44,7 @@ pub fn subscriber_ui(
         });
 
     egui::CentralPanel::default().show_inside(ui, |ui| {
-        let selected_msg = state
-            .selected_idx
-            .and_then(|idx| filtered_messages(state).get(idx).cloned().cloned());
+        let selected_msg = state.selected_idx.and_then(|idx| state.messages.get(idx));
         if let Some(msg) = &selected_msg {
             message_detail_ui(
                 ui,
@@ -195,6 +193,7 @@ fn render_message_list(ui: &mut egui::Ui, state: &mut SubscriberState) {
                         .changed()
                     {
                         state.selected_idx = None;
+                        state.cached_filtered = None;
                     }
                     for sub in &state.subscriptions {
                         let val = Some(sub.subject.clone());
@@ -203,86 +202,103 @@ fn render_message_list(ui: &mut egui::Ui, state: &mut SubscriberState) {
                             .changed()
                         {
                             state.selected_idx = None;
+                            state.cached_filtered = None;
                         }
                     }
                 });
         }
 
         if ui.small_button(t("subscriber.clear")).clicked() {
-            state.messages.clear();
-            state.selected_idx = None;
+            state.clear_messages();
         }
     });
 
     ui.add_space(4.0);
     ui.label(t("subscriber.messages"));
 
-    // Collect filtered message indices to avoid borrow conflicts
-    let filtered: Vec<(usize, String, String)> = {
-        let msgs = filtered_messages(state);
-        msgs.iter()
-            .enumerate()
-            .map(|(idx, msg)| {
-                let time = format_timestamp(msg.timestamp);
-                let subject = msg.subject.clone();
-                (idx, time, subject)
-            })
-            .collect()
-    };
+    let mut next_selected_idx = state.selected_idx;
+    let filtered = filtered_rows(state);
+    if filtered.is_empty() {
+        ui.label(t("subscriber.no_messages"));
+        return;
+    }
 
     egui::ScrollArea::vertical()
         .id_salt("sub_msg_list")
         .stick_to_bottom(true)
         .auto_shrink(false)
-        .show(ui, |ui| {
-            if filtered.is_empty() {
-                ui.label(t("subscriber.no_messages"));
-            } else {
-                for (idx, time, subject) in &filtered {
-                    let selected = state.selected_idx == Some(*idx);
-                    let visuals = ui.visuals();
-                    let time_color = visuals.weak_text_color();
-                    let subj_color = if selected {
-                        visuals.strong_text_color()
-                    } else {
-                        visuals.text_color()
-                    };
-                    let mut job = egui::text::LayoutJob::default();
-                    job.append(
-                        time,
-                        0.0,
-                        egui::TextFormat {
-                            font_id: egui::FontId::proportional(11.0),
-                            color: time_color,
-                            ..Default::default()
-                        },
-                    );
-                    job.append(
-                        &format!("\n{subject}"),
-                        0.0,
-                        egui::TextFormat {
-                            font_id: egui::FontId::proportional(13.0),
-                            color: subj_color,
-                            ..Default::default()
-                        },
-                    );
-                    if ui.selectable_label(selected, job).clicked() {
-                        state.selected_idx = Some(*idx);
-                    }
+        .show_rows(ui, 36.0, filtered.len(), |ui, row_range| {
+            for (idx, time, subject) in &filtered[row_range] {
+                let selected = next_selected_idx == Some(*idx);
+                let visuals = ui.visuals();
+                let time_color = visuals.weak_text_color();
+                let subj_color = if selected {
+                    visuals.strong_text_color()
+                } else {
+                    visuals.text_color()
+                };
+                let mut job = egui::text::LayoutJob::default();
+                job.append(
+                    time,
+                    0.0,
+                    egui::TextFormat {
+                        font_id: egui::FontId::proportional(11.0),
+                        color: time_color,
+                        ..Default::default()
+                    },
+                );
+                job.append(
+                    &format!("\n{subject}"),
+                    0.0,
+                    egui::TextFormat {
+                        font_id: egui::FontId::proportional(13.0),
+                        color: subj_color,
+                        ..Default::default()
+                    },
+                );
+                if ui.selectable_label(selected, job).clicked() {
+                    next_selected_idx = Some(*idx);
                 }
             }
         });
+    state.selected_idx = next_selected_idx;
 }
 
-fn filtered_messages(state: &SubscriberState) -> Vec<&ReceivedMessage> {
-    match &state.subject_filter {
-        Some(filter) => state
+fn filtered_rows(state: &mut SubscriberState) -> &[(usize, String, String)] {
+    let needs_refresh = match &state.cached_filtered {
+        Some((generation, filter, _)) => {
+            *generation != state.cache_generation || *filter != state.subject_filter
+        }
+        None => true,
+    };
+
+    if needs_refresh {
+        let subject_filter = state.subject_filter.clone();
+        let rows = state
             .messages
             .iter()
-            .filter(|m| m.subject == *filter)
-            .collect(),
-        None => state.messages.iter().collect(),
+            .enumerate()
+            .filter(|(_, message)| {
+                subject_filter
+                    .as_ref()
+                    .is_none_or(|filter| message.subject == *filter)
+            })
+            .map(|(idx, message)| {
+                (
+                    idx,
+                    format_timestamp(message.timestamp),
+                    message.subject.clone(),
+                )
+            })
+            .collect();
+        state.cached_filtered = Some((state.cache_generation, subject_filter, rows));
     }
+
+    state
+        .cached_filtered
+        .as_ref()
+        .map(|(_, _, rows)| rows.as_slice())
+        .unwrap_or(&[])
 }
 
 fn message_detail_ui(
@@ -379,5 +395,64 @@ mod tests {
         assert_eq!(state.messages.len(), 2);
         assert_eq!(state.messages[0].subject, "b");
         assert_eq!(state.messages[1].subject, "c");
+    }
+
+    #[test]
+    fn cache_is_reused_until_state_changes() {
+        let mut state = SubscriberState::default();
+        state.push_message(make_msg("alpha"));
+        state.push_message(make_msg("beta"));
+
+        let first = filtered_rows(&mut state).to_vec();
+        assert_eq!(
+            state.cached_filtered.as_ref().map(|cached| cached.0),
+            Some(2)
+        );
+
+        let second = filtered_rows(&mut state).to_vec();
+        assert_eq!(first, second);
+        assert_eq!(
+            state.cached_filtered.as_ref().map(|cached| cached.0),
+            Some(2)
+        );
+
+        state.subject_filter = Some("beta".to_string());
+        state.cached_filtered = None;
+        let filtered = filtered_rows(&mut state).to_vec();
+        assert_eq!(filtered.len(), 1);
+        assert_eq!(filtered[0].0, 1);
+        assert_eq!(filtered[0].2, "beta");
+    }
+
+    #[test]
+    fn clear_messages_resets_selection_and_cache() {
+        let mut state = SubscriberState::default();
+        state.push_message(make_msg("alpha"));
+        state.selected_idx = Some(0);
+        let _ = filtered_rows(&mut state);
+
+        state.clear_messages();
+
+        assert!(state.messages.is_empty());
+        assert_eq!(state.selected_idx, None);
+        assert!(state.cached_filtered.is_none());
+        assert_eq!(state.cache_generation, 2);
+    }
+
+    #[test]
+    fn selected_index_tracks_source_messages_after_eviction() {
+        let mut state = SubscriberState {
+            max_messages: 2,
+            ..Default::default()
+        };
+        state.push_message(make_msg("alpha"));
+        state.push_message(make_msg("beta"));
+        state.selected_idx = Some(1);
+
+        state.push_message(make_msg("gamma"));
+
+        assert_eq!(state.selected_idx, Some(0));
+        assert_eq!(state.messages[0].subject, "beta");
+        assert_eq!(state.messages[1].subject, "gamma");
     }
 }
