@@ -324,6 +324,7 @@ pub enum TabKind {
         connection_id: u64,
         connection_name: String,
         guard: TabGuard,
+        backend_id: u64,
         state: PublisherState,
     },
     Subscriber {
@@ -437,9 +438,9 @@ impl TabKind {
             TabKind::Welcome => egui::Id::new("tab:welcome"),
             TabKind::Publisher {
                 connection_id,
-                guard,
+                backend_id,
                 ..
-            } => egui::Id::new(("tab:publisher", *connection_id, guard.display_id())),
+            } => egui::Id::new(("tab:publisher", *connection_id, *backend_id)),
             TabKind::Subscriber {
                 connection_id,
                 backend_id,

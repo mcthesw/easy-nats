@@ -20,9 +20,9 @@ fn tab_scope_id(tab: &TabKind) -> String {
         TabKind::Welcome => "welcome".into(),
         TabKind::Publisher {
             connection_id,
-            guard,
+            backend_id,
             ..
-        } => format!("pub:{connection_id}:{}", guard.display_id().unwrap_or(0)),
+        } => format!("pub:{connection_id}:{backend_id}"),
         TabKind::Subscriber {
             connection_id,
             backend_id,
@@ -81,12 +81,14 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
         }
         TabKind::Publisher {
             connection_id,
+            backend_id,
             state,
             ..
         } => {
             publisher_ui(
                 ui,
                 *connection_id,
+                *backend_id,
                 state,
                 viewer.backend,
                 viewer.proto_manager,
