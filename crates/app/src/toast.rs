@@ -40,17 +40,20 @@ impl Toasts {
         });
     }
 
+    fn prune_expired(&mut self) {
+        self.items.retain(|t| t.created.elapsed() < self.duration);
+    }
+
     /// Render toasts as overlay in the top-right corner. Call once per frame.
     pub fn show(&mut self, ctx: &egui::Context) {
-        // Remove expired toasts
-        self.items.retain(|t| t.created.elapsed() < self.duration);
+        self.prune_expired();
 
         if self.items.is_empty() {
             return;
         }
 
         // Request repaint while toasts are visible (for auto-dismiss)
-        ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        ctx.request_repaint_after(std::time::Duration::from_secs(1));
 
         let mut dismissed: Option<usize> = None;
         let _area_resp = egui::Area::new(egui::Id::new("toasts_area"))
@@ -92,5 +95,34 @@ impl Toasts {
             // to prevent stale hover/drag state from blocking OS window interactions.
             ctx.memory_mut(|m| m.stop_text_input());
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Toast, ToastLevel, Toasts};
+
+    #[test]
+    fn prune_discards_expired_toasts() {
+        let mut toasts = Toasts {
+            items: vec![
+                Toast {
+                    level: ToastLevel::Info,
+                    message: "expired".to_string(),
+                    created: std::time::Instant::now() - std::time::Duration::from_secs(5),
+                },
+                Toast {
+                    level: ToastLevel::Success,
+                    message: "fresh".to_string(),
+                    created: std::time::Instant::now(),
+                },
+            ],
+            duration: std::time::Duration::from_secs(4),
+        };
+
+        toasts.prune_expired();
+
+        assert_eq!(toasts.items.len(), 1);
+        assert_eq!(toasts.items[0].message, "fresh");
     }
 }
