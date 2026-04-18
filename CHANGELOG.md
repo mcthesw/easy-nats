@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.1.6](https://github.com/mcthesw/easy-nats/compare/v0.1.5...v0.1.6) (2026-04-18)
+
+
+### Bug Fixes
+
+* **publisher:** route request events by backend id ([6b5e1f4](https://github.com/mcthesw/easy-nats/commit/6b5e1f4a8095673a5de80615947385df26375756))
+
+
+### Performance Improvements
+
+* **app:** lower idle footprint ([e12afca](https://github.com/mcthesw/easy-nats/commit/e12afca1c62e459d6a85504b8a847439a10e08f7))
+* **backend:** batch subscriber events ([30966a4](https://github.com/mcthesw/easy-nats/commit/30966a489a669d50f3d64f75cf36a4c4c3dd6c92))
+* **subscriber:** cache visible rows ([f184783](https://github.com/mcthesw/easy-nats/commit/f18478303b5dcda2e909dc3abfb31533944d9ec6))
+
+
+### Code Refactoring
+
+* **backend:** replace operation strings with enum ([7f572ce](https://github.com/mcthesw/easy-nats/commit/7f572cec538a093b049610431fd30223e0a29497))
+
 ## [0.1.5](https://github.com/mcthesw/easy-nats/compare/v0.1.4...v0.1.5) (2026-04-17)
 
 
