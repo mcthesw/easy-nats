@@ -1,3 +1,12 @@
+#[derive(Debug, Clone)]
+pub struct MessageData {
+    pub subject: String,
+    pub reply: Option<String>,
+    pub headers: Vec<(String, String)>,
+    pub payload: Vec<u8>,
+    pub timestamp: std::time::SystemTime,
+}
+
 /// Events sent from the async backend worker to the UI thread.
 #[derive(Debug)]
 pub enum BackendEvent {
@@ -7,14 +16,10 @@ pub enum BackendEvent {
         status: ConnectionStatusKind,
     },
     // Core Pub/Sub
-    MessageReceived {
+    MessageBatch {
         connection_id: u64,
         backend_id: u64,
-        subject: String,
-        reply: Option<String>,
-        headers: Vec<(String, String)>,
-        payload: Vec<u8>,
-        timestamp: std::time::SystemTime,
+        messages: Vec<MessageData>,
     },
     RequestResponse {
         connection_id: u64,

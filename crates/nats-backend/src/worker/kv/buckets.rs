@@ -9,9 +9,9 @@ use super::super::state::WorkerState;
 pub(crate) async fn handle_list_buckets(
     state: &WorkerState,
     connection_id: u64,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) = super::jetstream(state, connection_id, evt_tx, "list_kv_buckets") else {
+    let Some(js) = super::jetstream(state, connection_id, evt_tx, "list_kv_buckets").await else {
         return;
     };
 
@@ -35,7 +35,7 @@ pub(crate) async fn handle_list_buckets(
             }
             Ok(None) => break,
             Err(e) => {
-                super::send_err(evt_tx, connection_id, "list_kv_buckets", e.to_string());
+                super::send_err(evt_tx, connection_id, "list_kv_buckets", e.to_string()).await;
                 return;
             }
         }
@@ -46,16 +46,17 @@ pub(crate) async fn handle_list_buckets(
         connection_id,
         "list_kv_buckets",
         serde_json::Value::Array(buckets),
-    );
+    )
+    .await;
 }
 
 pub(crate) async fn handle_create_bucket(
     state: &WorkerState,
     connection_id: u64,
     config: serde_json::Value,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) = super::jetstream(state, connection_id, evt_tx, "create_kv_bucket") else {
+    let Some(js) = super::jetstream(state, connection_id, evt_tx, "create_kv_bucket").await else {
         return;
     };
 
@@ -66,7 +67,8 @@ pub(crate) async fn handle_create_bucket(
             connection_id,
             "create_kv_bucket",
             "Bucket name is required".to_string(),
-        );
+        )
+        .await;
         return;
     }
 
@@ -94,15 +96,20 @@ pub(crate) async fn handle_create_bucket(
 
     match js.create_key_value(bucket_config).await {
         Ok(store) => match store.status().await {
-            Ok(status) => super::send_ok(
-                evt_tx,
-                connection_id,
-                "create_kv_bucket",
-                kv_status_to_json(&status),
-            ),
-            Err(e) => super::send_err(evt_tx, connection_id, "create_kv_bucket", e.to_string()),
+            Ok(status) => {
+                super::send_ok(
+                    evt_tx,
+                    connection_id,
+                    "create_kv_bucket",
+                    kv_status_to_json(&status),
+                )
+                .await
+            }
+            Err(e) => {
+                super::send_err(evt_tx, connection_id, "create_kv_bucket", e.to_string()).await
+            }
         },
-        Err(e) => super::send_err(evt_tx, connection_id, "create_kv_bucket", e.to_string()),
+        Err(e) => super::send_err(evt_tx, connection_id, "create_kv_bucket", e.to_string()).await,
     }
 }
 
@@ -110,20 +117,23 @@ pub(crate) async fn handle_delete_bucket(
     state: &WorkerState,
     connection_id: u64,
     bucket: String,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) = super::jetstream(state, connection_id, evt_tx, "delete_kv_bucket") else {
+    let Some(js) = super::jetstream(state, connection_id, evt_tx, "delete_kv_bucket").await else {
         return;
     };
 
     match js.delete_key_value(&bucket).await {
-        Ok(_) => super::send_ok(
-            evt_tx,
-            connection_id,
-            "delete_kv_bucket",
-            serde_json::json!({ "bucket": bucket }),
-        ),
-        Err(e) => super::send_err(evt_tx, connection_id, "delete_kv_bucket", e.to_string()),
+        Ok(_) => {
+            super::send_ok(
+                evt_tx,
+                connection_id,
+                "delete_kv_bucket",
+                serde_json::json!({ "bucket": bucket }),
+            )
+            .await
+        }
+        Err(e) => super::send_err(evt_tx, connection_id, "delete_kv_bucket", e.to_string()).await,
     }
 }
 
@@ -131,9 +141,9 @@ pub(crate) async fn handle_update_bucket(
     state: &WorkerState,
     connection_id: u64,
     config: serde_json::Value,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) = super::jetstream(state, connection_id, evt_tx, "update_kv_bucket") else {
+    let Some(js) = super::jetstream(state, connection_id, evt_tx, "update_kv_bucket").await else {
         return;
     };
 
@@ -144,7 +154,8 @@ pub(crate) async fn handle_update_bucket(
             connection_id,
             "update_kv_bucket",
             "Bucket name is required".to_string(),
-        );
+        )
+        .await;
         return;
     }
 
@@ -172,14 +183,19 @@ pub(crate) async fn handle_update_bucket(
 
     match js.update_key_value(bucket_config).await {
         Ok(store) => match store.status().await {
-            Ok(status) => super::send_ok(
-                evt_tx,
-                connection_id,
-                "update_kv_bucket",
-                kv_status_to_json(&status),
-            ),
-            Err(e) => super::send_err(evt_tx, connection_id, "update_kv_bucket", e.to_string()),
+            Ok(status) => {
+                super::send_ok(
+                    evt_tx,
+                    connection_id,
+                    "update_kv_bucket",
+                    kv_status_to_json(&status),
+                )
+                .await
+            }
+            Err(e) => {
+                super::send_err(evt_tx, connection_id, "update_kv_bucket", e.to_string()).await
+            }
         },
-        Err(e) => super::send_err(evt_tx, connection_id, "update_kv_bucket", e.to_string()),
+        Err(e) => super::send_err(evt_tx, connection_id, "update_kv_bucket", e.to_string()).await,
     }
 }

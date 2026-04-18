@@ -18,7 +18,7 @@ pub use helpers::{build_header_map, extract_headers};
 
 pub async fn run_worker(
     mut cmd_rx: mpsc::UnboundedReceiver<BackendCommand>,
-    evt_tx: mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: mpsc::Sender<BackendEvent>,
 ) {
     tracing::info!("Backend worker started");
     let mut state = WorkerState::default();
@@ -229,7 +229,9 @@ pub async fn run_worker(
                     cancel,
                     generation,
                     &evt_tx,
-                ) {
+                )
+                .await
+                {
                     state
                         .kv_tasks
                         .insert((connection_id, bucket), (generation, handle));

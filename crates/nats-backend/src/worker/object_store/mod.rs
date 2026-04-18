@@ -12,67 +12,70 @@ pub(crate) use objects::{
     handle_delete_object, handle_download_object, handle_list_objects, handle_upload_object,
 };
 
-fn jetstream(
+async fn jetstream(
     state: &WorkerState,
     connection_id: u64,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
     operation: &str,
 ) -> Option<async_nats::jetstream::Context> {
-    state
-        .clients
-        .get(&connection_id)
-        .map(|client| async_nats::jetstream::new(client.clone()))
-        .or_else(|| {
-            send_not_connected(evt_tx, connection_id, operation);
+    match state.clients.get(&connection_id) {
+        Some(client) => Some(async_nats::jetstream::new(client.clone())),
+        None => {
+            send_not_connected(evt_tx, connection_id, operation).await;
             None
-        })
+        }
+    }
 }
 
 async fn open_store(
     state: &WorkerState,
     connection_id: u64,
     bucket: &str,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
     operation: &str,
 ) -> Option<async_nats::jetstream::object_store::ObjectStore> {
-    let js = jetstream(state, connection_id, evt_tx, operation)?;
+    let js = jetstream(state, connection_id, evt_tx, operation).await?;
     match js.get_object_store(bucket).await {
         Ok(store) => Some(store),
         Err(e) => {
-            send_err(evt_tx, connection_id, operation, e.to_string());
+            send_err(evt_tx, connection_id, operation, e.to_string()).await;
             None
         }
     }
 }
 
-fn send_ok(
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+async fn send_ok(
+    evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
     operation: &str,
     data: serde_json::Value,
 ) {
-    let _ = evt_tx.send(BackendEvent::OperationResult {
-        connection_id,
-        operation: operation.to_string(),
-        data,
-    });
+    let _ = evt_tx
+        .send(BackendEvent::OperationResult {
+            connection_id,
+            operation: operation.to_string(),
+            data,
+        })
+        .await;
 }
 
-fn send_err(
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+async fn send_err(
+    evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
     operation: &str,
     message: String,
 ) {
-    let _ = evt_tx.send(BackendEvent::Error {
-        connection_id: Some(connection_id),
-        operation: operation.to_string(),
-        message,
-    });
+    let _ = evt_tx
+        .send(BackendEvent::Error {
+            connection_id: Some(connection_id),
+            operation: operation.to_string(),
+            message,
+        })
+        .await;
 }
 
-fn send_not_connected(
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+async fn send_not_connected(
+    evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
     operation: &str,
 ) {
@@ -81,5 +84,6 @@ fn send_not_connected(
         connection_id,
         operation,
         "Not connected".to_string(),
-    );
+    )
+    .await;
 }

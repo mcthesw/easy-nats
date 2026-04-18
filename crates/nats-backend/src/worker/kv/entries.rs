@@ -11,15 +11,15 @@ use super::super::state::WorkerState;
 
 /// Spawn a task that streams key names in batches.
 /// Returns the JoinHandle so the caller can track/cancel it.
-pub(crate) fn handle_list_keys(
+pub(crate) async fn handle_list_keys(
     state: &WorkerState,
     connection_id: u64,
     bucket: String,
     cancel: TaskCancellation,
     generation: u64,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) -> Option<JoinHandle<()>> {
-    let js = super::jetstream(state, connection_id, evt_tx, "list_kv_keys")?;
+    let js = super::jetstream(state, connection_id, evt_tx, "list_kv_keys").await?;
     let evt_tx = evt_tx.clone();
     let token = cancel.into_token();
 
@@ -27,7 +27,7 @@ pub(crate) fn handle_list_keys(
         let store = match js.get_key_value(&bucket).await {
             Ok(s) => s,
             Err(e) => {
-                super::send_err(&evt_tx, connection_id, "list_kv_keys", e.to_string());
+                super::send_err(&evt_tx, connection_id, "list_kv_keys", e.to_string()).await;
                 return;
             }
         };
@@ -35,7 +35,7 @@ pub(crate) fn handle_list_keys(
         let mut keys_stream = match store.keys().await {
             Ok(k) => k,
             Err(e) => {
-                super::send_err(&evt_tx, connection_id, "list_kv_keys", e.to_string());
+                super::send_err(&evt_tx, connection_id, "list_kv_keys", e.to_string()).await;
                 return;
             }
         };
@@ -62,12 +62,12 @@ pub(crate) fn handle_list_keys(
                             connection_id,
                             "list_kv_keys",
                             serde_json::json!({ "bucket": &bucket, "entries": entries, "done": false, "generation": generation }),
-                        );
+                        ).await;
                     }
                 }
                 Ok(None) => break,
                 Err(e) => {
-                    super::send_err(&evt_tx, connection_id, "list_kv_keys", e.to_string());
+                    super::send_err(&evt_tx, connection_id, "list_kv_keys", e.to_string()).await;
                     return;
                 }
             }
@@ -84,7 +84,7 @@ pub(crate) fn handle_list_keys(
                 connection_id,
                 "list_kv_keys",
                 serde_json::json!({ "bucket": &bucket, "entries": entries, "done": false, "generation": generation }),
-            );
+            ).await;
         }
 
         // Signal completion
@@ -93,7 +93,7 @@ pub(crate) fn handle_list_keys(
             connection_id,
             "list_kv_keys",
             serde_json::json!({ "bucket": &bucket, "entries": [], "done": true, "generation": generation }),
-        );
+        ).await;
     }))
 }
 
@@ -102,7 +102,7 @@ pub(crate) async fn handle_get_entry(
     connection_id: u64,
     bucket: String,
     key: String,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(store) =
         super::open_store(state, connection_id, &bucket, evt_tx, "get_kv_entry").await
@@ -120,9 +120,10 @@ pub(crate) async fn handle_get_entry(
                 connection_id,
                 "get_kv_entry",
                 serde_json::json!({ "bucket": bucket, "entry": entry_json }),
-            );
+            )
+            .await;
         }
-        Err(e) => super::send_err(evt_tx, connection_id, "get_kv_entry", e.to_string()),
+        Err(e) => super::send_err(evt_tx, connection_id, "get_kv_entry", e.to_string()).await,
     }
 }
 
@@ -131,7 +132,7 @@ pub(crate) async fn handle_get_history(
     connection_id: u64,
     bucket: String,
     key: String,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(store) =
         super::open_store(state, connection_id, &bucket, evt_tx, "get_kv_history").await
@@ -146,7 +147,8 @@ pub(crate) async fn handle_get_history(
                     Ok(Some(entry)) => entries.push(kv_entry_to_json(&entry)),
                     Ok(None) => break,
                     Err(e) => {
-                        super::send_err(evt_tx, connection_id, "get_kv_history", e.to_string());
+                        super::send_err(evt_tx, connection_id, "get_kv_history", e.to_string())
+                            .await;
                         return;
                     }
                 }
@@ -157,9 +159,10 @@ pub(crate) async fn handle_get_history(
                 connection_id,
                 "get_kv_history",
                 serde_json::json!({ "bucket": bucket, "key": key, "history": entries }),
-            );
+            )
+            .await;
         }
-        Err(e) => super::send_err(evt_tx, connection_id, "get_kv_history", e.to_string()),
+        Err(e) => super::send_err(evt_tx, connection_id, "get_kv_history", e.to_string()).await,
     }
 }
 
@@ -169,7 +172,7 @@ pub(crate) async fn handle_put_entry(
     bucket: String,
     key: String,
     value: Vec<u8>,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(store) =
         super::open_store(state, connection_id, &bucket, evt_tx, "put_kv_entry").await
@@ -177,13 +180,16 @@ pub(crate) async fn handle_put_entry(
         return;
     };
     match store.put(&key, Bytes::from(value)).await {
-        Ok(revision) => super::send_ok(
-            evt_tx,
-            connection_id,
-            "put_kv_entry",
-            serde_json::json!({ "bucket": bucket, "key": key, "revision": revision }),
-        ),
-        Err(e) => super::send_err(evt_tx, connection_id, "put_kv_entry", e.to_string()),
+        Ok(revision) => {
+            super::send_ok(
+                evt_tx,
+                connection_id,
+                "put_kv_entry",
+                serde_json::json!({ "bucket": bucket, "key": key, "revision": revision }),
+            )
+            .await
+        }
+        Err(e) => super::send_err(evt_tx, connection_id, "put_kv_entry", e.to_string()).await,
     }
 }
 
@@ -192,7 +198,7 @@ pub(crate) async fn handle_delete_entry(
     connection_id: u64,
     bucket: String,
     key: String,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(store) =
         super::open_store(state, connection_id, &bucket, evt_tx, "delete_kv_entry").await
@@ -200,13 +206,16 @@ pub(crate) async fn handle_delete_entry(
         return;
     };
     match store.delete(&key).await {
-        Ok(()) => super::send_ok(
-            evt_tx,
-            connection_id,
-            "delete_kv_entry",
-            serde_json::json!({ "bucket": bucket, "key": key }),
-        ),
-        Err(e) => super::send_err(evt_tx, connection_id, "delete_kv_entry", e.to_string()),
+        Ok(()) => {
+            super::send_ok(
+                evt_tx,
+                connection_id,
+                "delete_kv_entry",
+                serde_json::json!({ "bucket": bucket, "key": key }),
+            )
+            .await
+        }
+        Err(e) => super::send_err(evt_tx, connection_id, "delete_kv_entry", e.to_string()).await,
     }
 }
 
@@ -215,7 +224,7 @@ pub(crate) async fn handle_purge_entry(
     connection_id: u64,
     bucket: String,
     key: String,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(store) =
         super::open_store(state, connection_id, &bucket, evt_tx, "purge_kv_entry").await
@@ -223,12 +232,15 @@ pub(crate) async fn handle_purge_entry(
         return;
     };
     match store.purge(&key).await {
-        Ok(()) => super::send_ok(
-            evt_tx,
-            connection_id,
-            "purge_kv_entry",
-            serde_json::json!({ "bucket": bucket, "key": key }),
-        ),
-        Err(e) => super::send_err(evt_tx, connection_id, "purge_kv_entry", e.to_string()),
+        Ok(()) => {
+            super::send_ok(
+                evt_tx,
+                connection_id,
+                "purge_kv_entry",
+                serde_json::json!({ "bucket": bucket, "key": key }),
+            )
+            .await
+        }
+        Err(e) => super::send_err(evt_tx, connection_id, "purge_kv_entry", e.to_string()).await,
     }
 }

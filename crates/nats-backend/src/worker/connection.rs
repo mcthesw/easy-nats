@@ -9,27 +9,33 @@ use super::state::WorkerState;
 pub(crate) async fn handle_connect(
     state: &mut WorkerState,
     config: ConnectionConfig,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let id = config.id;
-    let _ = evt_tx.send(BackendEvent::ConnectionStatus {
-        connection_id: id,
-        status: ConnectionStatusKind::Connecting,
-    });
+    let _ = evt_tx
+        .send(BackendEvent::ConnectionStatus {
+            connection_id: id,
+            status: ConnectionStatusKind::Connecting,
+        })
+        .await;
 
     match do_connect(&config, evt_tx).await {
         Ok(client) => {
             state.clients.insert(id, client);
-            let _ = evt_tx.send(BackendEvent::ConnectionStatus {
-                connection_id: id,
-                status: ConnectionStatusKind::Connected,
-            });
+            let _ = evt_tx
+                .send(BackendEvent::ConnectionStatus {
+                    connection_id: id,
+                    status: ConnectionStatusKind::Connected,
+                })
+                .await;
         }
         Err(e) => {
-            let _ = evt_tx.send(BackendEvent::ConnectionStatus {
-                connection_id: id,
-                status: ConnectionStatusKind::Error(e.to_string()),
-            });
+            let _ = evt_tx
+                .send(BackendEvent::ConnectionStatus {
+                    connection_id: id,
+                    status: ConnectionStatusKind::Error(e.to_string()),
+                })
+                .await;
         }
     }
 }
@@ -37,7 +43,7 @@ pub(crate) async fn handle_connect(
 pub(crate) async fn handle_disconnect(
     state: &mut WorkerState,
     id: u64,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     state.subscriptions.retain(|(cid, _, _), handle| {
         if *cid == id {
@@ -63,15 +69,17 @@ pub(crate) async fn handle_disconnect(
         tracing::warn!(id, %e, "Error draining connection");
     }
 
-    let _ = evt_tx.send(BackendEvent::ConnectionStatus {
-        connection_id: id,
-        status: ConnectionStatusKind::Disconnected,
-    });
+    let _ = evt_tx
+        .send(BackendEvent::ConnectionStatus {
+            connection_id: id,
+            status: ConnectionStatusKind::Disconnected,
+        })
+        .await;
 }
 
 async fn do_connect(
     config: &ConnectionConfig,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) -> Result<Client, Box<dyn std::error::Error + Send + Sync>> {
     let id = config.id;
     let event_tx = evt_tx.clone();
@@ -111,10 +119,12 @@ async fn do_connect(
                     return;
                 }
             };
-            let _ = tx.send(BackendEvent::ConnectionStatus {
-                connection_id: id,
-                status,
-            });
+            let _ = tx
+                .send(BackendEvent::ConnectionStatus {
+                    connection_id: id,
+                    status,
+                })
+                .await;
         }
     });
 
