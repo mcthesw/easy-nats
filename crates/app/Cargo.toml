@@ -16,7 +16,9 @@ path = "src/main.rs"
 [dependencies]
 nats-backend = { path = "../nats-backend" }
 base64 = "0.22"
-eframe = { version = "0.34", features = ["glow"] }
+# Keep native desktop functionality, but avoid eframe's default feature bundle
+# (notably wgpu + web_screen_reader) since this app explicitly uses Glow.
+eframe = { version = "0.34", default-features = false, features = ["glow", "default_fonts", "accesskit"] }
 egui_dock = "0.19"
 mimalloc = "0.1"
 protox = "0.9"
@@ -32,6 +34,10 @@ tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "registry", "fmt"] }
 tokio-util = "0.7"
 image = { version = "0.25", default-features = false, features = ["png"] }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Linux desktop support still needs both backends enabled.
+eframe = { version = "0.34", default-features = false, features = ["x11", "wayland"] }
 
 [target.'cfg(target_os = "windows")'.build-dependencies]
 winresource = "0.1"
