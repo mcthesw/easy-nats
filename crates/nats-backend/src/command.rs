@@ -31,6 +31,7 @@ pub enum BackendCommand {
     },
     Request {
         connection_id: u64,
+        backend_id: u64,
         subject: String,
         payload: Vec<u8>,
         headers: Option<Vec<(String, String)>>,

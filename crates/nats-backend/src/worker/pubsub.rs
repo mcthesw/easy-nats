@@ -12,6 +12,15 @@ use super::state::WorkerState;
 
 const MAX_BATCH_SIZE: usize = 256;
 
+pub(crate) struct RequestParams {
+    pub connection_id: u64,
+    pub backend_id: u64,
+    pub subject: String,
+    pub payload: Vec<u8>,
+    pub headers: Option<Vec<(String, String)>>,
+    pub timeout_ms: u64,
+}
+
 pub(crate) async fn handle_publish(
     state: &WorkerState,
     connection_id: u64,
@@ -31,10 +40,10 @@ pub(crate) async fn handle_publish(
         };
         match result {
             Ok(()) => send_ok(evt_tx, connection_id, "publish", serde_json::Value::Null).await,
-            Err(e) => send_err(evt_tx, connection_id, "publish", e.to_string()).await,
+            Err(e) => send_err(evt_tx, connection_id, None, "publish", e.to_string()).await,
         }
     } else {
-        send_not_connected(evt_tx, connection_id, "publish").await;
+        send_not_connected(evt_tx, connection_id, None, "publish").await;
     }
 }
 
@@ -52,6 +61,7 @@ pub(crate) async fn handle_subscribe(
             send_err(
                 evt_tx,
                 connection_id,
+                Some(backend_id),
                 "subscribe",
                 format!("Already subscribed to {subject}"),
             )
@@ -119,10 +129,19 @@ pub(crate) async fn handle_subscribe(
                         )
                         .await;
                     }
-                    Err(e) => send_err(evt_tx, connection_id, "subscribe", e.to_string()).await,
+                    Err(e) => {
+                        send_err(
+                            evt_tx,
+                            connection_id,
+                            Some(backend_id),
+                            "subscribe",
+                            e.to_string(),
+                        )
+                        .await
+                    }
                 }
             } else {
-                send_not_connected(evt_tx, connection_id, "subscribe").await;
+                send_not_connected(evt_tx, connection_id, Some(backend_id), "subscribe").await;
             }
         }
     }
@@ -151,6 +170,7 @@ pub(crate) async fn handle_unsubscribe(
         send_err(
             evt_tx,
             connection_id,
+            Some(backend_id),
             "unsubscribe",
             format!("Not subscribed to {subject}"),
         )
@@ -160,13 +180,17 @@ pub(crate) async fn handle_unsubscribe(
 
 pub(crate) async fn handle_request(
     state: &WorkerState,
-    connection_id: u64,
-    subject: String,
-    payload: Vec<u8>,
-    headers: Option<Vec<(String, String)>>,
-    timeout_ms: u64,
+    params: RequestParams,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
+    let RequestParams {
+        connection_id,
+        backend_id,
+        subject,
+        payload,
+        headers,
+        timeout_ms,
+    } = params;
     if let Some(client) = state.clients.get(&connection_id) {
         let payload = Bytes::from(payload);
         let timeout = std::time::Duration::from_millis(timeout_ms);
@@ -185,16 +209,27 @@ pub(crate) async fn handle_request(
                 let _ = evt_tx
                     .send(BackendEvent::RequestResponse {
                         connection_id,
+                        backend_id,
                         payload: msg.payload.to_vec(),
                         headers: extract_headers(&msg.headers),
                     })
                     .await;
             }
-            Ok(Err(e)) => send_err(evt_tx, connection_id, "request", e.to_string()).await,
+            Ok(Err(e)) => {
+                send_err(
+                    evt_tx,
+                    connection_id,
+                    Some(backend_id),
+                    "request",
+                    e.to_string(),
+                )
+                .await
+            }
             Err(_) => {
                 send_err(
                     evt_tx,
                     connection_id,
+                    Some(backend_id),
                     "request",
                     "Request timed out".to_string(),
                 )
@@ -202,7 +237,7 @@ pub(crate) async fn handle_request(
             }
         }
     } else {
-        send_not_connected(evt_tx, connection_id, "request").await;
+        send_not_connected(evt_tx, connection_id, Some(backend_id), "request").await;
     }
 }
 
@@ -234,12 +269,14 @@ async fn send_ok(
 async fn send_err(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
+    backend_id: Option<u64>,
     operation: &str,
     message: String,
 ) {
     let _ = evt_tx
         .send(BackendEvent::Error {
             connection_id: Some(connection_id),
+            backend_id,
             operation: operation.to_string(),
             message,
         })
@@ -249,11 +286,13 @@ async fn send_err(
 async fn send_not_connected(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
+    backend_id: Option<u64>,
     operation: &str,
 ) {
     send_err(
         evt_tx,
         connection_id,
+        backend_id,
         operation,
         "Not connected".to_string(),
     )

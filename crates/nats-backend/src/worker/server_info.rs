@@ -108,6 +108,7 @@ async fn send_err(
     let _ = evt_tx
         .send(BackendEvent::Error {
             connection_id: Some(connection_id),
+            backend_id: None,
             operation: operation.to_string(),
             message: message.to_string(),
         })

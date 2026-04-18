@@ -10,6 +10,7 @@ use super::types::PublisherState;
 pub fn publisher_ui(
     ui: &mut egui::Ui,
     connection_id: u64,
+    backend_id: u64,
     state: &mut PublisherState,
     backend: &BackendHandle,
     proto_manager: &ProtoSchemaManager,
@@ -100,6 +101,7 @@ pub fn publisher_ui(
             let timeout_ms = state.timeout_ms.parse::<u64>().unwrap_or(5000);
             backend.send(BackendCommand::Request {
                 connection_id,
+                backend_id,
                 subject: state.subject.clone(),
                 payload: state.payload.as_bytes().to_vec(),
                 headers: collect_headers(&state.headers),
