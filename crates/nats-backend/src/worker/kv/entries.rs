@@ -4,7 +4,7 @@ use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
 use crate::cancellation::TaskCancellation;
-use crate::event::BackendEvent;
+use crate::event::{BackendEvent, BackendOperation};
 
 use super::super::helpers::kv_entry_to_json;
 use super::super::state::WorkerState;
@@ -19,7 +19,11 @@ pub(crate) async fn handle_list_keys(
     generation: u64,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) -> Option<JoinHandle<()>> {
-    let js = super::jetstream(state, connection_id, evt_tx, "list_kv_keys").await?;
+    let js =
+        match super::jetstream(state, connection_id, evt_tx, BackendOperation::ListKvKeys).await {
+            Some(js) => js,
+            None => return None,
+        };
     let evt_tx = evt_tx.clone();
     let token = cancel.into_token();
 
@@ -27,7 +31,13 @@ pub(crate) async fn handle_list_keys(
         let store = match js.get_key_value(&bucket).await {
             Ok(s) => s,
             Err(e) => {
-                super::send_err(&evt_tx, connection_id, "list_kv_keys", e.to_string()).await;
+                super::send_err(
+                    &evt_tx,
+                    connection_id,
+                    BackendOperation::ListKvKeys,
+                    e.to_string(),
+                )
+                .await;
                 return;
             }
         };
@@ -35,7 +45,13 @@ pub(crate) async fn handle_list_keys(
         let mut keys_stream = match store.keys().await {
             Ok(k) => k,
             Err(e) => {
-                super::send_err(&evt_tx, connection_id, "list_kv_keys", e.to_string()).await;
+                super::send_err(
+                    &evt_tx,
+                    connection_id,
+                    BackendOperation::ListKvKeys,
+                    e.to_string(),
+                )
+                .await;
                 return;
             }
         };
@@ -60,14 +76,20 @@ pub(crate) async fn handle_list_keys(
                         super::send_ok(
                             &evt_tx,
                             connection_id,
-                            "list_kv_keys",
+                            BackendOperation::ListKvKeys,
                             serde_json::json!({ "bucket": &bucket, "entries": entries, "done": false, "generation": generation }),
                         ).await;
                     }
                 }
                 Ok(None) => break,
                 Err(e) => {
-                    super::send_err(&evt_tx, connection_id, "list_kv_keys", e.to_string()).await;
+                    super::send_err(
+                        &evt_tx,
+                        connection_id,
+                        BackendOperation::ListKvKeys,
+                        e.to_string(),
+                    )
+                    .await;
                     return;
                 }
             }
@@ -82,7 +104,7 @@ pub(crate) async fn handle_list_keys(
             super::send_ok(
                 &evt_tx,
                 connection_id,
-                "list_kv_keys",
+                BackendOperation::ListKvKeys,
                 serde_json::json!({ "bucket": &bucket, "entries": entries, "done": false, "generation": generation }),
             ).await;
         }
@@ -91,7 +113,7 @@ pub(crate) async fn handle_list_keys(
         super::send_ok(
             &evt_tx,
             connection_id,
-            "list_kv_keys",
+            BackendOperation::ListKvKeys,
             serde_json::json!({ "bucket": &bucket, "entries": [], "done": true, "generation": generation }),
         ).await;
     }))
@@ -104,8 +126,14 @@ pub(crate) async fn handle_get_entry(
     key: String,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(store) =
-        super::open_store(state, connection_id, &bucket, evt_tx, "get_kv_entry").await
+    let Some(store) = super::open_store(
+        state,
+        connection_id,
+        &bucket,
+        evt_tx,
+        BackendOperation::GetKvEntry,
+    )
+    .await
     else {
         return;
     };
@@ -118,12 +146,20 @@ pub(crate) async fn handle_get_entry(
             super::send_ok(
                 evt_tx,
                 connection_id,
-                "get_kv_entry",
+                BackendOperation::GetKvEntry,
                 serde_json::json!({ "bucket": bucket, "entry": entry_json }),
             )
             .await;
         }
-        Err(e) => super::send_err(evt_tx, connection_id, "get_kv_entry", e.to_string()).await,
+        Err(e) => {
+            super::send_err(
+                evt_tx,
+                connection_id,
+                BackendOperation::GetKvEntry,
+                e.to_string(),
+            )
+            .await
+        }
     }
 }
 
@@ -134,8 +170,14 @@ pub(crate) async fn handle_get_history(
     key: String,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(store) =
-        super::open_store(state, connection_id, &bucket, evt_tx, "get_kv_history").await
+    let Some(store) = super::open_store(
+        state,
+        connection_id,
+        &bucket,
+        evt_tx,
+        BackendOperation::GetKvHistory,
+    )
+    .await
     else {
         return;
     };
@@ -147,8 +189,13 @@ pub(crate) async fn handle_get_history(
                     Ok(Some(entry)) => entries.push(kv_entry_to_json(&entry)),
                     Ok(None) => break,
                     Err(e) => {
-                        super::send_err(evt_tx, connection_id, "get_kv_history", e.to_string())
-                            .await;
+                        super::send_err(
+                            evt_tx,
+                            connection_id,
+                            BackendOperation::GetKvHistory,
+                            e.to_string(),
+                        )
+                        .await;
                         return;
                     }
                 }
@@ -157,12 +204,20 @@ pub(crate) async fn handle_get_history(
             super::send_ok(
                 evt_tx,
                 connection_id,
-                "get_kv_history",
+                BackendOperation::GetKvHistory,
                 serde_json::json!({ "bucket": bucket, "key": key, "history": entries }),
             )
             .await;
         }
-        Err(e) => super::send_err(evt_tx, connection_id, "get_kv_history", e.to_string()).await,
+        Err(e) => {
+            super::send_err(
+                evt_tx,
+                connection_id,
+                BackendOperation::GetKvHistory,
+                e.to_string(),
+            )
+            .await
+        }
     }
 }
 
@@ -174,8 +229,14 @@ pub(crate) async fn handle_put_entry(
     value: Vec<u8>,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(store) =
-        super::open_store(state, connection_id, &bucket, evt_tx, "put_kv_entry").await
+    let Some(store) = super::open_store(
+        state,
+        connection_id,
+        &bucket,
+        evt_tx,
+        BackendOperation::PutKvEntry,
+    )
+    .await
     else {
         return;
     };
@@ -184,12 +245,20 @@ pub(crate) async fn handle_put_entry(
             super::send_ok(
                 evt_tx,
                 connection_id,
-                "put_kv_entry",
+                BackendOperation::PutKvEntry,
                 serde_json::json!({ "bucket": bucket, "key": key, "revision": revision }),
             )
             .await
         }
-        Err(e) => super::send_err(evt_tx, connection_id, "put_kv_entry", e.to_string()).await,
+        Err(e) => {
+            super::send_err(
+                evt_tx,
+                connection_id,
+                BackendOperation::PutKvEntry,
+                e.to_string(),
+            )
+            .await
+        }
     }
 }
 
@@ -200,8 +269,14 @@ pub(crate) async fn handle_delete_entry(
     key: String,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(store) =
-        super::open_store(state, connection_id, &bucket, evt_tx, "delete_kv_entry").await
+    let Some(store) = super::open_store(
+        state,
+        connection_id,
+        &bucket,
+        evt_tx,
+        BackendOperation::DeleteKvEntry,
+    )
+    .await
     else {
         return;
     };
@@ -210,12 +285,20 @@ pub(crate) async fn handle_delete_entry(
             super::send_ok(
                 evt_tx,
                 connection_id,
-                "delete_kv_entry",
+                BackendOperation::DeleteKvEntry,
                 serde_json::json!({ "bucket": bucket, "key": key }),
             )
             .await
         }
-        Err(e) => super::send_err(evt_tx, connection_id, "delete_kv_entry", e.to_string()).await,
+        Err(e) => {
+            super::send_err(
+                evt_tx,
+                connection_id,
+                BackendOperation::DeleteKvEntry,
+                e.to_string(),
+            )
+            .await
+        }
     }
 }
 
@@ -226,8 +309,14 @@ pub(crate) async fn handle_purge_entry(
     key: String,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(store) =
-        super::open_store(state, connection_id, &bucket, evt_tx, "purge_kv_entry").await
+    let Some(store) = super::open_store(
+        state,
+        connection_id,
+        &bucket,
+        evt_tx,
+        BackendOperation::PurgeKvEntry,
+    )
+    .await
     else {
         return;
     };
@@ -236,11 +325,19 @@ pub(crate) async fn handle_purge_entry(
             super::send_ok(
                 evt_tx,
                 connection_id,
-                "purge_kv_entry",
+                BackendOperation::PurgeKvEntry,
                 serde_json::json!({ "bucket": bucket, "key": key }),
             )
             .await
         }
-        Err(e) => super::send_err(evt_tx, connection_id, "purge_kv_entry", e.to_string()).await,
+        Err(e) => {
+            super::send_err(
+                evt_tx,
+                connection_id,
+                BackendOperation::PurgeKvEntry,
+                e.to_string(),
+            )
+            .await
+        }
     }
 }

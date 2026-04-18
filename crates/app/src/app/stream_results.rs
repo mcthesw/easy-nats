@@ -1,4 +1,4 @@
-use nats_backend::BackendCommand;
+use nats_backend::{BackendCommand, BackendOperation};
 
 use crate::i18n::t;
 use crate::tabs::TabKind;
@@ -10,11 +10,11 @@ impl EasyNatsApp {
     pub(crate) fn apply_stream_operation(
         &mut self,
         connection_id: u64,
-        operation: &str,
+        operation: BackendOperation,
         data: &serde_json::Value,
     ) -> bool {
         match operation {
-            "list_streams" => {
+            BackendOperation::ListStreams => {
                 if let Some(arr) = data.as_array() {
                     let infos = arr.clone();
                     for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
@@ -38,14 +38,14 @@ impl EasyNatsApp {
                 }
                 true
             }
-            "create_stream" | "update_stream" => {
+            BackendOperation::CreateStream | BackendOperation::UpdateStream => {
                 self.toasts
                     .push(ToastLevel::Success, format!("{operation} succeeded"));
                 self.backend
                     .send(BackendCommand::ListStreams { connection_id });
                 true
             }
-            "delete_stream" => {
+            BackendOperation::DeleteStream => {
                 self.toasts
                     .push(ToastLevel::Success, t("toast.stream_deleted").to_string());
                 if let Some(name) = data["name"].as_str() {
@@ -58,13 +58,13 @@ impl EasyNatsApp {
                     .send(BackendCommand::ListStreams { connection_id });
                 true
             }
-            "purge_stream" => {
+            BackendOperation::PurgeStream => {
                 let purged = data["purged"].as_u64().unwrap_or(0);
                 self.toasts
                     .push(ToastLevel::Success, format!("Purged {purged} messages"));
                 true
             }
-            "get_stream_messages" => {
+            BackendOperation::GetStreamMessages => {
                 let stream_name = data["stream"].as_str().unwrap_or("").to_string();
                 let messages = data["messages"].as_array().cloned().unwrap_or_default();
                 for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
@@ -84,7 +84,7 @@ impl EasyNatsApp {
                 }
                 true
             }
-            "list_consumers" => {
+            BackendOperation::ListConsumers => {
                 let stream_name = data["stream"].as_str().unwrap_or("").to_string();
                 let consumers = data["consumers"].as_array().cloned().unwrap_or_default();
                 for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
@@ -103,7 +103,9 @@ impl EasyNatsApp {
                 }
                 true
             }
-            "create_consumer" | "delete_consumer" | "update_consumer" => {
+            BackendOperation::CreateConsumer
+            | BackendOperation::DeleteConsumer
+            | BackendOperation::UpdateConsumer => {
                 let stream_name = data["stream"]
                     .as_str()
                     .or_else(|| data["stream_name"].as_str())
@@ -134,12 +136,12 @@ impl EasyNatsApp {
                     .send(BackendCommand::ListStreams { connection_id });
                 true
             }
-            "delete_stream_message" => {
+            BackendOperation::DeleteStreamMessage => {
                 self.toasts
                     .push(ToastLevel::Success, t("toast.message_deleted").to_string());
                 true
             }
-            "fetch_consumer_messages" => {
+            BackendOperation::FetchConsumerMessages => {
                 let stream_name = data["stream"].as_str().unwrap_or("").to_string();
                 let consumer_name = data["consumer"].as_str().unwrap_or("").to_string();
                 let messages = data["messages"].as_array().cloned().unwrap_or_default();

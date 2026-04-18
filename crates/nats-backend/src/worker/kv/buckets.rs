@@ -1,7 +1,7 @@
 use futures_util::TryStreamExt;
 use tokio::sync::mpsc;
 
-use crate::event::BackendEvent;
+use crate::event::{BackendEvent, BackendOperation};
 
 use super::super::helpers::kv_status_to_json;
 use super::super::state::WorkerState;
@@ -11,7 +11,14 @@ pub(crate) async fn handle_list_buckets(
     connection_id: u64,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) = super::jetstream(state, connection_id, evt_tx, "list_kv_buckets").await else {
+    let Some(js) = super::jetstream(
+        state,
+        connection_id,
+        evt_tx,
+        BackendOperation::ListKvBuckets,
+    )
+    .await
+    else {
         return;
     };
 
@@ -35,7 +42,13 @@ pub(crate) async fn handle_list_buckets(
             }
             Ok(None) => break,
             Err(e) => {
-                super::send_err(evt_tx, connection_id, "list_kv_buckets", e.to_string()).await;
+                super::send_err(
+                    evt_tx,
+                    connection_id,
+                    BackendOperation::ListKvBuckets,
+                    e.to_string(),
+                )
+                .await;
                 return;
             }
         }
@@ -44,7 +57,7 @@ pub(crate) async fn handle_list_buckets(
     super::send_ok(
         evt_tx,
         connection_id,
-        "list_kv_buckets",
+        BackendOperation::ListKvBuckets,
         serde_json::Value::Array(buckets),
     )
     .await;
@@ -56,7 +69,14 @@ pub(crate) async fn handle_create_bucket(
     config: serde_json::Value,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) = super::jetstream(state, connection_id, evt_tx, "create_kv_bucket").await else {
+    let Some(js) = super::jetstream(
+        state,
+        connection_id,
+        evt_tx,
+        BackendOperation::CreateKvBucket,
+    )
+    .await
+    else {
         return;
     };
 
@@ -65,7 +85,7 @@ pub(crate) async fn handle_create_bucket(
         super::send_err(
             evt_tx,
             connection_id,
-            "create_kv_bucket",
+            BackendOperation::CreateKvBucket,
             "Bucket name is required".to_string(),
         )
         .await;
@@ -100,16 +120,30 @@ pub(crate) async fn handle_create_bucket(
                 super::send_ok(
                     evt_tx,
                     connection_id,
-                    "create_kv_bucket",
+                    BackendOperation::CreateKvBucket,
                     kv_status_to_json(&status),
                 )
                 .await
             }
             Err(e) => {
-                super::send_err(evt_tx, connection_id, "create_kv_bucket", e.to_string()).await
+                super::send_err(
+                    evt_tx,
+                    connection_id,
+                    BackendOperation::CreateKvBucket,
+                    e.to_string(),
+                )
+                .await
             }
         },
-        Err(e) => super::send_err(evt_tx, connection_id, "create_kv_bucket", e.to_string()).await,
+        Err(e) => {
+            super::send_err(
+                evt_tx,
+                connection_id,
+                BackendOperation::CreateKvBucket,
+                e.to_string(),
+            )
+            .await
+        }
     }
 }
 
@@ -119,7 +153,14 @@ pub(crate) async fn handle_delete_bucket(
     bucket: String,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) = super::jetstream(state, connection_id, evt_tx, "delete_kv_bucket").await else {
+    let Some(js) = super::jetstream(
+        state,
+        connection_id,
+        evt_tx,
+        BackendOperation::DeleteKvBucket,
+    )
+    .await
+    else {
         return;
     };
 
@@ -128,12 +169,20 @@ pub(crate) async fn handle_delete_bucket(
             super::send_ok(
                 evt_tx,
                 connection_id,
-                "delete_kv_bucket",
+                BackendOperation::DeleteKvBucket,
                 serde_json::json!({ "bucket": bucket }),
             )
             .await
         }
-        Err(e) => super::send_err(evt_tx, connection_id, "delete_kv_bucket", e.to_string()).await,
+        Err(e) => {
+            super::send_err(
+                evt_tx,
+                connection_id,
+                BackendOperation::DeleteKvBucket,
+                e.to_string(),
+            )
+            .await
+        }
     }
 }
 
@@ -143,7 +192,14 @@ pub(crate) async fn handle_update_bucket(
     config: serde_json::Value,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) = super::jetstream(state, connection_id, evt_tx, "update_kv_bucket").await else {
+    let Some(js) = super::jetstream(
+        state,
+        connection_id,
+        evt_tx,
+        BackendOperation::UpdateKvBucket,
+    )
+    .await
+    else {
         return;
     };
 
@@ -152,7 +208,7 @@ pub(crate) async fn handle_update_bucket(
         super::send_err(
             evt_tx,
             connection_id,
-            "update_kv_bucket",
+            BackendOperation::UpdateKvBucket,
             "Bucket name is required".to_string(),
         )
         .await;
@@ -187,15 +243,29 @@ pub(crate) async fn handle_update_bucket(
                 super::send_ok(
                     evt_tx,
                     connection_id,
-                    "update_kv_bucket",
+                    BackendOperation::UpdateKvBucket,
                     kv_status_to_json(&status),
                 )
                 .await
             }
             Err(e) => {
-                super::send_err(evt_tx, connection_id, "update_kv_bucket", e.to_string()).await
+                super::send_err(
+                    evt_tx,
+                    connection_id,
+                    BackendOperation::UpdateKvBucket,
+                    e.to_string(),
+                )
+                .await
             }
         },
-        Err(e) => super::send_err(evt_tx, connection_id, "update_kv_bucket", e.to_string()).await,
+        Err(e) => {
+            super::send_err(
+                evt_tx,
+                connection_id,
+                BackendOperation::UpdateKvBucket,
+                e.to_string(),
+            )
+            .await
+        }
     }
 }

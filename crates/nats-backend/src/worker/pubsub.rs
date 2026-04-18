@@ -5,7 +5,7 @@ use bytes::Bytes;
 use futures_util::StreamExt;
 use tokio::sync::mpsc;
 
-use crate::event::{BackendEvent, MessageData};
+use crate::event::{BackendEvent, BackendOperation, MessageData};
 
 use super::helpers::{build_header_map, extract_headers};
 use super::state::WorkerState;
@@ -39,11 +39,28 @@ pub(crate) async fn handle_publish(
             client.publish(subject, payload).await
         };
         match result {
-            Ok(()) => send_ok(evt_tx, connection_id, "publish", serde_json::Value::Null).await,
-            Err(e) => send_err(evt_tx, connection_id, None, "publish", e.to_string()).await,
+            Ok(()) => {
+                send_ok(
+                    evt_tx,
+                    connection_id,
+                    BackendOperation::Publish,
+                    serde_json::Value::Null,
+                )
+                .await
+            }
+            Err(e) => {
+                send_err(
+                    evt_tx,
+                    connection_id,
+                    None,
+                    BackendOperation::Publish,
+                    e.to_string(),
+                )
+                .await
+            }
         }
     } else {
-        send_not_connected(evt_tx, connection_id, None, "publish").await;
+        send_not_connected(evt_tx, connection_id, None, BackendOperation::Publish).await;
     }
 }
 
@@ -62,7 +79,7 @@ pub(crate) async fn handle_subscribe(
                 evt_tx,
                 connection_id,
                 Some(backend_id),
-                "subscribe",
+                BackendOperation::Subscribe,
                 format!("Already subscribed to {subject}"),
             )
             .await
@@ -124,7 +141,7 @@ pub(crate) async fn handle_subscribe(
                         send_ok(
                             evt_tx,
                             connection_id,
-                            "subscribe",
+                            BackendOperation::Subscribe,
                             serde_json::json!({ "subject": subject }),
                         )
                         .await;
@@ -134,14 +151,20 @@ pub(crate) async fn handle_subscribe(
                             evt_tx,
                             connection_id,
                             Some(backend_id),
-                            "subscribe",
+                            BackendOperation::Subscribe,
                             e.to_string(),
                         )
                         .await
                     }
                 }
             } else {
-                send_not_connected(evt_tx, connection_id, Some(backend_id), "subscribe").await;
+                send_not_connected(
+                    evt_tx,
+                    connection_id,
+                    Some(backend_id),
+                    BackendOperation::Subscribe,
+                )
+                .await;
             }
         }
     }
@@ -162,7 +185,7 @@ pub(crate) async fn handle_unsubscribe(
         send_ok(
             evt_tx,
             connection_id,
-            "unsubscribe",
+            BackendOperation::Unsubscribe,
             serde_json::json!({ "subject": subject }),
         )
         .await;
@@ -171,7 +194,7 @@ pub(crate) async fn handle_unsubscribe(
             evt_tx,
             connection_id,
             Some(backend_id),
-            "unsubscribe",
+            BackendOperation::Unsubscribe,
             format!("Not subscribed to {subject}"),
         )
         .await;
@@ -220,7 +243,7 @@ pub(crate) async fn handle_request(
                     evt_tx,
                     connection_id,
                     Some(backend_id),
-                    "request",
+                    BackendOperation::Request,
                     e.to_string(),
                 )
                 .await
@@ -230,14 +253,20 @@ pub(crate) async fn handle_request(
                     evt_tx,
                     connection_id,
                     Some(backend_id),
-                    "request",
+                    BackendOperation::Request,
                     "Request timed out".to_string(),
                 )
                 .await
             }
         }
     } else {
-        send_not_connected(evt_tx, connection_id, Some(backend_id), "request").await;
+        send_not_connected(
+            evt_tx,
+            connection_id,
+            Some(backend_id),
+            BackendOperation::Request,
+        )
+        .await;
     }
 }
 
@@ -254,13 +283,13 @@ fn to_message_data(msg: async_nats::Message) -> MessageData {
 async fn send_ok(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
-    operation: &str,
+    operation: BackendOperation,
     data: serde_json::Value,
 ) {
     let _ = evt_tx
         .send(BackendEvent::OperationResult {
             connection_id,
-            operation: operation.to_string(),
+            operation,
             data,
         })
         .await;
@@ -270,14 +299,14 @@ async fn send_err(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
     backend_id: Option<u64>,
-    operation: &str,
+    operation: BackendOperation,
     message: String,
 ) {
     let _ = evt_tx
         .send(BackendEvent::Error {
             connection_id: Some(connection_id),
             backend_id,
-            operation: operation.to_string(),
+            operation,
             message,
         })
         .await;
@@ -287,7 +316,7 @@ async fn send_not_connected(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
     backend_id: Option<u64>,
-    operation: &str,
+    operation: BackendOperation,
 ) {
     send_err(
         evt_tx,

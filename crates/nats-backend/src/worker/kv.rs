@@ -3,7 +3,7 @@ mod entries;
 
 use tokio::sync::mpsc;
 
-use crate::event::BackendEvent;
+use crate::event::{BackendEvent, BackendOperation};
 
 use super::state::WorkerState;
 
@@ -19,7 +19,7 @@ async fn jetstream(
     state: &WorkerState,
     connection_id: u64,
     evt_tx: &mpsc::Sender<BackendEvent>,
-    operation: &str,
+    operation: BackendOperation,
 ) -> Option<async_nats::jetstream::Context> {
     match state.clients.get(&connection_id) {
         Some(client) => Some(async_nats::jetstream::new(client.clone())),
@@ -35,7 +35,7 @@ async fn open_store(
     connection_id: u64,
     bucket: &str,
     evt_tx: &mpsc::Sender<BackendEvent>,
-    operation: &str,
+    operation: BackendOperation,
 ) -> Option<async_nats::jetstream::kv::Store> {
     let js = jetstream(state, connection_id, evt_tx, operation).await?;
     match js.get_key_value(bucket).await {
@@ -50,13 +50,13 @@ async fn open_store(
 async fn send_ok(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
-    operation: &str,
+    operation: BackendOperation,
     data: serde_json::Value,
 ) {
     let _ = evt_tx
         .send(BackendEvent::OperationResult {
             connection_id,
-            operation: operation.to_string(),
+            operation,
             data,
         })
         .await;
@@ -65,14 +65,14 @@ async fn send_ok(
 async fn send_err(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
-    operation: &str,
+    operation: BackendOperation,
     message: String,
 ) {
     let _ = evt_tx
         .send(BackendEvent::Error {
             connection_id: Some(connection_id),
             backend_id: None,
-            operation: operation.to_string(),
+            operation,
             message,
         })
         .await;
@@ -81,7 +81,7 @@ async fn send_err(
 async fn send_not_connected(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
-    operation: &str,
+    operation: BackendOperation,
 ) {
     send_err(
         evt_tx,

@@ -1,7 +1,7 @@
 use futures_util::TryStreamExt;
 use tokio::sync::mpsc;
 
-use crate::event::BackendEvent;
+use crate::event::{BackendEvent, BackendOperation};
 
 use super::super::state::WorkerState;
 
@@ -10,8 +10,13 @@ pub(crate) async fn handle_list_buckets(
     connection_id: u64,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) =
-        super::jetstream(state, connection_id, evt_tx, "list_object_store_buckets").await
+    let Some(js) = super::jetstream(
+        state,
+        connection_id,
+        evt_tx,
+        BackendOperation::ListObjectStoreBuckets,
+    )
+    .await
     else {
         return;
     };
@@ -50,7 +55,7 @@ pub(crate) async fn handle_list_buckets(
                 super::send_err(
                     evt_tx,
                     connection_id,
-                    "list_object_store_buckets",
+                    BackendOperation::ListObjectStoreBuckets,
                     e.to_string(),
                 )
                 .await;
@@ -63,7 +68,7 @@ pub(crate) async fn handle_list_buckets(
     super::send_ok(
         evt_tx,
         connection_id,
-        "list_object_store_buckets",
+        BackendOperation::ListObjectStoreBuckets,
         serde_json::Value::Array(buckets),
     )
     .await;
@@ -75,8 +80,13 @@ pub(crate) async fn handle_create_bucket(
     config: serde_json::Value,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) =
-        super::jetstream(state, connection_id, evt_tx, "create_object_store_bucket").await
+    let Some(js) = super::jetstream(
+        state,
+        connection_id,
+        evt_tx,
+        BackendOperation::CreateObjectStoreBucket,
+    )
+    .await
     else {
         return;
     };
@@ -86,7 +96,7 @@ pub(crate) async fn handle_create_bucket(
         super::send_err(
             evt_tx,
             connection_id,
-            "create_object_store_bucket",
+            BackendOperation::CreateObjectStoreBucket,
             "Bucket name is required".to_string(),
         )
         .await;
@@ -112,7 +122,7 @@ pub(crate) async fn handle_create_bucket(
             super::send_ok(
                 evt_tx,
                 connection_id,
-                "create_object_store_bucket",
+                BackendOperation::CreateObjectStoreBucket,
                 serde_json::json!({ "bucket": bucket }),
             )
             .await
@@ -121,7 +131,7 @@ pub(crate) async fn handle_create_bucket(
             super::send_err(
                 evt_tx,
                 connection_id,
-                "create_object_store_bucket",
+                BackendOperation::CreateObjectStoreBucket,
                 e.to_string(),
             )
             .await
@@ -135,8 +145,13 @@ pub(crate) async fn handle_delete_bucket(
     bucket: String,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let Some(js) =
-        super::jetstream(state, connection_id, evt_tx, "delete_object_store_bucket").await
+    let Some(js) = super::jetstream(
+        state,
+        connection_id,
+        evt_tx,
+        BackendOperation::DeleteObjectStoreBucket,
+    )
+    .await
     else {
         return;
     };
@@ -146,7 +161,7 @@ pub(crate) async fn handle_delete_bucket(
             super::send_ok(
                 evt_tx,
                 connection_id,
-                "delete_object_store_bucket",
+                BackendOperation::DeleteObjectStoreBucket,
                 serde_json::json!({ "bucket": bucket }),
             )
             .await
@@ -155,7 +170,7 @@ pub(crate) async fn handle_delete_bucket(
             super::send_err(
                 evt_tx,
                 connection_id,
-                "delete_object_store_bucket",
+                BackendOperation::DeleteObjectStoreBucket,
                 e.to_string(),
             )
             .await
