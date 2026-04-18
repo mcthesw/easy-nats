@@ -14,7 +14,7 @@ pub(crate) async fn handle_list_consumers(
     state: &WorkerState,
     connection_id: u64,
     stream_name: String,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let lookup_name = stream_name.clone();
     with_stream(
@@ -43,7 +43,8 @@ pub(crate) async fn handle_list_consumers(
                     "stream": stream_name,
                     "consumers": list,
                 }),
-            );
+            )
+            .await;
         },
     )
     .await;
@@ -54,7 +55,7 @@ pub(crate) async fn handle_create_consumer(
     connection_id: u64,
     stream_name: String,
     config: serde_json::Value,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     with_stream(
         state,
@@ -65,20 +66,28 @@ pub(crate) async fn handle_create_consumer(
         |stream| async move {
             match serde_json::from_value::<async_nats::jetstream::consumer::pull::Config>(config) {
                 Ok(consumer_config) => match stream.create_consumer(consumer_config).await {
-                    Ok(consumer) => send_ok(
+                    Ok(consumer) => {
+                        send_ok(
+                            evt_tx,
+                            connection_id,
+                            "create_consumer",
+                            consumer_info_to_json(consumer.cached_info()),
+                        )
+                        .await
+                    }
+                    Err(e) => {
+                        send_err(evt_tx, connection_id, "create_consumer", e.to_string()).await
+                    }
+                },
+                Err(e) => {
+                    send_err(
                         evt_tx,
                         connection_id,
                         "create_consumer",
-                        consumer_info_to_json(consumer.cached_info()),
-                    ),
-                    Err(e) => send_err(evt_tx, connection_id, "create_consumer", e.to_string()),
-                },
-                Err(e) => send_err(
-                    evt_tx,
-                    connection_id,
-                    "create_consumer",
-                    format!("Invalid consumer config: {e}"),
-                ),
+                        format!("Invalid consumer config: {e}"),
+                    )
+                    .await
+                }
             }
         },
     )
@@ -90,7 +99,7 @@ pub(crate) async fn handle_delete_consumer(
     connection_id: u64,
     stream_name: String,
     name: String,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let lookup_name = stream_name.clone();
     with_stream(
@@ -101,16 +110,19 @@ pub(crate) async fn handle_delete_consumer(
         "delete_consumer",
         |stream| async move {
             match stream.delete_consumer(&name).await {
-                Ok(_) => send_ok(
-                    evt_tx,
-                    connection_id,
-                    "delete_consumer",
-                    serde_json::json!({
-                        "stream": stream_name,
-                        "name": name,
-                    }),
-                ),
-                Err(e) => send_err(evt_tx, connection_id, "delete_consumer", e.to_string()),
+                Ok(_) => {
+                    send_ok(
+                        evt_tx,
+                        connection_id,
+                        "delete_consumer",
+                        serde_json::json!({
+                            "stream": stream_name,
+                            "name": name,
+                        }),
+                    )
+                    .await
+                }
+                Err(e) => send_err(evt_tx, connection_id, "delete_consumer", e.to_string()).await,
             }
         },
     )
@@ -122,7 +134,7 @@ pub(crate) async fn handle_update_consumer(
     connection_id: u64,
     stream_name: String,
     config: serde_json::Value,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     with_stream(
         state,
@@ -133,20 +145,28 @@ pub(crate) async fn handle_update_consumer(
         |stream| async move {
             match serde_json::from_value::<async_nats::jetstream::consumer::pull::Config>(config) {
                 Ok(consumer_config) => match stream.update_consumer(consumer_config).await {
-                    Ok(consumer) => send_ok(
+                    Ok(consumer) => {
+                        send_ok(
+                            evt_tx,
+                            connection_id,
+                            "update_consumer",
+                            consumer_info_to_json(consumer.cached_info()),
+                        )
+                        .await
+                    }
+                    Err(e) => {
+                        send_err(evt_tx, connection_id, "update_consumer", e.to_string()).await
+                    }
+                },
+                Err(e) => {
+                    send_err(
                         evt_tx,
                         connection_id,
                         "update_consumer",
-                        consumer_info_to_json(consumer.cached_info()),
-                    ),
-                    Err(e) => send_err(evt_tx, connection_id, "update_consumer", e.to_string()),
-                },
-                Err(e) => send_err(
-                    evt_tx,
-                    connection_id,
-                    "update_consumer",
-                    format!("Invalid consumer config: {e}"),
-                ),
+                        format!("Invalid consumer config: {e}"),
+                    )
+                    .await
+                }
             }
         },
     )
@@ -159,7 +179,7 @@ pub(crate) async fn handle_fetch_consumer_messages(
     stream_name: String,
     consumer_name: String,
     batch: usize,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let operation = "fetch_consumer_messages";
     let lookup = stream_name.clone();
@@ -174,7 +194,7 @@ pub(crate) async fn handle_fetch_consumer_messages(
             let original = match stream.consumer_info(&consumer_name).await {
                 Ok(info) => info,
                 Err(e) => {
-                    send_err(evt_tx, connection_id, operation, e.to_string());
+                    send_err(evt_tx, connection_id, operation, e.to_string()).await;
                     return;
                 }
             };
@@ -201,7 +221,8 @@ pub(crate) async fn handle_fetch_consumer_messages(
                         connection_id,
                         operation,
                         format!("Failed to create inspector consumer: {e}"),
-                    );
+                    )
+                    .await;
                     return;
                 }
             };
@@ -217,7 +238,7 @@ pub(crate) async fn handle_fetch_consumer_messages(
                 Ok(s) => s,
                 Err(e) => {
                     cleanup_inspector_consumer(&stream, &inspector_name).await;
-                    send_err(evt_tx, connection_id, operation, e.to_string());
+                    send_err(evt_tx, connection_id, operation, e.to_string()).await;
                     return;
                 }
             };
@@ -229,7 +250,7 @@ pub(crate) async fn handle_fetch_consumer_messages(
                     Err(e) => {
                         drop(fetch_stream);
                         cleanup_inspector_consumer(&stream, &inspector_name).await;
-                        send_err(evt_tx, connection_id, operation, e.to_string());
+                        send_err(evt_tx, connection_id, operation, e.to_string()).await;
                         return;
                     }
                 };
@@ -253,7 +274,8 @@ pub(crate) async fn handle_fetch_consumer_messages(
                     "consumer": consumer_name,
                     "messages": messages,
                 }),
-            );
+            )
+            .await;
         },
     )
     .await;
@@ -276,7 +298,7 @@ async fn with_stream<F, Fut>(
     state: &WorkerState,
     connection_id: u64,
     stream_name: &str,
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+    evt_tx: &mpsc::Sender<BackendEvent>,
     operation: &str,
     f: F,
 ) where
@@ -287,7 +309,7 @@ async fn with_stream<F, Fut>(
         let js = async_nats::jetstream::new(client.clone());
         match js.get_stream(stream_name).await {
             Ok(stream) => f(stream).await,
-            Err(e) => send_err(evt_tx, connection_id, operation, e.to_string()),
+            Err(e) => send_err(evt_tx, connection_id, operation, e.to_string()).await,
         }
     } else {
         send_err(
@@ -295,32 +317,37 @@ async fn with_stream<F, Fut>(
             connection_id,
             operation,
             "Not connected".to_string(),
-        );
+        )
+        .await;
     }
 }
 
-fn send_ok(
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+async fn send_ok(
+    evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
     operation: &str,
     data: serde_json::Value,
 ) {
-    let _ = evt_tx.send(BackendEvent::OperationResult {
-        connection_id,
-        operation: operation.to_string(),
-        data,
-    });
+    let _ = evt_tx
+        .send(BackendEvent::OperationResult {
+            connection_id,
+            operation: operation.to_string(),
+            data,
+        })
+        .await;
 }
 
-fn send_err(
-    evt_tx: &mpsc::UnboundedSender<BackendEvent>,
+async fn send_err(
+    evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
     operation: &str,
     message: String,
 ) {
-    let _ = evt_tx.send(BackendEvent::Error {
-        connection_id: Some(connection_id),
-        operation: operation.to_string(),
-        message,
-    });
+    let _ = evt_tx
+        .send(BackendEvent::Error {
+            connection_id: Some(connection_id),
+            operation: operation.to_string(),
+            message,
+        })
+        .await;
 }

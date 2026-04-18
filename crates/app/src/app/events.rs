@@ -88,14 +88,10 @@ impl EasyNatsApp {
                         }
                     }
                 }
-                BackendEvent::MessageReceived {
+                BackendEvent::MessageBatch {
                     connection_id,
                     backend_id: msg_backend_id,
-                    subject,
-                    reply,
-                    headers,
-                    payload,
-                    timestamp,
+                    messages,
                 } => {
                     for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
                         if let TabKind::Subscriber {
@@ -107,13 +103,16 @@ impl EasyNatsApp {
                             && *cid == connection_id
                             && *backend_id == msg_backend_id
                         {
-                            state.push_message(ReceivedMessage {
-                                subject: subject.clone(),
-                                reply: reply.clone(),
-                                headers: headers.clone(),
-                                payload: payload.clone(),
-                                timestamp,
-                            });
+                            for message in messages {
+                                state.push_message(ReceivedMessage {
+                                    subject: message.subject,
+                                    reply: message.reply,
+                                    headers: message.headers,
+                                    payload: message.payload,
+                                    timestamp: message.timestamp,
+                                });
+                            }
+                            break;
                         }
                     }
                 }

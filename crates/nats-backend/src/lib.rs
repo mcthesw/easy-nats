@@ -12,5 +12,5 @@ pub use cancellation::TaskCancellation;
 pub use command::BackendCommand;
 pub use config::AppConfig;
 pub use connection::{AuthMethod, ConnectionConfig, ConnectionStatus};
-pub use event::{BackendEvent, ConnectionStatusKind};
+pub use event::{BackendEvent, ConnectionStatusKind, MessageData};
 pub use paths::{MigrationOutcome, ProjectPaths, migrate_legacy_file, migrate_legacy_on_startup};
