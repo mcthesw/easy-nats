@@ -1,6 +1,6 @@
 use tokio::sync::mpsc;
 
-use crate::event::BackendEvent;
+use crate::event::{BackendEvent, BackendOperation};
 
 use super::state::WorkerState;
 
@@ -10,7 +10,13 @@ pub(crate) async fn handle_get_server_info(
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(client) = state.clients.get(&connection_id) else {
-        send_err(evt_tx, connection_id, "server_info", "Not connected").await;
+        send_err(
+            evt_tx,
+            connection_id,
+            BackendOperation::ServerInfo,
+            "Not connected",
+        )
+        .await;
         return;
     };
 
@@ -29,7 +35,7 @@ pub(crate) async fn handle_get_server_info(
         "tls_required": info.tls_required,
         "connect_urls": info.connect_urls,
     });
-    send_ok(evt_tx, connection_id, "server_info", data).await;
+    send_ok(evt_tx, connection_id, BackendOperation::ServerInfo, data).await;
 }
 
 pub(crate) async fn handle_get_jetstream_account_info(
@@ -41,7 +47,7 @@ pub(crate) async fn handle_get_jetstream_account_info(
         send_err(
             evt_tx,
             connection_id,
-            "jetstream_account_info",
+            BackendOperation::JetStreamAccountInfo,
             "Not connected",
         )
         .await;
@@ -70,13 +76,19 @@ pub(crate) async fn handle_get_jetstream_account_info(
                 "api_total": account.requests.total,
                 "api_errors": account.requests.errors,
             });
-            send_ok(evt_tx, connection_id, "jetstream_account_info", data).await;
+            send_ok(
+                evt_tx,
+                connection_id,
+                BackendOperation::JetStreamAccountInfo,
+                data,
+            )
+            .await;
         }
         Err(e) => {
             send_err(
                 evt_tx,
                 connection_id,
-                "jetstream_account_info",
+                BackendOperation::JetStreamAccountInfo,
                 &e.to_string(),
             )
             .await
@@ -87,13 +99,13 @@ pub(crate) async fn handle_get_jetstream_account_info(
 async fn send_ok(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
-    operation: &str,
+    operation: BackendOperation,
     data: serde_json::Value,
 ) {
     let _ = evt_tx
         .send(BackendEvent::OperationResult {
             connection_id,
-            operation: operation.to_string(),
+            operation,
             data,
         })
         .await;
@@ -102,14 +114,14 @@ async fn send_ok(
 async fn send_err(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
-    operation: &str,
+    operation: BackendOperation,
     message: &str,
 ) {
     let _ = evt_tx
         .send(BackendEvent::Error {
             connection_id: Some(connection_id),
             backend_id: None,
-            operation: operation.to_string(),
+            operation,
             message: message.to_string(),
         })
         .await;

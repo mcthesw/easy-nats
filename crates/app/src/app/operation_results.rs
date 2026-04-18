@@ -1,3 +1,5 @@
+use nats_backend::BackendOperation;
+
 use crate::tabs::TabKind;
 use crate::toast::ToastLevel;
 
@@ -7,10 +9,10 @@ impl EasyNatsApp {
     pub(crate) fn handle_operation_result(
         &mut self,
         connection_id: u64,
-        operation: &str,
+        operation: BackendOperation,
         data: serde_json::Value,
     ) {
-        if operation == "publish" {
+        if operation == BackendOperation::Publish {
             self.toasts.push(
                 ToastLevel::Success,
                 format!("Published to {}", self.conn_name(connection_id)),
@@ -34,10 +36,10 @@ impl EasyNatsApp {
         &mut self,
         connection_id: Option<u64>,
         backend_id: Option<u64>,
-        operation: &str,
+        operation: BackendOperation,
         message: &str,
     ) {
-        if operation == "request"
+        if operation == BackendOperation::Request
             && let Some(cid) = connection_id
         {
             for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
@@ -55,7 +57,7 @@ impl EasyNatsApp {
             }
         }
 
-        if operation == "list_consumers"
+        if operation == BackendOperation::ListConsumers
             && let Some(cid) = connection_id
         {
             for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
@@ -71,7 +73,7 @@ impl EasyNatsApp {
             }
         }
 
-        if operation == "fetch_consumer_messages"
+        if operation == BackendOperation::FetchConsumerMessages
             && let Some(cid) = connection_id
         {
             for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {

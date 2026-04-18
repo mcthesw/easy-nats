@@ -3,7 +3,7 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use futures_util::StreamExt;
 use tokio::sync::mpsc;
 
-use crate::event::BackendEvent;
+use crate::event::{BackendEvent, BackendOperation};
 
 use super::helpers::{consumer_info_to_json, raw_message_to_json};
 use super::state::WorkerState;
@@ -22,7 +22,7 @@ pub(crate) async fn handle_list_consumers(
         connection_id,
         &lookup_name,
         evt_tx,
-        "list_consumers",
+        BackendOperation::ListConsumers,
         |stream| async move {
             let mut consumers_iter = stream.consumers();
             let mut list = Vec::new();
@@ -38,7 +38,7 @@ pub(crate) async fn handle_list_consumers(
             send_ok(
                 evt_tx,
                 connection_id,
-                "list_consumers",
+                BackendOperation::ListConsumers,
                 serde_json::json!({
                     "stream": stream_name,
                     "consumers": list,
@@ -62,7 +62,7 @@ pub(crate) async fn handle_create_consumer(
         connection_id,
         &stream_name,
         evt_tx,
-        "create_consumer",
+        BackendOperation::CreateConsumer,
         |stream| async move {
             match serde_json::from_value::<async_nats::jetstream::consumer::pull::Config>(config) {
                 Ok(consumer_config) => match stream.create_consumer(consumer_config).await {
@@ -70,20 +70,26 @@ pub(crate) async fn handle_create_consumer(
                         send_ok(
                             evt_tx,
                             connection_id,
-                            "create_consumer",
+                            BackendOperation::CreateConsumer,
                             consumer_info_to_json(consumer.cached_info()),
                         )
                         .await
                     }
                     Err(e) => {
-                        send_err(evt_tx, connection_id, "create_consumer", e.to_string()).await
+                        send_err(
+                            evt_tx,
+                            connection_id,
+                            BackendOperation::CreateConsumer,
+                            e.to_string(),
+                        )
+                        .await
                     }
                 },
                 Err(e) => {
                     send_err(
                         evt_tx,
                         connection_id,
-                        "create_consumer",
+                        BackendOperation::CreateConsumer,
                         format!("Invalid consumer config: {e}"),
                     )
                     .await
@@ -107,14 +113,14 @@ pub(crate) async fn handle_delete_consumer(
         connection_id,
         &lookup_name,
         evt_tx,
-        "delete_consumer",
+        BackendOperation::DeleteConsumer,
         |stream| async move {
             match stream.delete_consumer(&name).await {
                 Ok(_) => {
                     send_ok(
                         evt_tx,
                         connection_id,
-                        "delete_consumer",
+                        BackendOperation::DeleteConsumer,
                         serde_json::json!({
                             "stream": stream_name,
                             "name": name,
@@ -122,7 +128,15 @@ pub(crate) async fn handle_delete_consumer(
                     )
                     .await
                 }
-                Err(e) => send_err(evt_tx, connection_id, "delete_consumer", e.to_string()).await,
+                Err(e) => {
+                    send_err(
+                        evt_tx,
+                        connection_id,
+                        BackendOperation::DeleteConsumer,
+                        e.to_string(),
+                    )
+                    .await
+                }
             }
         },
     )
@@ -141,7 +155,7 @@ pub(crate) async fn handle_update_consumer(
         connection_id,
         &stream_name,
         evt_tx,
-        "update_consumer",
+        BackendOperation::UpdateConsumer,
         |stream| async move {
             match serde_json::from_value::<async_nats::jetstream::consumer::pull::Config>(config) {
                 Ok(consumer_config) => match stream.update_consumer(consumer_config).await {
@@ -149,20 +163,26 @@ pub(crate) async fn handle_update_consumer(
                         send_ok(
                             evt_tx,
                             connection_id,
-                            "update_consumer",
+                            BackendOperation::UpdateConsumer,
                             consumer_info_to_json(consumer.cached_info()),
                         )
                         .await
                     }
                     Err(e) => {
-                        send_err(evt_tx, connection_id, "update_consumer", e.to_string()).await
+                        send_err(
+                            evt_tx,
+                            connection_id,
+                            BackendOperation::UpdateConsumer,
+                            e.to_string(),
+                        )
+                        .await
                     }
                 },
                 Err(e) => {
                     send_err(
                         evt_tx,
                         connection_id,
-                        "update_consumer",
+                        BackendOperation::UpdateConsumer,
                         format!("Invalid consumer config: {e}"),
                     )
                     .await
@@ -181,7 +201,7 @@ pub(crate) async fn handle_fetch_consumer_messages(
     batch: usize,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let operation = "fetch_consumer_messages";
+    let operation = BackendOperation::FetchConsumerMessages;
     let lookup = stream_name.clone();
     with_stream(
         state,
@@ -299,7 +319,7 @@ async fn with_stream<F, Fut>(
     connection_id: u64,
     stream_name: &str,
     evt_tx: &mpsc::Sender<BackendEvent>,
-    operation: &str,
+    operation: BackendOperation,
     f: F,
 ) where
     F: FnOnce(async_nats::jetstream::stream::Stream) -> Fut,
@@ -325,13 +345,13 @@ async fn with_stream<F, Fut>(
 async fn send_ok(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
-    operation: &str,
+    operation: BackendOperation,
     data: serde_json::Value,
 ) {
     let _ = evt_tx
         .send(BackendEvent::OperationResult {
             connection_id,
-            operation: operation.to_string(),
+            operation,
             data,
         })
         .await;
@@ -340,14 +360,14 @@ async fn send_ok(
 async fn send_err(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
-    operation: &str,
+    operation: BackendOperation,
     message: String,
 ) {
     let _ = evt_tx
         .send(BackendEvent::Error {
             connection_id: Some(connection_id),
             backend_id: None,
-            operation: operation.to_string(),
+            operation,
             message,
         })
         .await;
