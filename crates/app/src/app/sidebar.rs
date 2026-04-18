@@ -196,10 +196,12 @@ fn render_pubsub_section(
                 let (display_id, id_return) = app.tab_id_alloc.allocate();
                 let cancel = CancellationToken::new();
                 let guard = TabGuard::new(cancel.clone(), display_id, id_return);
+                let bid = next_backend_id();
                 *action = Some(SidebarAction::OpenTab(Box::new(TabKind::Publisher {
                     connection_id: id,
                     connection_name: name.to_string(),
                     guard,
+                    backend_id: bid,
                     state: PublisherState::default(),
                 })));
             }

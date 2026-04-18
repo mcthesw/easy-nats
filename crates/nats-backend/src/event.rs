@@ -23,6 +23,7 @@ pub enum BackendEvent {
     },
     RequestResponse {
         connection_id: u64,
+        backend_id: u64,
         payload: Vec<u8>,
         headers: Vec<(String, String)>,
     },
@@ -35,6 +36,7 @@ pub enum BackendEvent {
     // Errors
     Error {
         connection_id: Option<u64>,
+        backend_id: Option<u64>,
         operation: String,
         message: String,
     },

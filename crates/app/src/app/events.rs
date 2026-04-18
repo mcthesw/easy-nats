@@ -69,16 +69,19 @@ impl EasyNatsApp {
                 }
                 BackendEvent::RequestResponse {
                     connection_id,
+                    backend_id: response_backend_id,
                     payload,
                     headers,
                 } => {
                     for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
                         if let TabKind::Publisher {
                             connection_id: cid,
+                            backend_id,
                             state,
                             ..
                         } = tab
                             && *cid == connection_id
+                            && *backend_id == response_backend_id
                         {
                             state.response = Some(ResponseData {
                                 payload: payload.clone(),
@@ -118,10 +121,11 @@ impl EasyNatsApp {
                 }
                 BackendEvent::Error {
                     connection_id,
+                    backend_id,
                     operation,
                     message,
                 } => {
-                    self.handle_error(connection_id, &operation, &message);
+                    self.handle_error(connection_id, backend_id, &operation, &message);
                 }
             }
         }
