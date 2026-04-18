@@ -31,6 +31,10 @@ tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "registry", "fmt"] }
 tokio-util = "0.7"
+image = { version = "0.25", default-features = false, features = ["png"] }
+
+[target.'cfg(target_os = "windows")'.build-dependencies]
+winresource = "0.1"
 
 # Package metadata for cargo-packager.
 [package.metadata.packager]

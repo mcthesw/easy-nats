@@ -7,6 +7,11 @@
   "include-component-in-tag": false,
   "pull-request-title-pattern": "chore${scope}: release ${version}",
   "separate-pull-requests": true,
+  "plugins": [
+    {
+      "type": "cargo-workspace"
+    }
+  ],
   "changelog-sections": [
     { "type": "feat", "section": "Features" },
     { "type": "fix", "section": "Bug Fixes" },
