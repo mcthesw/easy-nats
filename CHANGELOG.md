@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.8](https://github.com/mcthesw/easy-nats/compare/v0.1.7...v0.1.8) (2026-04-18)
+
+
+### Performance Improvements
+
+* update eframe dependencies for smaller size ([76f554e](https://github.com/mcthesw/easy-nats/commit/76f554e6a7f0da51a3f211c0824e03f05696acb8))
+
 ## [0.1.7](https://github.com/mcthesw/easy-nats/compare/v0.1.6...v0.1.7) (2026-04-18)
 
 
