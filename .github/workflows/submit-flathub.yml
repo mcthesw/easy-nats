@@ -12,7 +12,7 @@ permissions:
   contents: read
 
 env:
-  APP_ID: io.github.mcthesw.easy_nats
+  APP_ID: io.github.mcthesw.easy-nats
   UPSTREAM_REPO: flathub/flathub
   UPSTREAM_BRANCH: new-pr
   FORK_REPO: ${{ vars.FLATHUB_FORK }}
@@ -58,11 +58,15 @@ jobs:
           sed -e "s|@REPO@|${REPO}|g" \
               -e "s|@TAG@|${TAG}|g" \
               -e "s|@SOURCE_SHA256@|${source_sha}|g" \
-              packaging/flatpak/io.github.mcthesw.easy_nats.yml.tmpl > "out/${APP_ID}.yml"
-          cp packaging/flatpak/io.github.mcthesw.easy_nats.desktop "out/${APP_ID}.desktop"
-          cp packaging/flatpak/io.github.mcthesw.easy_nats.metainfo.xml "out/${APP_ID}.metainfo.xml"
+              packaging/flatpak/io.github.mcthesw.easy-nats.yml.tmpl > "out/${APP_ID}.yml"
+          cp packaging/flatpak/io.github.mcthesw.easy-nats.desktop "out/${APP_ID}.desktop"
+          cp packaging/flatpak/io.github.mcthesw.easy-nats.metainfo.xml "out/${APP_ID}.metainfo.xml"
           cp packaging/flatpak/flathub.json out/flathub.json
           cp packaging/icon.png "out/${APP_ID}.png"
+          flatpak-builder --force-clean --disable-rofiles-fuse \
+            --mirror-screenshots-url=https://dl.flathub.org/media \
+            out/build-tmp "out/${APP_ID}.yml"
+          rm -rf out/build-tmp
           rm -f out/source.tar.gz
 
       - name: Checkout fork

@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.mcthesw.easy-nats</id>
+  <name>Easy NATS</name>
+  <summary>Desktop GUI client for NATS and JetStream</summary>
+  <developer id="io.github.mcthesw">
+    <name>mcthesw</name>
+  </developer>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <launchable type="desktop-id">io.github.mcthesw.easy-nats.desktop</launchable>
+  <url type="homepage">https://github.com/mcthesw/easy-nats</url>
+  <url type="bugtracker">https://github.com/mcthesw/easy-nats/issues</url>
+  <url type="vcs-browser">https://github.com/mcthesw/easy-nats</url>
+  <description>
+    <p>Easy NATS is a desktop client for NATS servers, JetStream, KV, and Object Store.</p>
+    <p>It provides a tabbed UI for publishing, subscribing, browsing streams and consumers, and managing KV and object store buckets.</p>
+  </description>
+  <screenshots>
+    <screenshot type="default">
+      <caption>Main workspace showing connections, stream browsing, and publish controls</caption>
+      <image>https://raw.githubusercontent.com/mcthesw/easy-nats/v0.1.8/assets/imgs/main-menu.png</image>
+    </screenshot>
+  </screenshots>
+  <releases>
+    <release version="0.1.8" timestamp="1776505346"/>
+    <release version="0.1.7" timestamp="1776499953"/>
+    <release version="0.1.6" timestamp="1776489489"/>
+    <release version="0.1.5" timestamp="1776447478"/>
+    <release version="0.1.4" timestamp="1776391278"/>
+    <release version="0.1.3" timestamp="1776388923"/>
+    <release version="0.1.2" timestamp="1776364835"/>
+    <release version="0.1.1" timestamp="1776362314"/>
+  </releases>
+  <content_rating type="oars-1.1"/>
+</component>
