@@ -2,7 +2,7 @@
 Type=Application
 Name=Easy NATS
 Exec=easy-nats
-Icon=io.github.mcthesw.easy_nats
-Categories=Development;Network;
+Icon=io.github.mcthesw.easy-nats
+Categories=Development;
 Terminal=false
 StartupNotify=true
