@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.9](https://github.com/mcthesw/easy-nats/compare/v0.1.8...v0.1.9) (2026-04-20)
+
+
+### Features
+
+* **flatpak:** enhance Flathub metadata ([e781b5d](https://github.com/mcthesw/easy-nats/commit/e781b5d5425af4e725e8650b8448f7c7d6266a6f))
+
 ## [0.1.8](https://github.com/mcthesw/easy-nats/compare/v0.1.7...v0.1.8) (2026-04-18)
 
 
