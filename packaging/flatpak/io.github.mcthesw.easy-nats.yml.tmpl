@@ -31,9 +31,9 @@ modules:
       - type: archive
         url: https://github.com/@REPO@/archive/refs/tags/@TAG@.tar.gz
         sha256: @SOURCE_SHA256@
-        strip-components: 1
         x-checker-data:
-          type: github
-          repo: @REPO@
-          tag-template: v{version}
+          type: json
+          url: https://api.github.com/repos/@REPO@/releases/latest
+          version-query: .tag_name | sub("^v"; "")
+          url-query: .tag_name as $tag | "https://github.com/@REPO@/archive/refs/tags/\($tag).tar.gz"
       - cargo-sources.json
