@@ -3,10 +3,7 @@ use nats_backend::{BackendCommand, ConnectionStatusKind};
 use tokio_util::sync::CancellationToken;
 
 use crate::i18n::t;
-use crate::tabs::{
-    KvBucketState, ObjectStoreBucketState, PublisherState, StreamState, SubscriberState, TabGuard,
-    TabKind, next_backend_id,
-};
+use crate::tabs::{KvBucketState, ObjectStoreBucketState, StreamState, TabGuard, TabKind};
 
 use super::{
     editors::{KvBucketCreateEditor, ObjStoreBucketCreateEditor, StreamCreateEditor},
@@ -18,6 +15,8 @@ pub(crate) enum SidebarAction {
     Connect(u64),
     Disconnect(u64),
     OpenTab(Box<TabKind>),
+    OpenPublisher(u64),
+    OpenSubscriber(u64),
     OpenStreamCreate(u64),
     OpenKvBucketCreate(u64),
     OpenObjStoreBucketCreate(u64),
@@ -166,7 +165,7 @@ fn render_resource_tree(
     action: &mut Option<SidebarAction>,
 ) {
     ui.indent(format!("tree_{id}"), |ui| {
-        render_pubsub_section(app, ui, id, name, action);
+        render_pubsub_section(ui, id, action);
         render_streams_section(app, ui, id, name, action);
         render_kv_section(app, ui, id, name, action);
         render_obj_store_section(app, ui, id, name, action);
@@ -179,13 +178,7 @@ fn render_resource_tree(
     });
 }
 
-fn render_pubsub_section(
-    app: &mut EasyNatsApp,
-    ui: &mut egui::Ui,
-    id: u64,
-    name: &str,
-    action: &mut Option<SidebarAction>,
-) {
+fn render_pubsub_section(ui: &mut egui::Ui, id: u64, action: &mut Option<SidebarAction>) {
     egui::CollapsingHeader::new(t("sidebar.section_pubsub"))
         .id_salt(format!("pubsub_{id}"))
         .show(ui, |ui| {
@@ -193,33 +186,13 @@ fn render_pubsub_section(
                 .selectable_label(false, t("sidebar.open_publisher"))
                 .clicked()
             {
-                let (display_id, id_return) = app.tab_id_alloc.allocate();
-                let cancel = CancellationToken::new();
-                let guard = TabGuard::new(cancel.clone(), display_id, id_return);
-                let bid = next_backend_id();
-                *action = Some(SidebarAction::OpenTab(Box::new(TabKind::Publisher {
-                    connection_id: id,
-                    connection_name: name.to_string(),
-                    guard,
-                    backend_id: bid,
-                    state: PublisherState::default(),
-                })));
+                *action = Some(SidebarAction::OpenPublisher(id));
             }
             if ui
                 .selectable_label(false, t("sidebar.open_subscriber"))
                 .clicked()
             {
-                let (display_id, id_return) = app.tab_id_alloc.allocate();
-                let cancel = CancellationToken::new();
-                let guard = TabGuard::new(cancel.clone(), display_id, id_return);
-                let bid = next_backend_id();
-                *action = Some(SidebarAction::OpenTab(Box::new(TabKind::Subscriber {
-                    connection_id: id,
-                    connection_name: name.to_string(),
-                    guard,
-                    backend_id: bid,
-                    state: SubscriberState::default(),
-                })));
+                *action = Some(SidebarAction::OpenSubscriber(id));
             }
         });
 }
@@ -386,6 +359,12 @@ fn apply_sidebar_action(app: &mut EasyNatsApp, action: Option<SidebarAction>) {
         Some(SidebarAction::Connect(id)) => app.connect(id),
         Some(SidebarAction::Disconnect(id)) => app.disconnect(id),
         Some(SidebarAction::OpenTab(tab)) => app.open_tab(*tab),
+        Some(SidebarAction::OpenPublisher(connection_id)) => {
+            app.open_or_focus_publisher_tab(connection_id);
+        }
+        Some(SidebarAction::OpenSubscriber(connection_id)) => {
+            app.open_or_focus_subscriber_tab(connection_id);
+        }
         Some(SidebarAction::OpenStreamCreate(connection_id)) => {
             app.stream_editor = StreamCreateEditor {
                 visible: true,
