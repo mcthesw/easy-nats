@@ -1,7 +1,9 @@
 use eframe::egui;
 use nats_backend::{AuthMethod, BackendCommand, ConnectionConfig};
+use tokio_util::sync::CancellationToken;
 
-use crate::tabs::TabKind;
+use crate::settings::PubSubTabMode;
+use crate::tabs::{PublisherState, SubscriberState, TabGuard, TabKind, next_backend_id};
 
 use super::{model::EasyNatsApp, util::same_tab};
 
@@ -244,6 +246,14 @@ impl EasyNatsApp {
         } else {
             self.dock_state.push_to_focused_leaf(tab);
         }
+    }
+
+    pub(crate) fn open_or_focus_publisher_tab(&mut self, connection_id: u64) {
+        self.open_or_focus_pubsub_tab(connection_id, PubSubTabKind::Publisher);
+    }
+
+    pub(crate) fn open_or_focus_subscriber_tab(&mut self, connection_id: u64) {
+        self.open_or_focus_pubsub_tab(connection_id, PubSubTabKind::Subscriber);
     }
 
     pub(crate) fn save_stream_editor(&mut self) {
@@ -528,6 +538,52 @@ impl EasyNatsApp {
     }
 }
 
+#[derive(Clone, Copy)]
+enum PubSubTabKind {
+    Publisher,
+    Subscriber,
+}
+
+impl EasyNatsApp {
+    fn open_or_focus_pubsub_tab(&mut self, connection_id: u64, tab_kind: PubSubTabKind) {
+        if self.settings.pubsub_tab_mode == PubSubTabMode::ReuseExisting
+            && let Some(path) = self
+                .dock_state
+                .find_tab_from(|tab| matches_pubsub_tab(tab, connection_id, tab_kind))
+        {
+            let _ = self.dock_state.set_active_tab(path);
+            return;
+        }
+
+        let tab = self.new_pubsub_tab(connection_id, tab_kind);
+        self.open_tab(tab);
+    }
+
+    fn new_pubsub_tab(&mut self, connection_id: u64, tab_kind: PubSubTabKind) -> TabKind {
+        let connection_name = self.conn_name(connection_id);
+        let (display_id, id_return) = self.tab_id_alloc.allocate();
+        let guard = TabGuard::new(CancellationToken::new(), display_id, id_return);
+        let backend_id = next_backend_id();
+
+        match tab_kind {
+            PubSubTabKind::Publisher => TabKind::Publisher {
+                connection_id,
+                connection_name,
+                guard,
+                backend_id,
+                state: PublisherState::default(),
+            },
+            PubSubTabKind::Subscriber => TabKind::Subscriber {
+                connection_id,
+                connection_name,
+                guard,
+                backend_id,
+                state: SubscriberState::default(),
+            },
+        }
+    }
+}
+
 fn collect_non_empty_headers(headers: &[(String, String)]) -> Option<Vec<(String, String)>> {
     let non_empty: Vec<(String, String)> = headers
         .iter()
@@ -538,5 +594,97 @@ fn collect_non_empty_headers(headers: &[(String, String)]) -> Option<Vec<(String
         None
     } else {
         Some(non_empty)
+    }
+}
+
+fn matches_pubsub_tab(tab: &TabKind, connection_id: u64, tab_kind: PubSubTabKind) -> bool {
+    match (tab_kind, tab) {
+        (
+            PubSubTabKind::Publisher,
+            TabKind::Publisher {
+                connection_id: existing_id,
+                ..
+            },
+        ) => *existing_id == connection_id,
+        (
+            PubSubTabKind::Subscriber,
+            TabKind::Subscriber {
+                connection_id: existing_id,
+                ..
+            },
+        ) => *existing_id == connection_id,
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::sync::{Arc, Mutex};
+
+    use super::EasyNatsApp;
+    use crate::log_layer::LogBuffer;
+    use crate::settings::{AppSettings, PubSubTabMode};
+    use crate::tabs::TabKind;
+    use crate::theme::ThemeId;
+
+    fn test_app(mode: PubSubTabMode) -> EasyNatsApp {
+        EasyNatsApp::new(
+            AppSettings {
+                pubsub_tab_mode: mode,
+                ..Default::default()
+            },
+            ThemeId::EguiDark,
+            Arc::new(Mutex::new(LogBuffer::default())),
+        )
+    }
+
+    fn count_publisher_tabs(app: &EasyNatsApp, connection_id: u64) -> usize {
+        app.dock_state
+            .iter_all_tabs()
+            .filter(|(_, tab)| {
+                matches!(
+                    tab,
+                    TabKind::Publisher {
+                        connection_id: existing_id,
+                        ..
+                    } if *existing_id == connection_id
+                )
+            })
+            .count()
+    }
+
+    fn count_subscriber_tabs(app: &EasyNatsApp, connection_id: u64) -> usize {
+        app.dock_state
+            .iter_all_tabs()
+            .filter(|(_, tab)| {
+                matches!(
+                    tab,
+                    TabKind::Subscriber {
+                        connection_id: existing_id,
+                        ..
+                    } if *existing_id == connection_id
+                )
+            })
+            .count()
+    }
+
+    #[test]
+    fn publisher_reuses_existing_tab_when_configured() {
+        let mut app = test_app(PubSubTabMode::ReuseExisting);
+
+        app.open_or_focus_publisher_tab(7);
+        app.open_or_focus_publisher_tab(7);
+
+        assert_eq!(count_publisher_tabs(&app, 7), 1);
+    }
+
+    #[test]
+    fn subscriber_opens_new_tabs_by_default() {
+        let mut app = test_app(PubSubTabMode::NewTab);
+
+        app.open_or_focus_subscriber_tab(7);
+        app.open_or_focus_subscriber_tab(7);
+
+        assert_eq!(count_subscriber_tabs(&app, 7), 2);
     }
 }
