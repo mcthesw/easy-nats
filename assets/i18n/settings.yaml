@@ -7,6 +7,10 @@ section_appearance:
   en: "Appearance"
   zh: "外观"
 
+section_behavior:
+  en: "Behavior"
+  zh: "行为"
+
 language:
   en: "Language"
   zh: "语言"
@@ -38,6 +42,18 @@ theme_catppuccin_macchiato:
 theme_catppuccin_mocha:
   en: "Catppuccin Mocha"
   zh: "Catppuccin Mocha"
+
+pubsub_tab_mode:
+  en: "Pub/Sub tabs"
+  zh: "Pub/Sub 标签页"
+
+pubsub_tab_mode_new:
+  en: "Always open new tab"
+  zh: "总是新开标签页"
+
+pubsub_tab_mode_reuse:
+  en: "Reuse existing tab"
+  zh: "复用已有标签页"
 
 section_protobuf:
   en: "Protobuf Schemas"

@@ -1,7 +1,7 @@
 use eframe::egui;
 
 use crate::i18n::{self, Language, t};
-use crate::settings::AppSettings;
+use crate::settings::{AppSettings, PubSubTabMode};
 use crate::theme::{ThemeId, theme_catalog, theme_definition};
 
 use super::types::TabAction;
@@ -49,6 +49,27 @@ pub fn settings_ui(
                         settings.theme = Some(theme.id);
                         settings.save();
                         actions.push(TabAction::ApplyTheme { theme_id: theme.id });
+                    }
+                }
+            });
+    });
+
+    ui.add_space(12.0);
+    ui.separator();
+    ui.label(egui::RichText::new(t("settings.section_behavior")).strong());
+    ui.add_space(4.0);
+
+    ui.horizontal(|ui| {
+        ui.label(t("settings.pubsub_tab_mode"));
+        egui::ComboBox::from_id_salt("settings_pubsub_tab_mode")
+            .selected_text(t(settings.pubsub_tab_mode.label_key()))
+            .show_ui(ui, |ui| {
+                for mode in PubSubTabMode::ALL {
+                    if ui
+                        .selectable_value(&mut settings.pubsub_tab_mode, mode, t(mode.label_key()))
+                        .changed()
+                    {
+                        settings.save();
                     }
                 }
             });

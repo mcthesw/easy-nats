@@ -8,12 +8,33 @@ use serde::{Deserialize, Serialize};
 use crate::i18n::Language;
 use crate::theme::ThemeId;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "kebab-case")]
+pub enum PubSubTabMode {
+    #[default]
+    NewTab,
+    ReuseExisting,
+}
+
+impl PubSubTabMode {
+    pub const ALL: [Self; 2] = [Self::NewTab, Self::ReuseExisting];
+
+    pub fn label_key(self) -> &'static str {
+        match self {
+            Self::NewTab => "settings.pubsub_tab_mode_new",
+            Self::ReuseExisting => "settings.pubsub_tab_mode_reuse",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppSettings {
     #[serde(default)]
     pub language: Language,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub theme: Option<ThemeId>,
+    #[serde(default)]
+    pub pubsub_tab_mode: PubSubTabMode,
     #[serde(default)]
     pub proto_schema_dir: Option<String>,
     #[serde(default)]
@@ -29,6 +50,8 @@ struct StoredAppSettings {
     #[serde(default)]
     dark_mode: Option<bool>,
     #[serde(default)]
+    pubsub_tab_mode: PubSubTabMode,
+    #[serde(default)]
     proto_schema_dir: Option<String>,
     #[serde(default)]
     topic_history: Vec<String>,
@@ -39,6 +62,7 @@ impl Default for AppSettings {
         Self {
             language: Language::En,
             theme: None,
+            pubsub_tab_mode: PubSubTabMode::NewTab,
             proto_schema_dir: None,
             topic_history: Vec::new(),
         }
@@ -74,6 +98,7 @@ impl AppSettings {
             theme: stored
                 .theme
                 .or_else(|| stored.dark_mode.map(ThemeId::from_legacy_dark_mode)),
+            pubsub_tab_mode: stored.pubsub_tab_mode,
             proto_schema_dir: stored.proto_schema_dir,
             topic_history: stored.topic_history,
         })
@@ -136,7 +161,7 @@ impl AppSettings {
 
 #[cfg(test)]
 mod tests {
-    use super::AppSettings;
+    use super::{AppSettings, PubSubTabMode};
     use crate::theme::ThemeId;
 
     #[test]
@@ -157,6 +182,20 @@ mod tests {
         let settings = AppSettings::parse(r#"{ "dark_mode": false }"#).unwrap();
 
         assert_eq!(settings.theme, Some(ThemeId::EguiLight));
+    }
+
+    #[test]
+    fn pubsub_tab_mode_defaults_to_new_tab_when_missing() {
+        let settings = AppSettings::parse(r#"{}"#).unwrap();
+
+        assert_eq!(settings.pubsub_tab_mode, PubSubTabMode::NewTab);
+    }
+
+    #[test]
+    fn pubsub_tab_mode_parses_reuse_existing() {
+        let settings = AppSettings::parse(r#"{ "pubsub_tab_mode": "reuse-existing" }"#).unwrap();
+
+        assert_eq!(settings.pubsub_tab_mode, PubSubTabMode::ReuseExisting);
     }
 
     #[test]
