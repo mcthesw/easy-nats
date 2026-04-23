@@ -87,6 +87,7 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
             state,
             ..
         } => {
+            let suggestions = viewer.settings.topic_suggestions(&state.subject);
             publisher_ui(
                 ui,
                 *connection_id,
@@ -94,6 +95,8 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
                 state,
                 viewer.backend,
                 viewer.proto_manager,
+                viewer.actions,
+                &suggestions,
             );
         }
         TabKind::Subscriber {
