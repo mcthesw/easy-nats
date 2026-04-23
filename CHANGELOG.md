@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.10](https://github.com/mcthesw/easy-nats/compare/v0.1.9...v0.1.10) (2026-04-23)
+
+
+### Features
+
+* add configurable Pub/Sub tab reuse behavior ([f31ca9e](https://github.com/mcthesw/easy-nats/commit/f31ca9eee42e36d5f42f2a5d47e4a4cd51fec8e8))
+* **metrics:** add connection-scoped monitoring dashboard ([38747b8](https://github.com/mcthesw/easy-nats/commit/38747b8fec9f4ee71069602da9025ebbe3253068))
+
 ## [0.1.9](https://github.com/mcthesw/easy-nats/compare/v0.1.8...v0.1.9) (2026-04-20)
 
 
