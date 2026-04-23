@@ -5,7 +5,7 @@ use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
 use crate::proto::ProtoSchemaManager;
 
-use super::common::format_timestamp;
+use super::common::{format_timestamp, topic_history_text_edit};
 use super::guard::TabGuard;
 use super::types::{ReceivedMessage, SubjectSubscription, SubscriberState, TabAction};
 
@@ -76,33 +76,14 @@ fn render_subscription_controls(
     let mut do_subscribe = false;
     ui.horizontal(|ui| {
         ui.label(t("subscriber.subject"));
-        let input_resp = ui.text_edit_singleline(&mut state.subject_input);
+        let input_resp = topic_history_text_edit(
+            ui,
+            "subscriber_topic_suggestions",
+            &mut state.subject_input,
+            &mut state.subject_suggestion_idx,
+            topic_suggestions,
+        );
         let input_id = input_resp.id;
-
-        // Topic suggestion popup
-        let prefix = state.subject_input.trim();
-        let suggestions: Vec<&str> = topic_suggestions
-            .iter()
-            .filter(|s| !prefix.is_empty() && s.starts_with(prefix) && **s != prefix)
-            .copied()
-            .take(10)
-            .collect();
-        if input_resp.has_focus() && !suggestions.is_empty() {
-            let popup_id = ui.id().with("topic_suggestions");
-            let below = input_resp.rect.left_bottom();
-            egui::Area::new(popup_id)
-                .order(egui::Order::Foreground)
-                .fixed_pos(below)
-                .show(ui.ctx(), |ui| {
-                    egui::Frame::popup(ui.style()).show(ui, |ui| {
-                        for suggestion in &suggestions {
-                            if ui.selectable_label(false, *suggestion).clicked() {
-                                state.subject_input = suggestion.to_string();
-                            }
-                        }
-                    });
-                });
-        }
 
         let can_add = !state.subject_input.trim().is_empty();
         let enter_pressed =
@@ -133,6 +114,7 @@ fn render_subscription_controls(
             actions.push(TabAction::RecordTopic { topic: subject });
         }
         state.subject_input.clear();
+        state.subject_suggestion_idx = None;
     }
 
     // Active subscriptions list
