@@ -101,6 +101,7 @@ pub enum TabAction {
 #[derive(Debug)]
 pub struct PublisherState {
     pub subject: String,
+    pub subject_suggestion_idx: Option<usize>,
     pub payload: String,
     pub headers: Vec<(String, String)>,
     pub timeout_ms: String,
@@ -114,6 +115,7 @@ impl Default for PublisherState {
     fn default() -> Self {
         Self {
             subject: String::new(),
+            subject_suggestion_idx: None,
             payload: String::new(),
             headers: Vec::new(),
             timeout_ms: "5000".to_string(),
@@ -152,6 +154,7 @@ pub struct SubjectSubscription {
 #[derive(Debug)]
 pub struct SubscriberState {
     pub subject_input: String,
+    pub subject_suggestion_idx: Option<usize>,
     pub subscriptions: Vec<SubjectSubscription>,
     pub messages: VecDeque<ReceivedMessage>,
     pub max_messages: usize,
@@ -168,6 +171,7 @@ impl Default for SubscriberState {
     fn default() -> Self {
         Self {
             subject_input: String::new(),
+            subject_suggestion_idx: None,
             subscriptions: Vec::new(),
             messages: VecDeque::new(),
             max_messages: 1000,

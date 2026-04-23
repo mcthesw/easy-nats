@@ -5,8 +5,10 @@ use crate::format;
 use crate::i18n::t;
 use crate::proto::ProtoSchemaManager;
 
-use super::types::PublisherState;
+use super::common::topic_history_text_edit;
+use super::types::{PublisherState, TabAction};
 
+#[allow(clippy::too_many_arguments)]
 pub fn publisher_ui(
     ui: &mut egui::Ui,
     connection_id: u64,
@@ -14,10 +16,18 @@ pub fn publisher_ui(
     state: &mut PublisherState,
     backend: &BackendHandle,
     proto_manager: &ProtoSchemaManager,
+    actions: &mut Vec<TabAction>,
+    topic_suggestions: &[&str],
 ) {
     ui.horizontal(|ui| {
         ui.label(t("publisher.subject"));
-        ui.text_edit_singleline(&mut state.subject);
+        topic_history_text_edit(
+            ui,
+            "publisher_topic_suggestions",
+            &mut state.subject,
+            &mut state.subject_suggestion_idx,
+            topic_suggestions,
+        );
     });
 
     ui.add_space(4.0);
@@ -79,6 +89,9 @@ pub fn publisher_ui(
             .add_enabled(can_send, egui::Button::new(t("publisher.publish")))
             .clicked()
         {
+            actions.push(TabAction::RecordTopic {
+                topic: state.subject.clone(),
+            });
             backend.send(BackendCommand::Publish {
                 connection_id,
                 subject: state.subject.clone(),
@@ -98,6 +111,9 @@ pub fn publisher_ui(
             )
             .clicked()
         {
+            actions.push(TabAction::RecordTopic {
+                topic: state.subject.clone(),
+            });
             let timeout_ms = state.timeout_ms.parse::<u64>().unwrap_or(5000);
             backend.send(BackendCommand::Request {
                 connection_id,
