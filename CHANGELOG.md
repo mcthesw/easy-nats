@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.11](https://github.com/mcthesw/easy-nats/compare/v0.1.10...v0.1.11) (2026-04-23)
+
+
+### Features
+
+* **pubsub:** restore clickable topic history and tab cycling ([8d4535d](https://github.com/mcthesw/easy-nats/commit/8d4535d32c8a2fcb22f44f5e5da517f13d8d65d6))
+
+
+### Documentation
+
+* refresh README ([43383f7](https://github.com/mcthesw/easy-nats/commit/43383f7f773c93961fad5c5baede6576f5d0d2e8))
+
 ## [0.1.10](https://github.com/mcthesw/easy-nats/compare/v0.1.9...v0.1.10) (2026-04-23)
 
 
