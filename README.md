@@ -1,21 +1,17 @@
 # Easy NATS
 
-A cross-platform desktop GUI for [NATS](https://nats.io/) messaging, built with Rust.
+Manage [NATS](https://nats.io/) messaging, JetStream data, object storage, and server metrics in one workspace.
 
 ![main-menu](assets/imgs/main-menu.png)
 
 ## Features
 
-- **Connection Management** — Multiple server profiles with support for no-auth, token, user/password, NKey, credentials file, and TLS client certificates. Profiles are persisted across sessions.
-- **Publish / Subscribe** — Publish messages with headers, send request-reply with configurable timeout, subscribe to subjects with wildcard support (`*`, `>`), and browse messages in a real-time scrolling list.
-- **Message Formatting** — Auto-detect JSON / UTF-8 / binary payloads with pretty-printed JSON, hex dump, and Base64 display modes. Manual format override per message.
-- **JetStream Streams** — List, create, update, and delete streams. Browse stream messages with pagination and subject filter. Purge by subject or purge all. Delete individual messages.
-- **JetStream Consumers** — List, create, and delete consumers per stream. View consumer info including pending, ack-pending, and redelivery counts.
-- **Key-Value Store** — List, create, and delete KV buckets. Browse keys with filter, view/edit entry values, and inspect full revision history.
-- **Object Store** — 🚧 Under construction.
-- **Dockable Tabs** — Multi-tab workspace powered by egui_dock. Undock, rearrange, and tile tabs freely.
-- **Dark / Light Theme** — Follow system preference or toggle manually. Preference is persisted.
-- **Toast Notifications** — Non-blocking feedback for operation outcomes.
+- **Connections and Messaging** — Save multiple server profiles, publish with headers or request-reply, and subscribe to live subjects with wildcard support.
+- **Streams, KV, and Object Store** — Browse stream messages, inspect KV revision history, and upload, download, or delete object store files.
+- **Metrics Dashboard** — Track connection health, summary stats, and live plots for message rate, traffic, and JetStream usage.
+- **Message Inspection** — Auto-detect JSON, text, and binary payloads with pretty JSON, hex dump, Base64, and manual format override.
+- **Dockable Workspace** — Arrange publishers, subscribers, resources, and detail panes in a flexible multi-tab layout.
+- **Themes** — Choose from egui dark, egui light, Catppuccin Latte, Frappé, Macchiato, and Mocha.
 
 ## Install
 
@@ -31,11 +27,18 @@ scoop install easy-nats
 **macOS (Homebrew)**
 
 ```bash
-brew install mcthesw/tap/easy-nats
+brew install --cask mcthesw/tap/easy-nats
 xattr -dr com.apple.quarantine "/Applications/Easy NATS.app"
 ```
 
-**Linux**
+Upgrade:
+
+```bash
+brew upgrade --cask mcthesw/tap/easy-nats
+xattr -dr com.apple.quarantine "/Applications/Easy NATS.app"
+```
+
+**Linux (APT)**
 
 ```bash
 echo "deb [trusted=yes] https://mcthesw.github.io/sworld-apt stable main" | \
@@ -44,9 +47,13 @@ sudo apt update
 sudo apt install easy-nats
 ```
 
+**Linux (Flathub)**
+
+[![Download on Flathub](https://flathub.org/assets/badges/flathub-badge-en.svg)](https://flathub.org/zh-Hans/apps/io.github.mcthesw.easy-nats)
+
 For `.rpm` and `.AppImage`, use the [Releases](https://github.com/mcthesw/easy-nats/releases) page.
 
-See [roadmap.md](roadmap.md) for additional distribution channels (Flathub, AUR, etc.).
+See [roadmap.md](roadmap.md) for additional distribution channels (AUR, etc.).
 
 ## Build
 
