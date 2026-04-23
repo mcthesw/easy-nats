@@ -10,6 +10,7 @@ pub(crate) struct ConnectionEditor {
     pub(crate) token: String,
     pub(crate) username: String,
     pub(crate) password: String,
+    pub(crate) metrics_endpoint: String,
     pub(crate) nkey_seed: String,
     pub(crate) creds_path: String,
     pub(crate) cert_path: String,

@@ -2,6 +2,7 @@ mod actions;
 mod editors;
 mod events;
 mod kv_results;
+mod metrics_results;
 mod model;
 mod obj_store_results;
 mod operation_results;

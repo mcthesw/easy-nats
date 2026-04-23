@@ -1,3 +1,5 @@
+use crate::monitoring::MetricsSnapshot;
+
 #[derive(Debug, Clone)]
 pub struct MessageData {
     pub subject: String,
@@ -113,6 +115,10 @@ pub enum BackendEvent {
         backend_id: u64,
         payload: Vec<u8>,
         headers: Vec<(String, String)>,
+    },
+    MetricsSnapshot {
+        connection_id: u64,
+        snapshot: Box<MetricsSnapshot>,
     },
     // Operations
     OperationResult {

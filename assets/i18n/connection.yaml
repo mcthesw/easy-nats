@@ -22,6 +22,12 @@ field_name:
 field_url:
   en: "URL:"
   zh: "URL:"
+field_metrics_endpoint:
+  en: "Metrics Endpoint:"
+  zh: "指标端点:"
+metrics_endpoint_hint:
+  en: "http://localhost:8222"
+  zh: "http://localhost:8222"
 field_auth:
   en: "Auth:"
   zh: "认证:"

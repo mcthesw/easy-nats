@@ -72,7 +72,7 @@ impl AppConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::connection::AuthMethod;
+    use crate::connection::{AuthMethod, MonitoringConfig};
 
     #[test]
     fn test_config_serialization_roundtrip() {
@@ -84,6 +84,9 @@ mod tests {
                 auth: AuthMethod::None,
                 tls_enabled: false,
                 tls_first: false,
+                monitoring: Some(MonitoringConfig {
+                    endpoint: "http://localhost:8222".to_string(),
+                }),
             }],
             next_id: 1,
         };
@@ -93,7 +96,30 @@ mod tests {
 
         assert_eq!(loaded.connections.len(), 1);
         assert_eq!(loaded.connections[0].name, "local");
+        assert_eq!(
+            loaded.connections[0].monitoring_endpoint(),
+            Some("http://localhost:8222")
+        );
         assert_eq!(loaded.next_id, 1);
+    }
+
+    #[test]
+    fn test_legacy_config_without_monitoring_still_loads() {
+        let json = r#"{
+            "connections": [{
+                "id": 7,
+                "name": "legacy",
+                "urls": ["nats://localhost:4222"],
+                "auth": {"type": "None"},
+                "tls_enabled": false,
+                "tls_first": false
+            }],
+            "next_id": 8
+        }"#;
+
+        let loaded: AppConfig = serde_json::from_str(json).unwrap();
+
+        assert_eq!(loaded.connections[0].monitoring_endpoint(), None);
     }
 
     #[test]

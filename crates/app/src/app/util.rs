@@ -60,6 +60,14 @@ pub(crate) fn same_tab(a: &TabKind, b: &TabKind) -> bool {
                 connection_id: a2, ..
             },
         ) => a1 == a2,
+        (
+            TabKind::Metrics {
+                connection_id: a1, ..
+            },
+            TabKind::Metrics {
+                connection_id: a2, ..
+            },
+        ) => a1 == a2,
         (TabKind::Settings, TabKind::Settings) => true,
         (TabKind::LogViewer, TabKind::LogViewer) => true,
         _ => false,

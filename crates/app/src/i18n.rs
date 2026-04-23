@@ -96,6 +96,7 @@ pub fn init(lang: Language) {
             "server_info",
             include_str!("../../../assets/i18n/server_info.yaml"),
         ),
+        ("metrics", include_str!("../../../assets/i18n/metrics.yaml")),
     ];
 
     let mut en = HashMap::new();
