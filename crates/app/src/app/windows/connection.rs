@@ -58,6 +58,13 @@ fn render_editor_grid(editor: &mut ConnectionEditor, ui: &mut egui::Ui) {
             ui.text_edit_singleline(&mut editor.url);
             ui.end_row();
 
+            ui.label(t("connection.field_metrics_endpoint"));
+            ui.add(
+                egui::TextEdit::singleline(&mut editor.metrics_endpoint)
+                    .hint_text(t("connection.metrics_endpoint_hint")),
+            );
+            ui.end_row();
+
             ui.label(t("connection.field_auth"));
             egui::ComboBox::from_id_salt("auth_kind")
                 .selected_text(editor.auth_kind.label())

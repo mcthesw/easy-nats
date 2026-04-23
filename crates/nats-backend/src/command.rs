@@ -184,4 +184,9 @@ pub enum BackendCommand {
     GetJetStreamAccountInfo {
         connection_id: u64,
     },
+    // Monitoring
+    FetchMetrics {
+        connection_id: u64,
+        endpoint: String,
+    },
 }

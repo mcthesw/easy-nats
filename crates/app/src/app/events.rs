@@ -119,6 +119,12 @@ impl EasyNatsApp {
                         }
                     }
                 }
+                BackendEvent::MetricsSnapshot {
+                    connection_id,
+                    snapshot,
+                } => {
+                    self.apply_metrics_snapshot(connection_id, *snapshot);
+                }
                 BackendEvent::Error {
                     connection_id,
                     backend_id,

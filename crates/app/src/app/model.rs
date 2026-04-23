@@ -130,4 +130,13 @@ impl EasyNatsApp {
             .map(|c| c.name.clone())
             .unwrap_or_else(|| format!("#{id}"))
     }
+
+    pub(crate) fn connection_metrics_endpoint(&self, id: u64) -> Option<String> {
+        self.config
+            .connections
+            .iter()
+            .find(|c| c.id == id)
+            .and_then(|c| c.monitoring_endpoint())
+            .map(ToOwned::to_owned)
+    }
 }

@@ -1,9 +1,11 @@
 use eframe::egui;
-use nats_backend::{AuthMethod, BackendCommand, ConnectionConfig};
+use nats_backend::{AuthMethod, BackendCommand, ConnectionConfig, MonitoringConfig};
 use tokio_util::sync::CancellationToken;
 
 use crate::settings::PubSubTabMode;
-use crate::tabs::{PublisherState, SubscriberState, TabGuard, TabKind, next_backend_id};
+use crate::tabs::{
+    MetricsState, PublisherState, SubscriberState, TabGuard, TabKind, next_backend_id,
+};
 
 use super::{model::EasyNatsApp, util::same_tab};
 
@@ -111,6 +113,7 @@ impl EasyNatsApp {
             token,
             username,
             password,
+            metrics_endpoint: cfg.monitoring_endpoint().unwrap_or_default().to_string(),
             nkey_seed,
             creds_path,
             cert_path,
@@ -150,6 +153,7 @@ impl EasyNatsApp {
                 c.auth = auth;
                 c.tls_enabled = self.editor.tls_enabled;
                 c.tls_first = self.editor.tls_first;
+                c.monitoring = monitoring_from_editor(&self.editor);
             }
         } else {
             let id = self.config.next_connection_id();
@@ -160,6 +164,7 @@ impl EasyNatsApp {
                 auth,
                 tls_enabled: self.editor.tls_enabled,
                 tls_first: self.editor.tls_first,
+                monitoring: monitoring_from_editor(&self.editor),
             });
         }
         self.config.save();
@@ -254,6 +259,33 @@ impl EasyNatsApp {
 
     pub(crate) fn open_or_focus_subscriber_tab(&mut self, connection_id: u64) {
         self.open_or_focus_pubsub_tab(connection_id, PubSubTabKind::Subscriber);
+    }
+
+    pub(crate) fn open_or_focus_metrics_tab(&mut self, connection_id: u64) {
+        let connection_name = self.conn_name(connection_id);
+        let endpoint = self
+            .connection_metrics_endpoint(connection_id)
+            .unwrap_or_default();
+
+        for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+            if let TabKind::Metrics {
+                connection_id: existing_id,
+                connection_name: existing_name,
+                state,
+            } = tab
+                && *existing_id == connection_id
+            {
+                *existing_name = connection_name.clone();
+                state.set_endpoint(endpoint.clone());
+            }
+        }
+
+        let tab = TabKind::Metrics {
+            connection_id,
+            connection_name,
+            state: MetricsState::with_endpoint(endpoint),
+        };
+        self.open_or_focus_tab_kind(tab);
     }
 
     pub(crate) fn save_stream_editor(&mut self) {
@@ -538,6 +570,17 @@ impl EasyNatsApp {
     }
 }
 
+fn monitoring_from_editor(editor: &super::editors::ConnectionEditor) -> Option<MonitoringConfig> {
+    let endpoint = editor.metrics_endpoint.trim();
+    if endpoint.is_empty() {
+        None
+    } else {
+        Some(MonitoringConfig {
+            endpoint: endpoint.to_string(),
+        })
+    }
+}
+
 #[derive(Clone, Copy)]
 enum PubSubTabKind {
     Publisher,
@@ -621,6 +664,8 @@ fn matches_pubsub_tab(tab: &TabKind, connection_id: u64, tab_kind: PubSubTabKind
 mod tests {
     use std::sync::{Arc, Mutex};
 
+    use nats_backend::{AuthMethod, ConnectionConfig, MonitoringConfig};
+
     use super::EasyNatsApp;
     use crate::log_layer::LogBuffer;
     use crate::settings::{AppSettings, PubSubTabMode};
@@ -636,6 +681,20 @@ mod tests {
             ThemeId::EguiDark,
             Arc::new(Mutex::new(LogBuffer::default())),
         )
+    }
+
+    fn push_metrics_connection(app: &mut EasyNatsApp, connection_id: u64) {
+        app.config.connections.push(ConnectionConfig {
+            id: connection_id,
+            name: "local".to_string(),
+            urls: vec!["nats://localhost:4222".to_string()],
+            auth: AuthMethod::None,
+            tls_enabled: false,
+            tls_first: false,
+            monitoring: Some(MonitoringConfig {
+                endpoint: "http://localhost:8222".to_string(),
+            }),
+        });
     }
 
     fn count_publisher_tabs(app: &EasyNatsApp, connection_id: u64) -> usize {
@@ -668,6 +727,21 @@ mod tests {
             .count()
     }
 
+    fn count_metrics_tabs(app: &EasyNatsApp, connection_id: u64) -> usize {
+        app.dock_state
+            .iter_all_tabs()
+            .filter(|(_, tab)| {
+                matches!(
+                    tab,
+                    TabKind::Metrics {
+                        connection_id: existing_id,
+                        ..
+                    } if *existing_id == connection_id
+                )
+            })
+            .count()
+    }
+
     #[test]
     fn publisher_reuses_existing_tab_when_configured() {
         let mut app = test_app(PubSubTabMode::ReuseExisting);
@@ -686,5 +760,16 @@ mod tests {
         app.open_or_focus_subscriber_tab(7);
 
         assert_eq!(count_subscriber_tabs(&app, 7), 2);
+    }
+
+    #[test]
+    fn metrics_tab_focuses_existing_tab_for_same_connection() {
+        let mut app = test_app(PubSubTabMode::NewTab);
+        push_metrics_connection(&mut app, 7);
+
+        app.open_or_focus_metrics_tab(7);
+        app.open_or_focus_metrics_tab(7);
+
+        assert_eq!(count_metrics_tabs(&app, 7), 1);
     }
 }

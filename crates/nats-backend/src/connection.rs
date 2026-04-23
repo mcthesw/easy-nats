@@ -11,6 +11,8 @@ pub struct ConnectionConfig {
     pub tls_enabled: bool,
     #[serde(default)]
     pub tls_first: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub monitoring: Option<MonitoringConfig>,
 }
 
 impl ConnectionConfig {
@@ -22,8 +24,22 @@ impl ConnectionConfig {
             auth: AuthMethod::None,
             tls_enabled: false,
             tls_first: false,
+            monitoring: None,
         }
     }
+
+    pub fn monitoring_endpoint(&self) -> Option<&str> {
+        self.monitoring
+            .as_ref()
+            .map(|monitoring| monitoring.endpoint.trim())
+            .filter(|endpoint| !endpoint.is_empty())
+    }
+}
+
+/// Optional monitoring configuration for a connection profile.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct MonitoringConfig {
+    pub endpoint: String,
 }
 
 /// Authentication method for a NATS connection.

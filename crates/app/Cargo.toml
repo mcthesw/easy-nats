@@ -19,7 +19,8 @@ base64 = "0.22"
 # Keep native desktop functionality, but avoid eframe's default feature bundle
 # (notably wgpu + web_screen_reader) since this app explicitly uses Glow.
 eframe = { version = "0.34", default-features = false, features = ["glow", "default_fonts", "accesskit"] }
-egui_dock = "0.19"
+egui_dock = "0.19.1"
+egui_plot = "0.35.0"
 mimalloc = "0.1"
 protox = "0.9"
 prost = "0.14"
@@ -28,7 +29,7 @@ prost-types = "0.14"
 rfd = "0.17"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
-serde_yaml = "0.9.34+deprecated"
+serde_yaml = "0.9.34"
 tracing = "0.1"
 tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "registry", "fmt"] }
