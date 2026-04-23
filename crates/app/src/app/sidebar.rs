@@ -21,6 +21,7 @@ pub(crate) enum SidebarAction {
     OpenKvBucketCreate(u64),
     OpenObjStoreBucketCreate(u64),
     OpenServerInfo(u64),
+    OpenMetrics(u64),
 }
 
 pub(crate) fn render_sidebar(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
@@ -169,13 +170,38 @@ fn render_resource_tree(
         render_streams_section(app, ui, id, name, action);
         render_kv_section(app, ui, id, name, action);
         render_obj_store_section(app, ui, id, name, action);
-        if ui
-            .selectable_label(false, format!("ℹ  {}", t("server_info.title")))
-            .clicked()
-        {
+        render_metrics_entry(app, ui, id, action);
+        if render_sidebar_leaf(ui, "ℹ", t("server_info.title")).clicked() {
             *action = Some(SidebarAction::OpenServerInfo(id));
         }
     });
+}
+
+fn render_metrics_entry(
+    app: &mut EasyNatsApp,
+    ui: &mut egui::Ui,
+    id: u64,
+    action: &mut Option<SidebarAction>,
+) {
+    if app.connection_metrics_endpoint(id).is_none() {
+        return;
+    }
+
+    if render_sidebar_leaf(ui, "◔", t("sidebar.section_metrics")).clicked() {
+        *action = Some(SidebarAction::OpenMetrics(id));
+    }
+}
+
+fn render_sidebar_leaf(ui: &mut egui::Ui, icon: &str, label: &str) -> egui::Response {
+    ui.horizontal(|ui| {
+        let icon_response = ui.add_sized(
+            [16.0, ui.spacing().interact_size.y],
+            egui::Label::new(egui::RichText::new(icon).weak()).sense(egui::Sense::click()),
+        );
+        let label_response = ui.selectable_label(false, label);
+        icon_response.union(label_response)
+    })
+    .inner
 }
 
 fn render_pubsub_section(ui: &mut egui::Ui, id: u64, action: &mut Option<SidebarAction>) {
@@ -404,6 +430,9 @@ fn apply_sidebar_action(app: &mut EasyNatsApp, action: Option<SidebarAction>) {
                 .send(BackendCommand::GetServerInfo { connection_id: id });
             app.backend
                 .send(BackendCommand::GetJetStreamAccountInfo { connection_id: id });
+        }
+        Some(SidebarAction::OpenMetrics(id)) => {
+            app.open_or_focus_metrics_tab(id);
         }
         None => {}
     }

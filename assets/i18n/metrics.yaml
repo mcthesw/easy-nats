@@ -1,0 +1,130 @@
+# Metrics dashboard
+title:
+  en: "Metrics"
+  zh: "监控指标"
+refresh:
+  en: "Refresh metrics"
+  zh: "刷新指标"
+no_endpoint:
+  en: "Add a metrics endpoint in the connection settings to enable the dashboard."
+  zh: "在连接设置中添加 metrics 端点后即可启用仪表盘。"
+not_loaded:
+  en: "No metrics sample available yet."
+  zh: "尚无可用指标样本。"
+loading:
+  en: "Loading monitoring data..."
+  zh: "正在加载监控数据..."
+
+status_missing:
+  en: "Missing Endpoint"
+  zh: "缺少端点"
+status_loading:
+  en: "Loading"
+  zh: "加载中"
+status_degraded:
+  en: "Degraded"
+  zh: "降级"
+status_partial:
+  en: "Partial"
+  zh: "部分可用"
+status_stale:
+  en: "Stale"
+  zh: "数据过期"
+status_unavailable:
+  en: "Unavailable"
+  zh: "不可用"
+status_not_loaded:
+  en: "Not Loaded"
+  zh: "未加载"
+
+error_partial:
+  en: "Some monitoring sections failed to load"
+  zh: "部分监控分区加载失败"
+error_stale:
+  en: "Showing last successful sample"
+  zh: "当前展示的是最近一次成功样本"
+error_unavailable:
+  en: "Monitoring data is currently unavailable"
+  zh: "当前无法获取监控数据"
+
+summary_empty:
+  en: "Monitoring endpoint responded, but no summary metrics are available yet."
+  zh: "监控端点已响应，但当前还没有可展示的摘要指标。"
+charts_need_samples:
+  en: "Charts need at least two successful samples."
+  zh: "图表至少需要两次成功采样。"
+section_health:
+  en: "Health"
+  zh: "健康检查"
+section_varz:
+  en: "Server"
+  zh: "服务器"
+section_connz:
+  en: "Connections"
+  zh: "连接"
+section_jsz:
+  en: "JetStream"
+  zh: "JetStream"
+
+card_connections:
+  en: "Connections"
+  zh: "连接数"
+card_subscriptions:
+  en: "Subscriptions"
+  zh: "订阅数"
+card_memory:
+  en: "Server Memory"
+  zh: "服务器内存"
+card_cpu:
+  en: "Server CPU"
+  zh: "服务器 CPU"
+card_js_streams:
+  en: "JetStream Streams"
+  zh: "JetStream 流"
+card_js_storage:
+  en: "JetStream Storage"
+  zh: "JetStream 存储"
+
+chart_time:
+  en: "Time"
+  zh: "时间"
+chart_msg_rate:
+  en: "Message Rate"
+  zh: "消息速率"
+chart_msg_rate_y:
+  en: "Msgs/s"
+  zh: "消息/秒"
+chart_byte_rate:
+  en: "Byte Throughput"
+  zh: "字节吞吐"
+chart_byte_rate_y:
+  en: "Bytes/s"
+  zh: "字节/秒"
+chart_js_usage:
+  en: "JetStream Usage"
+  zh: "JetStream 使用量"
+chart_js_usage_y:
+  en: "Bytes"
+  zh: "字节"
+chart_reset:
+  en: "Reset view"
+  zh: "还原视图"
+
+series_in_msgs:
+  en: "In Messages/s"
+  zh: "入消息/秒"
+series_out_msgs:
+  en: "Out Messages/s"
+  zh: "出消息/秒"
+series_in_bytes:
+  en: "In Bytes/s"
+  zh: "入字节/秒"
+series_out_bytes:
+  en: "Out Bytes/s"
+  zh: "出字节/秒"
+series_js_memory:
+  en: "JetStream Memory"
+  zh: "JetStream 内存"
+series_js_storage:
+  en: "JetStream Storage"
+  zh: "JetStream 存储"

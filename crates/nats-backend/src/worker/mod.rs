@@ -2,6 +2,7 @@ mod connection;
 mod consumers;
 mod helpers;
 mod kv;
+mod metrics;
 mod object_store;
 mod pubsub;
 mod server_info;
@@ -344,6 +345,12 @@ pub async fn run_worker(
             BackendCommand::GetJetStreamAccountInfo { connection_id } => {
                 server_info::handle_get_jetstream_account_info(&state, connection_id, &evt_tx)
                     .await;
+            }
+            BackendCommand::FetchMetrics {
+                connection_id,
+                endpoint,
+            } => {
+                metrics::handle_fetch_metrics(&state, connection_id, endpoint, &evt_tx).await;
             }
         }
     }
