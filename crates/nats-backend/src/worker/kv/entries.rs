@@ -24,10 +24,12 @@ pub(crate) async fn handle_list_keys(
             Some(js) => js,
             None => return None,
         };
+    tracing::info!(connection_id, bucket = %bucket, generation, "Starting KV key list task");
     let evt_tx = evt_tx.clone();
     let token = cancel.into_token();
 
     Some(tokio::spawn(async move {
+        let mut total_keys = 0usize;
         let store = match js.get_key_value(&bucket).await {
             Ok(s) => s,
             Err(e) => {
@@ -61,7 +63,10 @@ pub(crate) async fn handle_list_keys(
 
         loop {
             let next = tokio::select! {
-                _ = token.cancelled() => return,
+                _ = token.cancelled() => {
+                    tracing::debug!(connection_id, bucket = %bucket, generation, total_keys, "Cancelled KV key list task");
+                    return;
+                },
                 result = keys_stream.try_next() => result,
             };
 
@@ -73,6 +78,8 @@ pub(crate) async fn handle_list_keys(
                             .drain(..)
                             .map(|k| serde_json::json!({ "key": k }))
                             .collect();
+                        total_keys += entries.len();
+                        tracing::debug!(connection_id, bucket = %bucket, generation, batch_size = entries.len(), total_keys, "Sending KV key batch");
                         super::send_ok(
                             &evt_tx,
                             connection_id,
@@ -101,6 +108,8 @@ pub(crate) async fn handle_list_keys(
                 .drain(..)
                 .map(|k| serde_json::json!({ "key": k }))
                 .collect();
+            total_keys += entries.len();
+            tracing::debug!(connection_id, bucket = %bucket, generation, batch_size = entries.len(), total_keys, "Sending final KV key batch");
             super::send_ok(
                 &evt_tx,
                 connection_id,
@@ -108,6 +117,8 @@ pub(crate) async fn handle_list_keys(
                 serde_json::json!({ "bucket": &bucket, "entries": entries, "done": false, "generation": generation }),
             ).await;
         }
+
+        tracing::info!(connection_id, bucket = %bucket, generation, total_keys, "Completed KV key list task");
 
         // Signal completion
         super::send_ok(
@@ -126,6 +137,7 @@ pub(crate) async fn handle_get_entry(
     key: String,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
+    tracing::debug!(connection_id, bucket = %bucket, key = %key, "Fetching KV entry");
     let Some(store) = super::open_store(
         state,
         connection_id,
@@ -139,6 +151,7 @@ pub(crate) async fn handle_get_entry(
     };
     match store.entry(&key).await {
         Ok(entry) => {
+            tracing::debug!(connection_id, bucket = %bucket, key = %key, found = entry.is_some(), "Fetched KV entry");
             let entry_json = match entry.as_ref().map(kv_entry_to_json) {
                 Some(v) => v,
                 None => serde_json::json!({ "key": key }),
@@ -170,6 +183,7 @@ pub(crate) async fn handle_get_history(
     key: String,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
+    tracing::debug!(connection_id, bucket = %bucket, key = %key, "Fetching KV entry");
     let Some(store) = super::open_store(
         state,
         connection_id,
@@ -229,6 +243,7 @@ pub(crate) async fn handle_put_entry(
     value: Vec<u8>,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
+    tracing::debug!(connection_id, bucket = %bucket, key = %key, "Fetching KV entry");
     let Some(store) = super::open_store(
         state,
         connection_id,
@@ -269,6 +284,7 @@ pub(crate) async fn handle_delete_entry(
     key: String,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
+    tracing::debug!(connection_id, bucket = %bucket, key = %key, "Fetching KV entry");
     let Some(store) = super::open_store(
         state,
         connection_id,
@@ -309,6 +325,7 @@ pub(crate) async fn handle_purge_entry(
     key: String,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
+    tracing::debug!(connection_id, bucket = %bucket, key = %key, "Fetching KV entry");
     let Some(store) = super::open_store(
         state,
         connection_id,
