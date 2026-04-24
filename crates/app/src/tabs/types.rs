@@ -1,4 +1,4 @@
-use std::collections::VecDeque;
+use std::collections::{HashMap, VecDeque};
 use std::time::{Instant, SystemTime};
 
 use eframe::egui;
@@ -143,7 +143,57 @@ pub struct ReceivedMessage {
 }
 
 pub type SubscriberListRow = (usize, String, String);
-pub type CachedSubscriberRows = (u64, Option<String>, Vec<SubscriberListRow>);
+pub type CachedSubscriberRows = (u64, Option<String>, SearchCacheKey, Vec<SubscriberListRow>);
+pub type StreamListRow = (usize, String);
+pub type CachedStreamRows = (u64, SearchCacheKey, Vec<StreamListRow>);
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SearchCacheKey {
+    pub query: String,
+    pub primary: bool,
+    pub secondary: bool,
+}
+
+impl SearchCacheKey {
+    pub fn from_state(search: &ScopedSearchState) -> Self {
+        Self {
+            query: search.normalized_query(),
+            primary: search.primary,
+            secondary: search.secondary,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ScopedSearchState {
+    pub query: String,
+    pub primary: bool,
+    pub secondary: bool,
+}
+
+impl ScopedSearchState {
+    pub fn new(primary: bool, secondary: bool) -> Self {
+        Self {
+            query: String::new(),
+            primary,
+            secondary,
+        }
+    }
+
+    pub fn is_active(&self) -> bool {
+        !self.query.trim().is_empty() && (self.primary || self.secondary)
+    }
+
+    pub fn normalized_query(&self) -> String {
+        self.query.trim().to_lowercase()
+    }
+}
+
+impl Default for ScopedSearchState {
+    fn default() -> Self {
+        Self::new(true, true)
+    }
+}
 
 #[derive(Debug)]
 pub struct SubjectSubscription {
@@ -164,6 +214,7 @@ pub struct SubscriberState {
     pub subject_filter: Option<String>,
     pub cache_generation: u64,
     pub cached_filtered: Option<CachedSubscriberRows>,
+    pub search: ScopedSearchState,
     pub proto_view: ProtoViewState,
 }
 
@@ -180,6 +231,7 @@ impl Default for SubscriberState {
             subject_filter: None,
             cache_generation: 0,
             cached_filtered: None,
+            search: ScopedSearchState::default(),
             proto_view: ProtoViewState::default(),
         }
     }
@@ -227,6 +279,9 @@ pub struct StreamState {
     pub proto_view: ProtoViewState,
     pub consumer_fetched: std::collections::HashMap<String, Vec<serde_json::Value>>,
     pub consumer_fetching: std::collections::HashSet<String>,
+    pub search: ScopedSearchState,
+    pub search_generation: u64,
+    pub cached_filtered: Option<CachedStreamRows>,
 }
 
 impl Default for StreamState {
@@ -248,6 +303,9 @@ impl Default for StreamState {
             proto_view: ProtoViewState::default(),
             consumer_fetched: std::collections::HashMap::new(),
             consumer_fetching: std::collections::HashSet::new(),
+            search: ScopedSearchState::default(),
+            search_generation: 0,
+            cached_filtered: None,
         }
     }
 }
@@ -257,13 +315,18 @@ pub struct KvBucketState {
     pub info: Option<serde_json::Value>,
     pub keys: Vec<String>,
     pub selected_key: Option<String>,
-    pub key_filter: String,
+    pub search: ScopedSearchState,
+    pub keys_complete: bool,
+    pub search_more_requested: bool,
+    pub value_search_scanning: usize,
+    pub value_search_cursor: usize,
     pub loading_entries: bool,
     pub loading_entry: bool,
     pub loading_history: bool,
     pub load_generation: u64,
     pub entry_key: String,
     pub entry_value: String,
+    pub fetched_values: HashMap<String, String>,
     pub entry_revision: Option<u64>,
     pub entry_operation: Option<String>,
     pub entry_created: Option<String>,
@@ -282,13 +345,18 @@ impl Default for KvBucketState {
             info: None,
             keys: Vec::new(),
             selected_key: None,
-            key_filter: String::new(),
+            search: ScopedSearchState::default(),
+            keys_complete: false,
+            search_more_requested: false,
+            value_search_scanning: 0,
+            value_search_cursor: 0,
             loading_entries: false,
             loading_entry: false,
             loading_history: false,
             load_generation: 0,
             entry_key: String::new(),
             entry_value: String::new(),
+            fetched_values: HashMap::new(),
             entry_revision: None,
             entry_operation: None,
             entry_created: None,

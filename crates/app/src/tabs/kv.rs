@@ -6,8 +6,13 @@ use crate::i18n::t;
 use crate::proto::ProtoSchemaManager;
 use crate::tabs::guard::TabGuard;
 
-use super::common::{auto_refresh_ui, decode_base64_payload, format_bytes};
+use super::common::{
+    SearchStatus, auto_refresh_ui, decode_base64_payload, format_bytes, matches_query,
+    render_search_row, searchable_json_payload,
+};
 use super::types::{KvBucketState, TabAction};
+
+const KV_VALUE_SEARCH_BATCH: usize = 100;
 
 #[allow(clippy::too_many_arguments)]
 pub fn kv_bucket_ui(
@@ -120,31 +125,46 @@ fn render_key_list(
             .on_hover_text(t("kv.refresh"))
             .clicked()
         {
-            let new_gen = crate::tabs::next_generation();
-            state.load_generation = new_gen;
-            state.keys.clear();
-            backend.send(BackendCommand::ListKvKeys {
-                connection_id,
-                bucket: bucket_name.to_string(),
-                cancel: guard.cancellation(),
-                generation: new_gen,
-            });
-            state.loading_entries = true;
+            refresh_kv_keys(connection_id, bucket_name, state, backend, guard);
         }
         if ui.button("+").on_hover_text(t("kv.new_entry")).clicked() {
             actions.push(TabAction::OpenKvEntryCreate {
                 connection_id,
                 bucket_name: bucket_name.to_string(),
-                initial_key: state.key_filter.trim().to_string(),
+                initial_key: state.search.query.trim().to_string(),
             });
         }
     });
-    // Filter row: full width
-    ui.add(
-        egui::TextEdit::singleline(&mut state.key_filter)
-            .hint_text(t("kv.key_filter"))
-            .desired_width(ui.available_width()),
+    let search_status = kv_search_status(state);
+    let search_changed = render_search_row(
+        ui,
+        ("kv_search", bucket_name),
+        &mut state.search,
+        t("kv.search_placeholder"),
+        t("kv.search_scope_key"),
+        t("kv.search_scope_value"),
+        search_status,
     );
+    if search_changed {
+        state.search_more_requested = false;
+        state.value_search_cursor = 0;
+    }
+    if state.search.is_active() {
+        ui.horizontal_wrapped(|ui| {
+            if let Some(text) = search_status.text() {
+                ui.weak(text);
+            }
+            if state.search.secondary {
+                ui.weak(format!(
+                    "· {} {}/{}",
+                    t("kv.search_values_scanned"),
+                    state.fetched_values.len(),
+                    state.keys.len()
+                ));
+            }
+        });
+    }
+    render_kv_search_actions(ui, connection_id, bucket_name, state, backend, guard);
 
     if state.loading_entries {
         ui.horizontal(|ui| {
@@ -156,22 +176,20 @@ fn render_key_list(
     egui::ScrollArea::vertical()
         .id_salt(("kv_keys", connection_id, bucket_name))
         .show(ui, |ui| {
-            let filtered: Vec<&str> = state
-                .keys
-                .iter()
-                .filter(|key| state.key_filter.is_empty() || key.starts_with(&state.key_filter))
-                .map(|s| s.as_str())
-                .collect();
+            let filtered = filtered_keys(state);
 
             if filtered.is_empty() {
                 ui.label(t("kv.no_keys"));
             } else {
                 for key in &filtered {
                     if ui
-                        .selectable_label(state.selected_key.as_deref() == Some(*key), *key)
+                        .selectable_label(
+                            state.selected_key.as_deref() == Some(key.as_str()),
+                            key.as_str(),
+                        )
                         .clicked()
                     {
-                        state.selected_key = Some(key.to_string());
+                        state.selected_key = Some(key.clone());
                         state.show_history = false;
                         // Clear editor state and request entry details
                         state.entry_key.clear();
@@ -183,18 +201,143 @@ fn render_key_list(
                         backend.send(BackendCommand::GetKvEntry {
                             connection_id,
                             bucket: bucket_name.to_string(),
-                            key: key.to_string(),
+                            key: key.clone(),
                         });
                         backend.send(BackendCommand::GetKvHistory {
                             connection_id,
                             bucket: bucket_name.to_string(),
-                            key: key.to_string(),
+                            key: key.clone(),
                         });
                         state.loading_history = true;
                     }
                 }
             }
         });
+}
+
+fn render_kv_search_actions(
+    ui: &mut egui::Ui,
+    connection_id: u64,
+    bucket_name: &str,
+    state: &mut KvBucketState,
+    backend: &BackendHandle,
+    guard: &TabGuard,
+) {
+    let value_search_active = state.search.is_active() && state.search.secondary;
+    let can_scan_values = value_search_active
+        && state.value_search_scanning == 0
+        && state.value_search_cursor < state.keys.len();
+    let can_load_keys = state.search.is_active() && !state.keys_complete && !state.loading_entries;
+
+    if value_search_active || can_load_keys || state.value_search_scanning > 0 {
+        ui.horizontal_wrapped(|ui| {
+            if state.value_search_scanning > 0 {
+                ui.spinner();
+                ui.weak(t("kv.search_values_loading"));
+            }
+            if can_scan_values {
+                let label = if state.value_search_cursor == 0 {
+                    t("kv.search_values")
+                } else {
+                    t("kv.search_more_values")
+                };
+                if ui.small_button(label).clicked() {
+                    scan_next_kv_values(connection_id, bucket_name, state, backend);
+                }
+            }
+            if can_load_keys {
+                ui.weak(t("kv.search_more_hint"));
+                if ui.small_button(t("kv.search_more")).clicked() {
+                    refresh_kv_keys(connection_id, bucket_name, state, backend, guard);
+                }
+            }
+        });
+    }
+}
+
+fn scan_next_kv_values(
+    connection_id: u64,
+    bucket_name: &str,
+    state: &mut KvBucketState,
+    backend: &BackendHandle,
+) {
+    let start = state.value_search_cursor.min(state.keys.len());
+    let end = (start + KV_VALUE_SEARCH_BATCH).min(state.keys.len());
+    let keys: Vec<String> = state.keys[start..end]
+        .iter()
+        .filter(|key| !state.fetched_values.contains_key(key.as_str()))
+        .cloned()
+        .collect();
+    state.value_search_cursor = end;
+    state.value_search_scanning += keys.len();
+    for key in keys {
+        backend.send(BackendCommand::GetKvEntry {
+            connection_id,
+            bucket: bucket_name.to_string(),
+            key,
+        });
+    }
+}
+
+fn kv_search_status(state: &KvBucketState) -> SearchStatus {
+    if !state.search.is_active() {
+        return SearchStatus::Inactive;
+    }
+    let matches = filtered_keys(state).len();
+    SearchStatus::Showing {
+        matches,
+        capped: false,
+    }
+}
+
+fn filtered_keys(state: &KvBucketState) -> Vec<String> {
+    let query = state.search.normalized_query();
+    state
+        .keys
+        .iter()
+        .filter(|key| {
+            if query.is_empty() || (!state.search.primary && !state.search.secondary) {
+                return true;
+            }
+            let key_matches = state.search.primary && matches_query(key, &query);
+            let fetched_value_matches = state.search.secondary
+                && state
+                    .fetched_values
+                    .get(key.as_str())
+                    .is_some_and(|value| matches_query(value, &query));
+            let history_matches = state.search.secondary
+                && state.selected_key.as_deref() == Some(key.as_str())
+                && state
+                    .history
+                    .iter()
+                    .any(|item| matches_query(&searchable_json_payload(item), &query));
+            key_matches || fetched_value_matches || history_matches
+        })
+        .cloned()
+        .collect()
+}
+
+fn refresh_kv_keys(
+    connection_id: u64,
+    bucket_name: &str,
+    state: &mut KvBucketState,
+    backend: &BackendHandle,
+    guard: &TabGuard,
+) {
+    let new_gen = crate::tabs::next_generation();
+    state.load_generation = new_gen;
+    state.keys.clear();
+    state.fetched_values.clear();
+    state.value_search_cursor = 0;
+    state.value_search_scanning = 0;
+    state.keys_complete = false;
+    state.loading_entries = true;
+    backend.send(BackendCommand::ListKvKeys {
+        connection_id,
+        bucket: bucket_name.to_string(),
+        cancel: guard.cancellation(),
+        generation: new_gen,
+    });
 }
 
 fn render_detail_panel(
@@ -411,4 +554,49 @@ fn kv_bucket_info_panel(ui: &mut egui::Ui, info: &serde_json::Value) {
                 ui.end_row();
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn kv_key_search_matches_loaded_keys() {
+        let mut state = KvBucketState {
+            keys: vec!["users.alice".to_string(), "orders.1".to_string()],
+            ..Default::default()
+        };
+        state.search.query = "alice".to_string();
+        state.search.primary = true;
+        state.search.secondary = false;
+
+        assert_eq!(filtered_keys(&state), vec!["users.alice".to_string()]);
+    }
+
+    #[test]
+    fn kv_value_scan_advances_in_batches() {
+        let mut state = KvBucketState {
+            keys: (0..150).map(|idx| format!("key.{idx}")).collect(),
+            ..Default::default()
+        };
+        state.value_search_cursor = 100;
+        assert_eq!(state.value_search_cursor, 100);
+        assert_eq!(state.keys.len(), 150);
+    }
+
+    #[test]
+    fn kv_value_search_uses_fetched_value_cache() {
+        let mut state = KvBucketState {
+            keys: vec!["users.alice".to_string(), "users.bob".to_string()],
+            ..Default::default()
+        };
+        state
+            .fetched_values
+            .insert("users.bob".to_string(), "balance: 42".to_string());
+        state.search.query = "42".to_string();
+        state.search.primary = false;
+        state.search.secondary = true;
+
+        assert_eq!(filtered_keys(&state), vec!["users.bob".to_string()]);
+    }
 }

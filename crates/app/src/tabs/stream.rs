@@ -7,9 +7,12 @@ use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
 use crate::proto::ProtoSchemaManager;
 
-use super::common::{auto_refresh_ui, format_bytes};
+use super::common::{
+    SEARCH_RESULT_LIMIT, SearchStatus, auto_refresh_ui, format_bytes, matches_query,
+    render_search_row, searchable_json_payload,
+};
 use super::stream_consumers::render_consumers;
-use super::types::{StreamState, TabAction};
+use super::types::{SearchCacheKey, StreamState, TabAction};
 
 pub fn stream_ui(
     ui: &mut egui::Ui,
@@ -191,32 +194,112 @@ fn render_message_controls(
 
 fn render_message_list(ui: &mut egui::Ui, state: &mut StreamState) {
     ui.label(t("stream.messages"));
+    let status = stream_search_status(state);
+    if render_search_row(
+        ui,
+        "stream_search",
+        &mut state.search,
+        t("stream.search_placeholder"),
+        t("stream.search_scope_subject"),
+        t("stream.search_scope_payload"),
+        status,
+    ) {
+        state.cached_filtered = None;
+    }
+    if state.search.is_active() {
+        ui.weak(t("stream.search_loaded_only"));
+    }
+
+    let mut next_selected = state.selected_msg;
+    let rows = filtered_stream_rows(state).to_vec();
     egui::ScrollArea::vertical()
         .id_salt("stream_msg_list")
         .auto_shrink(false)
         .show(ui, |ui| {
             if state.messages.is_empty() {
                 ui.label(t("stream.no_messages"));
+            } else if rows.is_empty() {
+                ui.label(t("common.search_no_matches"));
             } else {
-                for (idx, msg) in state.messages.iter().enumerate() {
-                    let seq = msg["sequence"].as_u64().unwrap_or(0);
-                    let subject = msg["subject"].as_str().unwrap_or("");
-                    let time_str = msg["time"]
-                        .as_str()
-                        .and_then(format_rfc3339_short)
-                        .unwrap_or_default();
-                    let label = if time_str.is_empty() {
-                        format!("#{seq} {subject}")
-                    } else {
-                        format!("#{seq} {time_str} {subject}")
-                    };
-                    let selected = state.selected_msg == Some(idx);
+                for (idx, label) in rows {
+                    let selected = next_selected == Some(idx);
                     if ui.selectable_label(selected, &label).clicked() {
-                        state.selected_msg = Some(idx);
+                        next_selected = Some(idx);
                     }
                 }
             }
         });
+    state.selected_msg = next_selected;
+}
+
+fn stream_search_status(state: &mut StreamState) -> SearchStatus {
+    if !state.search.is_active() {
+        return SearchStatus::Inactive;
+    }
+    let rows = filtered_stream_rows(state);
+    SearchStatus::Showing {
+        matches: rows.len(),
+        capped: rows.len() >= SEARCH_RESULT_LIMIT,
+    }
+}
+
+fn filtered_stream_rows(state: &mut StreamState) -> &[(usize, String)] {
+    let cache_key = SearchCacheKey::from_state(&state.search);
+    let needs_refresh = match &state.cached_filtered {
+        Some((generation, cached_key, _)) => {
+            *generation != state.search_generation || *cached_key != cache_key
+        }
+        None => true,
+    };
+
+    if needs_refresh {
+        let query = state.search.normalized_query();
+        let rows = state
+            .messages
+            .iter()
+            .enumerate()
+            .filter(|(_, msg)| stream_message_matches(msg, &state.search, &query))
+            .take(SEARCH_RESULT_LIMIT)
+            .map(|(idx, msg)| (idx, stream_message_label(msg)))
+            .collect();
+        state.cached_filtered = Some((state.search_generation, cache_key, rows));
+    }
+
+    state
+        .cached_filtered
+        .as_ref()
+        .map(|(_, _, rows)| rows.as_slice())
+        .unwrap_or(&[])
+}
+
+fn stream_message_matches(
+    msg: &serde_json::Value,
+    search: &super::types::ScopedSearchState,
+    query: &str,
+) -> bool {
+    if !search.is_active() {
+        return true;
+    }
+    let subject_matches = search.primary
+        && msg["subject"]
+            .as_str()
+            .is_some_and(|subject| matches_query(subject, query));
+    let payload_matches = search.secondary && matches_query(&searchable_json_payload(msg), query);
+    subject_matches || payload_matches
+}
+
+fn stream_message_label(msg: &serde_json::Value) -> String {
+    let seq = msg["sequence"].as_u64().unwrap_or(0);
+    let subject = msg["subject"].as_str().unwrap_or("");
+    let time_str = msg["time"]
+        .as_str()
+        .and_then(format_rfc3339_short)
+        .unwrap_or_default();
+    if time_str.is_empty() {
+        format!("#{seq} {subject}")
+    } else {
+        format!("#{seq} {time_str} {subject}")
+    }
 }
 
 /// Format an RFC3339 timestamp to a compact local-friendly display.

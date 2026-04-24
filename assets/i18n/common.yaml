@@ -105,3 +105,16 @@ storage_label:
 replicas:
   en: "Replicas"
   zh: "副本数"
+
+clear:
+  en: "Clear"
+  zh: "清除"
+search:
+  en: "Search"
+  zh: "搜索"
+search_matches:
+  en: "Matches:"
+  zh: "匹配:"
+search_no_matches:
+  en: "No matches in loaded content."
+  zh: "已加载内容中没有匹配项。"
