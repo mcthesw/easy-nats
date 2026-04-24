@@ -202,12 +202,16 @@ fn render_message_list(ui: &mut egui::Ui, state: &mut StreamState) {
         t("stream.search_placeholder"),
         t("stream.search_scope_subject"),
         t("stream.search_scope_payload"),
-        status,
     ) {
         state.cached_filtered = None;
     }
     if state.search.is_active() {
-        ui.weak(t("stream.search_loaded_only"));
+        ui.horizontal_wrapped(|ui| {
+            if let Some(text) = status.text() {
+                ui.weak(text);
+            }
+            ui.weak(format!("· {}", t("stream.search_loaded_only")));
+        });
     }
 
     let mut next_selected = state.selected_msg;

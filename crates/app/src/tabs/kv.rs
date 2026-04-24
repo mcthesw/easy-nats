@@ -143,7 +143,6 @@ fn render_key_list(
         t("kv.search_placeholder"),
         t("kv.search_scope_key"),
         t("kv.search_scope_value"),
-        search_status,
     );
     if search_changed {
         state.search_more_requested = false;
