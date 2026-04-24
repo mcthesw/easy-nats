@@ -219,6 +219,15 @@ pub(crate) async fn handle_get_messages(
     params: GetMessagesParams,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
+    tracing::info!(
+        connection_id,
+        stream = %params.stream_name,
+        start_sequence = ?params.start_sequence,
+        subject_filter = ?params.subject_filter,
+        start_time = ?params.start_time,
+        batch_size = params.batch_size,
+        "Fetching stream messages"
+    );
     let Some(stream) = open_stream(
         state,
         connection_id,
@@ -272,6 +281,8 @@ pub(crate) async fn handle_get_messages(
         }
     }
 
+    let message_count = messages.len();
+    tracing::info!(connection_id, stream = %params.stream_name, message_count, "Fetched stream messages");
     send_ok(
         evt_tx,
         connection_id,
@@ -380,6 +391,8 @@ async fn handle_get_messages_by_time(
     }
 
     // Ephemeral consumer auto-deletes on timeout; no explicit cleanup needed.
+    let message_count = messages.len();
+    tracing::info!(connection_id, stream = %stream_name, message_count, "Fetched stream messages by time");
     send_ok(
         evt_tx,
         connection_id,

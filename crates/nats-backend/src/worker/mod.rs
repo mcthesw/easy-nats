@@ -25,6 +25,7 @@ pub async fn run_worker(
     let mut state = WorkerState::default();
 
     while let Some(cmd) = cmd_rx.recv().await {
+        tracing::trace!(?cmd, "Backend command received");
         match cmd {
             BackendCommand::Connect { config } => {
                 connection::handle_connect(&mut state, config, &evt_tx).await;
@@ -219,14 +220,16 @@ pub async fn run_worker(
                 generation,
             } => {
                 // Cancel any previous task for the same (connection_id, bucket)
-                if let Some((_, prev_handle)) =
+                if let Some((prev_generation, prev_handle)) =
                     state.kv_tasks.remove(&(connection_id, bucket.clone()))
                 {
+                    tracing::debug!(connection_id, bucket = %bucket, generation, prev_generation, "Aborting previous KV key list task");
                     prev_handle.abort();
                 }
                 // Clean up finished tasks opportunistically
                 state.kv_tasks.retain(|_, (_, h)| !h.is_finished());
                 // Spawn new task
+                tracing::debug!(connection_id, bucket = %bucket, generation, "Spawning KV key list task");
                 if let Some(handle) = kv::handle_list_keys(
                     &state,
                     connection_id,
