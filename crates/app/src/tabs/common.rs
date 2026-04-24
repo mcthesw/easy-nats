@@ -63,30 +63,22 @@ pub(crate) fn render_search_row(
     placeholder: &str,
     primary_label: &str,
     secondary_label: &str,
-    status: SearchStatus,
 ) -> bool {
     let before = (search.query.clone(), search.primary, search.secondary);
-    ui.horizontal_wrapped(|ui| {
-        ui.label(t("common.search"));
+    ui.horizontal(|ui| {
         ui.add(
             egui::TextEdit::singleline(&mut search.query)
                 .id_salt(id_salt)
                 .hint_text(placeholder)
-                .desired_width(160.0),
+                .desired_width((ui.available_width() - 84.0).clamp(96.0, 260.0)),
         );
-        if !search.query.is_empty()
-            && ui
-                .small_button("×")
-                .on_hover_text(t("common.clear"))
-                .clicked()
-        {
-            search.query.clear();
-        }
-        ui.checkbox(&mut search.primary, primary_label);
-        ui.checkbox(&mut search.secondary, secondary_label);
-        if let Some(text) = status.text() {
-            ui.weak(text);
-        }
+        egui::ComboBox::from_id_salt(ui.id().with("search_fields"))
+            .width(76.0)
+            .selected_text(t("common.search_fields"))
+            .show_ui(ui, |ui| {
+                ui.checkbox(&mut search.primary, primary_label);
+                ui.checkbox(&mut search.secondary, secondary_label);
+            });
     });
     before != (search.query.clone(), search.primary, search.secondary)
 }
