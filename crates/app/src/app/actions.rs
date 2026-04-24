@@ -216,6 +216,10 @@ impl EasyNatsApp {
             state.loading_entries = true;
             state.load_generation = new_gen;
             state.keys.clear();
+            state.fetched_values.clear();
+            state.value_search_cursor = 0;
+            state.value_search_scanning = 0;
+            state.keys_complete = false;
             self.backend.send(BackendCommand::ListKvKeys {
                 connection_id: *connection_id,
                 bucket: bucket_name.clone(),

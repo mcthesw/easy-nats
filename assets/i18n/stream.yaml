@@ -128,3 +128,16 @@ time_30d:
 time_clear:
   en: "Clear"
   zh: "清除"
+
+search_placeholder:
+  en: "Search loaded messages"
+  zh: "搜索已加载消息"
+search_scope_subject:
+  en: "Subject"
+  zh: "主题"
+search_scope_payload:
+  en: "Payload"
+  zh: "载荷"
+search_loaded_only:
+  en: "Search covers the loaded message batch only."
+  zh: "搜索仅覆盖已加载的消息批次。"

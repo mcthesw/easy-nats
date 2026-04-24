@@ -116,3 +116,31 @@ back_to_detail:
 format_json:
   en: "Format JSON"
   zh: "格式化 JSON"
+
+search_placeholder:
+  en: "Search loaded keys or fetched values"
+  zh: "搜索已加载键或已获取值"
+search_scope_key:
+  en: "Key"
+  zh: "键"
+search_scope_value:
+  en: "Value"
+  zh: "值"
+search_values_scanned:
+  en: "Values scanned:"
+  zh: "已扫描值:"
+search_more_hint:
+  en: "More keys may exist."
+  zh: "可能还有更多键。"
+search_more:
+  en: "Search more"
+  zh: "继续搜索"
+search_values:
+  en: "Search values"
+  zh: "搜索值"
+search_more_values:
+  en: "Search more values"
+  zh: "继续搜索值"
+search_values_loading:
+  en: "Searching values..."
+  zh: "正在搜索值..."

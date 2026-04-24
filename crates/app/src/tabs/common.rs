@@ -34,6 +34,87 @@ pub(crate) fn format_bytes(bytes: u64) -> String {
     }
 }
 
+pub(crate) const SEARCH_RESULT_LIMIT: usize = 200;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SearchStatus {
+    Inactive,
+    Showing { matches: usize, capped: bool },
+}
+
+impl SearchStatus {
+    pub(crate) fn text(self) -> Option<String> {
+        match self {
+            Self::Inactive => None,
+            Self::Showing { matches, capped } if capped => {
+                Some(format!("{} {matches}+", t("common.search_matches")))
+            }
+            Self::Showing { matches, .. } => {
+                Some(format!("{} {matches}", t("common.search_matches")))
+            }
+        }
+    }
+}
+
+pub(crate) fn render_search_row(
+    ui: &mut egui::Ui,
+    id_salt: impl std::hash::Hash,
+    search: &mut super::types::ScopedSearchState,
+    placeholder: &str,
+    primary_label: &str,
+    secondary_label: &str,
+    status: SearchStatus,
+) -> bool {
+    let before = (search.query.clone(), search.primary, search.secondary);
+    ui.horizontal_wrapped(|ui| {
+        ui.label(t("common.search"));
+        ui.add(
+            egui::TextEdit::singleline(&mut search.query)
+                .id_salt(id_salt)
+                .hint_text(placeholder)
+                .desired_width(160.0),
+        );
+        if !search.query.is_empty()
+            && ui
+                .small_button("×")
+                .on_hover_text(t("common.clear"))
+                .clicked()
+        {
+            search.query.clear();
+        }
+        ui.checkbox(&mut search.primary, primary_label);
+        ui.checkbox(&mut search.secondary, secondary_label);
+        if let Some(text) = status.text() {
+            ui.weak(text);
+        }
+    });
+    before != (search.query.clone(), search.primary, search.secondary)
+}
+
+pub(crate) fn matches_query(value: &str, query: &str) -> bool {
+    value.to_lowercase().contains(query)
+}
+
+pub(crate) fn searchable_payload_text(payload: &[u8]) -> String {
+    String::from_utf8_lossy(payload).into_owned()
+}
+
+pub(crate) fn searchable_json_payload(value: &serde_json::Value) -> String {
+    if let Some(payload) = value["payload"].as_str() {
+        return payload.to_string();
+    }
+    if let Some(value_base64) = value["payload_base64"]
+        .as_str()
+        .or_else(|| value["value_base64"].as_str())
+    {
+        return searchable_payload_text(&decode_base64_payload(Some(value_base64)));
+    }
+    if let Some(payload) = value.get("payload") {
+        return payload.to_string();
+    }
+    String::new()
+}
+
 pub(crate) fn decode_base64_payload(value_base64: Option<&str>) -> Vec<u8> {
     value_base64
         .and_then(|value| base64::engine::general_purpose::STANDARD.decode(value).ok())
@@ -177,7 +258,9 @@ fn cycle_suggestion_index(current: Option<usize>, len: usize, forward: bool) -> 
 
 #[cfg(test)]
 mod tests {
-    use super::{cycle_suggestion_index, visible_topic_suggestions};
+    use super::{
+        cycle_suggestion_index, matches_query, searchable_payload_text, visible_topic_suggestions,
+    };
 
     #[test]
     fn visible_topic_suggestions_matches_prefix_and_skips_exact_match() {
@@ -188,6 +271,13 @@ mod tests {
         assert_eq!(visible, vec!["foo.bar", "foo.baz"]);
         assert!(visible_topic_suggestions(&suggestions, "foo.bar").is_empty());
         assert!(visible_topic_suggestions(&suggestions, "").is_empty());
+    }
+
+    #[test]
+    fn search_helpers_match_case_insensitively() {
+        assert!(matches_query("Balance: 42", "balance"));
+        assert!(matches_query("Balance: 42", "42"));
+        assert_eq!(searchable_payload_text(b"hello"), "hello");
     }
 
     #[test]

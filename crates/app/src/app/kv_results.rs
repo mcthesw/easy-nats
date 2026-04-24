@@ -79,6 +79,7 @@ impl EasyNatsApp {
                         state.keys.extend(new_keys.clone());
                         if done {
                             state.keys.sort();
+                            state.keys_complete = true;
                             state.loading_entries = false;
                         }
                     }
@@ -98,14 +99,20 @@ impl EasyNatsApp {
                     } = tab
                         && *cid == connection_id
                         && *bucket_name == bucket
-                        && state.selected_key.as_deref() == Some(entry_key)
                     {
-                        state.loading_entry = false;
-                        state.entry_key = entry_key.to_string();
-                        state.entry_value = decode_kv_value(&entry);
-                        state.entry_revision = entry["revision"].as_u64();
-                        state.entry_operation = entry["operation"].as_str().map(str::to_owned);
-                        state.entry_created = entry["created"].as_str().map(str::to_owned);
+                        let entry_value = decode_kv_value(&entry);
+                        state
+                            .fetched_values
+                            .insert(entry_key.to_string(), entry_value.clone());
+                        state.value_search_scanning = state.value_search_scanning.saturating_sub(1);
+                        if state.selected_key.as_deref() == Some(entry_key) {
+                            state.loading_entry = false;
+                            state.entry_key = entry_key.to_string();
+                            state.entry_value = entry_value;
+                            state.entry_revision = entry["revision"].as_u64();
+                            state.entry_operation = entry["operation"].as_str().map(str::to_owned);
+                            state.entry_created = entry["created"].as_str().map(str::to_owned);
+                        }
                     }
                 }
                 true
@@ -156,6 +163,10 @@ impl EasyNatsApp {
                             state.loading_entries = true;
                             state.load_generation = new_gen;
                             state.keys.clear();
+                            state.fetched_values.clear();
+                            state.value_search_cursor = 0;
+                            state.value_search_scanning = 0;
+                            state.keys_complete = false;
                             if is_put && !key.is_empty() {
                                 state.selected_key = Some(key.clone());
                                 state.show_history = false;
