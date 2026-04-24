@@ -2,35 +2,23 @@
 
 ## Distribution
 
-Current availability and planned publishing targets.
+| Channel | Goal | Status |
+|---------|------|--------|
+| APT (signed) | Publish signed APT repository metadata so users do not need `[trusted=yes]` | Planned hardening |
+| AUR | Publish an Arch package from the retained PKGBUILD template | Deferred until AUR account and SSH key setup are ready |
+| Homebrew Cask (official) | Submit to the official Homebrew Cask repository | Waiting for upstream eligibility |
+| Scoop Extras | Submit to the Scoop Extras bucket | Waiting for upstream eligibility |
+| Debian official | Package through Debian review and sponsorship | Long-term |
+| Fedora / RPM Fusion | Package through Fedora or RPM Fusion review | Long-term |
 
-### Available now
+## Search
 
-| Channel | Install | Auto-update |
-|---------|---------|-------------|
-| GitHub Releases | [Releases page](https://github.com/mcthesw/easy-nats/releases) | — |
-| Homebrew (tap) | `brew install mcthesw/tap/easy-nats` | On each release |
-| Scoop (bucket) | `scoop bucket add sworld https://github.com/mcthesw/scoop-bucket && scoop install easy-nats` | On each release |
-| APT | `echo "deb [trusted=yes] https://mcthesw.github.io/sworld-apt stable main" \| sudo tee /etc/apt/sources.list.d/mcthesw.list` | On each release |
+### Full-Text Search Workspace
 
-### Pending setup
+- Add a dedicated in-memory search tab that can aggregate selected KV buckets, stream batches, and Pub/Sub buffers.
+- Keep search indexes ephemeral by default; do not persist message or KV content locally unless a separate future change explicitly defines that behavior.
+- Evaluate a RAM-backed full-text engine only if simple substring search is no longer sufficient for aggregated search.
 
-| Channel | What's needed | Notes |
-|---------|---------------|-------|
-| Flathub | Submit initial PR | Manifest and metadata are prepared; updates can be automated later |
-| APT (signed) | GPG key pair | Set `APT_GPG_PRIVATE_KEY` + `APT_GPG_PASSPHRASE` secrets; without signing, APT still works but users need `[trusted=yes]` |
-| AUR | SSH key pair + AUR account | Deferred for now; keep PKGBUILD template, re-enable publishing after keys are ready |
-
-### Planned
-
-| Channel | Requirement | Status |
-|---------|-------------|--------|
-| Homebrew Cask (official) | 30 stars + 30 forks | Waiting for eligibility |
-| Scoop (Extras) | 100 stars | Waiting for eligibility |
-| Flathub | Review on `new-pr` branch | Ready for first submission |
-| Debian official | Sponsorship + review | Long-term |
-| Fedora / RPM Fusion | Package review | Long-term |
-
-## Features
+## More Ideas
 
 See [GitHub Issues](https://github.com/mcthesw/easy-nats/issues) for feature requests and bug reports.
