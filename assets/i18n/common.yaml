@@ -118,3 +118,6 @@ search_matches:
 search_no_matches:
   en: "No matches in loaded content."
   zh: "已加载内容中没有匹配项。"
+search_fields:
+  en: "Fields"
+  zh: "字段"
