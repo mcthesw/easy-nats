@@ -53,6 +53,7 @@ async fn send_ok(
     operation: BackendOperation,
     data: serde_json::Value,
 ) {
+    tracing::debug!(connection_id, ?operation, "KV operation succeeded");
     let _ = evt_tx
         .send(BackendEvent::OperationResult {
             connection_id,
@@ -68,6 +69,7 @@ async fn send_err(
     operation: BackendOperation,
     message: String,
 ) {
+    tracing::warn!(connection_id, ?operation, %message, "KV operation failed");
     let _ = evt_tx
         .send(BackendEvent::Error {
             connection_id: Some(connection_id),

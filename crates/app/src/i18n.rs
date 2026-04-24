@@ -140,8 +140,7 @@ pub fn t(key: &str) -> &'static str {
     if let Some(v) = store.maps[0].get(key) {
         return v.as_str();
     }
-    tracing::warn!("Missing i18n key: {key}");
-    "???"
+    panic!("Missing i18n key: {key}");
 }
 
 /// Switch the active language. Takes effect on the next `t()` call.
