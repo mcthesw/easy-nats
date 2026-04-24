@@ -5,9 +5,14 @@ use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
 use crate::proto::ProtoSchemaManager;
 
-use super::common::{format_timestamp, topic_history_text_edit};
+use super::common::{
+    SEARCH_RESULT_LIMIT, SearchStatus, format_timestamp, matches_query, render_search_row,
+    searchable_payload_text, topic_history_text_edit,
+};
 use super::guard::TabGuard;
-use super::types::{ReceivedMessage, SubjectSubscription, SubscriberState, TabAction};
+use super::types::{
+    ReceivedMessage, SearchCacheKey, SubjectSubscription, SubscriberState, TabAction,
+};
 
 #[allow(clippy::too_many_arguments)]
 pub fn subscriber_ui(
@@ -197,11 +202,30 @@ fn render_message_list(ui: &mut egui::Ui, state: &mut SubscriberState) {
 
     ui.add_space(4.0);
     ui.label(t("subscriber.messages"));
+    let status = subscriber_search_status(state);
+    if render_search_row(
+        ui,
+        "subscriber_search",
+        &mut state.search,
+        t("subscriber.search_placeholder"),
+        t("subscriber.search_scope_subject"),
+        t("subscriber.search_scope_payload"),
+        status,
+    ) {
+        state.cached_filtered = None;
+    }
+    if state.search.is_active() {
+        ui.weak(t("subscriber.search_buffer_only"));
+    }
 
     let mut next_selected_idx = state.selected_idx;
     let filtered = filtered_rows(state);
     if filtered.is_empty() {
-        ui.label(t("subscriber.no_messages"));
+        ui.label(if state.messages.is_empty() {
+            t("subscriber.no_messages")
+        } else {
+            t("common.search_no_matches")
+        });
         return;
     }
 
@@ -246,16 +270,31 @@ fn render_message_list(ui: &mut egui::Ui, state: &mut SubscriberState) {
     state.selected_idx = next_selected_idx;
 }
 
+fn subscriber_search_status(state: &mut SubscriberState) -> SearchStatus {
+    if !state.search.is_active() {
+        return SearchStatus::Inactive;
+    }
+    let rows = filtered_rows(state);
+    SearchStatus::Showing {
+        matches: rows.len(),
+        capped: rows.len() >= SEARCH_RESULT_LIMIT,
+    }
+}
+
 fn filtered_rows(state: &mut SubscriberState) -> &[(usize, String, String)] {
+    let search_key = SearchCacheKey::from_state(&state.search);
     let needs_refresh = match &state.cached_filtered {
-        Some((generation, filter, _)) => {
-            *generation != state.cache_generation || *filter != state.subject_filter
+        Some((generation, filter, cached_search, _)) => {
+            *generation != state.cache_generation
+                || *filter != state.subject_filter
+                || *cached_search != search_key
         }
         None => true,
     };
 
     if needs_refresh {
         let subject_filter = state.subject_filter.clone();
+        let query = state.search.normalized_query();
         let rows = state
             .messages
             .iter()
@@ -264,7 +303,9 @@ fn filtered_rows(state: &mut SubscriberState) -> &[(usize, String, String)] {
                 subject_filter
                     .as_ref()
                     .is_none_or(|filter| message.subject == *filter)
+                    && subscriber_message_matches(message, &state.search, &query)
             })
+            .take(SEARCH_RESULT_LIMIT)
             .map(|(idx, message)| {
                 (
                     idx,
@@ -273,14 +314,28 @@ fn filtered_rows(state: &mut SubscriberState) -> &[(usize, String, String)] {
                 )
             })
             .collect();
-        state.cached_filtered = Some((state.cache_generation, subject_filter, rows));
+        state.cached_filtered = Some((state.cache_generation, subject_filter, search_key, rows));
     }
 
     state
         .cached_filtered
         .as_ref()
-        .map(|(_, _, rows)| rows.as_slice())
+        .map(|(_, _, _, rows)| rows.as_slice())
         .unwrap_or(&[])
+}
+
+fn subscriber_message_matches(
+    message: &ReceivedMessage,
+    search: &super::types::ScopedSearchState,
+    query: &str,
+) -> bool {
+    if !search.is_active() {
+        return true;
+    }
+    let subject_matches = search.primary && matches_query(&message.subject, query);
+    let payload_matches =
+        search.secondary && matches_query(&searchable_payload_text(&message.payload), query);
+    subject_matches || payload_matches
 }
 
 fn message_detail_ui(
@@ -356,11 +411,15 @@ mod tests {
     use super::*;
 
     fn make_msg(subject: &str) -> ReceivedMessage {
+        make_msg_with_payload(subject, b"")
+    }
+
+    fn make_msg_with_payload(subject: &str, payload: &[u8]) -> ReceivedMessage {
         ReceivedMessage {
             subject: subject.to_string(),
             reply: None,
             headers: Vec::new(),
-            payload: Vec::new(),
+            payload: payload.to_vec(),
             timestamp: SystemTime::now(),
         }
     }
@@ -404,6 +463,28 @@ mod tests {
         assert_eq!(filtered.len(), 1);
         assert_eq!(filtered[0].0, 1);
         assert_eq!(filtered[0].2, "beta");
+    }
+
+    #[test]
+    fn search_filters_by_subject_or_payload() {
+        let mut state = SubscriberState::default();
+        state.push_message(make_msg_with_payload("orders.created", b"balance: 10"));
+        state.push_message(make_msg_with_payload("payments.updated", b"balance: 42"));
+
+        state.search.query = "payments".to_string();
+        state.search.primary = true;
+        state.search.secondary = false;
+        let by_subject = filtered_rows(&mut state).to_vec();
+        assert_eq!(by_subject.len(), 1);
+        assert_eq!(by_subject[0].2, "payments.updated");
+
+        state.search.query = "42".to_string();
+        state.search.primary = false;
+        state.search.secondary = true;
+        state.cached_filtered = None;
+        let by_payload = filtered_rows(&mut state).to_vec();
+        assert_eq!(by_payload.len(), 1);
+        assert_eq!(by_payload[0].2, "payments.updated");
     }
 
     #[test]

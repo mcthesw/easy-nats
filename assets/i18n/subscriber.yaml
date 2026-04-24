@@ -56,3 +56,16 @@ detail_headers:
 detail_payload:
   en: "Payload:"
   zh: "载荷:"
+
+search_placeholder:
+  en: "Search retained messages"
+  zh: "搜索保留的消息"
+search_scope_subject:
+  en: "Subject"
+  zh: "主题"
+search_scope_payload:
+  en: "Payload"
+  zh: "载荷"
+search_buffer_only:
+  en: "Search covers the retained message buffer only."
+  zh: "搜索仅覆盖保留的消息缓冲区。"
