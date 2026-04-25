@@ -5,6 +5,7 @@ pub(crate) mod log_viewer;
 mod metrics;
 mod object_store;
 mod publisher;
+mod search_workspace;
 mod server_info;
 pub(crate) mod settings;
 mod stream;
@@ -13,16 +14,18 @@ mod subscriber;
 mod types;
 mod viewer;
 
+pub(crate) use common::KV_VALUE_SEARCH_BATCH;
 pub use guard::{TabGuard, next_backend_id, next_generation};
 pub use kv::kv_bucket_ui;
 pub use metrics::metrics_ui;
 pub use object_store::obj_store_bucket_ui;
 pub use publisher::publisher_ui;
+pub(crate) use search_workspace::{search_workspace_ui, source_snapshot_from_tab};
 pub use server_info::server_info_ui;
 pub use stream::stream_ui;
 pub use subscriber::subscriber_ui;
 pub use types::{
     AppTabViewer, KvBucketState, MetricsState, ObjectStoreBucketState, PublisherState,
-    ReceivedMessage, ResponseData, ServerInfoState, StreamState, SubscriberState, TabAction,
-    TabKind,
+    ReceivedMessage, ResponseData, SearchResultLocator, SearchSourceId, SearchSourceSnapshot,
+    SearchWorkspaceState, ServerInfoState, StreamState, SubscriberState, TabAction, TabKind,
 };

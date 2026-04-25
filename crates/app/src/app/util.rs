@@ -68,6 +68,7 @@ pub(crate) fn same_tab(a: &TabKind, b: &TabKind) -> bool {
                 connection_id: a2, ..
             },
         ) => a1 == a2,
+        (TabKind::SearchWorkspace { .. }, TabKind::SearchWorkspace { .. }) => true,
         (TabKind::Settings, TabKind::Settings) => true,
         (TabKind::LogViewer, TabKind::LogViewer) => true,
         _ => false,

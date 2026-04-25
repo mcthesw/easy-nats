@@ -80,6 +80,8 @@ impl EasyNatsApp {
                         state.messages = messages.clone();
                         state.fetching = false;
                         state.selected_msg = None;
+                        state.search_generation = state.search_generation.wrapping_add(1);
+                        state.cached_filtered = None;
                     }
                 }
                 true

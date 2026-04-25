@@ -77,10 +77,14 @@ impl EasyNatsApp {
                         && state.load_generation == generation
                     {
                         state.keys.extend(new_keys.clone());
+                        if !new_keys.is_empty() {
+                            state.search_generation = state.search_generation.wrapping_add(1);
+                        }
                         if done {
                             state.keys.sort();
                             state.keys_complete = true;
                             state.loading_entries = false;
+                            state.search_generation = state.search_generation.wrapping_add(1);
                         }
                     }
                 }
@@ -104,6 +108,7 @@ impl EasyNatsApp {
                         state
                             .fetched_values
                             .insert(entry_key.to_string(), entry_value.clone());
+                        state.search_generation = state.search_generation.wrapping_add(1);
                         state.value_search_scanning = state.value_search_scanning.saturating_sub(1);
                         if state.selected_key.as_deref() == Some(entry_key) {
                             state.loading_entry = false;
@@ -166,6 +171,7 @@ impl EasyNatsApp {
                             state.fetched_values.clear();
                             state.value_search_cursor = 0;
                             state.value_search_scanning = 0;
+                            state.search_generation = state.search_generation.wrapping_add(1);
                             state.keys_complete = false;
                             if is_put && !key.is_empty() {
                                 state.selected_key = Some(key.clone());

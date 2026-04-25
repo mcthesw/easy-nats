@@ -7,12 +7,10 @@ use crate::proto::ProtoSchemaManager;
 use crate::tabs::guard::TabGuard;
 
 use super::common::{
-    SearchStatus, auto_refresh_ui, decode_base64_payload, format_bytes, matches_query,
-    render_search_row, searchable_json_payload,
+    KV_VALUE_SEARCH_BATCH, SearchStatus, auto_refresh_ui, decode_base64_payload, format_bytes,
+    matches_query, render_search_row, searchable_json_payload,
 };
 use super::types::{KvBucketState, TabAction};
-
-const KV_VALUE_SEARCH_BATCH: usize = 100;
 
 #[allow(clippy::too_many_arguments)]
 pub fn kv_bucket_ui(
@@ -51,6 +49,10 @@ pub fn kv_bucket_ui(
         let new_gen = crate::tabs::next_generation();
         state.load_generation = new_gen;
         state.keys.clear();
+        state.fetched_values.clear();
+        state.value_search_cursor = 0;
+        state.value_search_scanning = 0;
+        state.search_generation = state.search_generation.wrapping_add(1);
         backend.send(BackendCommand::ListKvKeys {
             connection_id,
             bucket: bucket_name.to_string(),
@@ -329,6 +331,7 @@ fn refresh_kv_keys(
     state.fetched_values.clear();
     state.value_search_cursor = 0;
     state.value_search_scanning = 0;
+    state.search_generation = state.search_generation.wrapping_add(1);
     state.keys_complete = false;
     state.loading_entries = true;
     backend.send(BackendCommand::ListKvKeys {

@@ -35,6 +35,7 @@ pub(crate) fn format_bytes(bytes: u64) -> String {
 }
 
 pub(crate) const SEARCH_RESULT_LIMIT: usize = 200;
+pub(crate) const KV_VALUE_SEARCH_BATCH: usize = 100;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SearchStatus {
