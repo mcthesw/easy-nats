@@ -57,6 +57,14 @@ fn render_sidebar_header(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
             }
 
             if ui
+                .small_button("🔍")
+                .on_hover_text(t("search_workspace.title"))
+                .clicked()
+            {
+                app.open_or_focus_search_workspace();
+            }
+
+            if ui
                 .small_button("＋")
                 .on_hover_text(t("sidebar.connection_new"))
                 .clicked()

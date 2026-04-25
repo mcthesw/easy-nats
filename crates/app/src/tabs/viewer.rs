@@ -2,8 +2,8 @@ use eframe::egui;
 
 use crate::i18n::t;
 use crate::tabs::{
-    kv_bucket_ui, metrics_ui, obj_store_bucket_ui, publisher_ui, server_info_ui, stream_ui,
-    subscriber_ui,
+    kv_bucket_ui, metrics_ui, obj_store_bucket_ui, publisher_ui, search_workspace_ui,
+    server_info_ui, stream_ui, subscriber_ui,
 };
 
 use super::log_viewer::log_viewer_ui;
@@ -46,6 +46,7 @@ fn tab_scope_id(tab: &TabKind) -> String {
         } => format!("obj:{connection_id}:{bucket_name}"),
         TabKind::ServerInfo { connection_id, .. } => format!("srvinfo:{connection_id}"),
         TabKind::Metrics { connection_id, .. } => format!("metrics:{connection_id}"),
+        TabKind::SearchWorkspace { .. } => "search-workspace".into(),
         TabKind::Settings => "settings".into(),
         TabKind::LogViewer => "log-viewer".into(),
     }
@@ -181,6 +182,9 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
             ..
         } => {
             metrics_ui(ui, *connection_id, state, viewer.backend);
+        }
+        TabKind::SearchWorkspace { state } => {
+            search_workspace_ui(ui, state, viewer.search_sources, viewer.actions);
         }
         TabKind::Settings => {
             settings_ui(ui, viewer.settings, viewer.theme_id, viewer.actions);

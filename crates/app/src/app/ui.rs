@@ -21,6 +21,7 @@ impl eframe::App for EasyNatsApp {
         windows::render_windows(self, ui);
         sidebar::render_sidebar(self, ui);
 
+        let search_sources = self.search_source_snapshots();
         let mut tab_actions = Vec::new();
         let prev_style = ui.ctx().global_style();
         let mut dock_egui_style = (*prev_style).clone();
@@ -53,6 +54,7 @@ impl eframe::App for EasyNatsApp {
                 &mut AppTabViewer {
                     backend: &self.backend,
                     actions: &mut tab_actions,
+                    search_sources: &search_sources,
                     settings: &mut self.settings,
                     theme_id: &mut self.theme_id,
                     log_buffer: &self.log_buffer,
@@ -145,6 +147,12 @@ impl eframe::App for EasyNatsApp {
                 }
                 TabAction::ClearProtoSchemas => {
                     self.proto_manager.clear();
+                }
+                TabAction::ScanSearchWorkspaceKvValues { source_id } => {
+                    self.scan_search_workspace_kv_values(&source_id);
+                }
+                TabAction::NavigateSearchResult { locator } => {
+                    self.navigate_search_result(locator);
                 }
                 TabAction::RecordTopic { topic } => {
                     self.settings.record_topic(&topic);

@@ -59,6 +59,9 @@ tab_object_store:
 tab_metrics:
   en: "Metrics"
   zh: "监控指标"
+tab_search_workspace:
+  en: "Search"
+  zh: "搜索"
 
 # Welcome
 welcome_heading:

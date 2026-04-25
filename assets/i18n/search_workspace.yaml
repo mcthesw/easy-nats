@@ -1,0 +1,82 @@
+# In-memory search workspace strings
+title:
+  en: "Search Workspace"
+  zh: "搜索工作区"
+query_placeholder:
+  en: "Search selected in-memory data"
+  zh: "搜索选中的内存数据"
+scope_primary:
+  en: "Key / Subject"
+  zh: "键 / 主题"
+scope_secondary:
+  en: "Value / Payload"
+  zh: "值 / 载荷"
+add_source:
+  en: "Add source"
+  zh: "添加来源"
+no_available_sources:
+  en: "No more open sources."
+  zh: "没有更多已打开来源。"
+select_sources:
+  en: "Select open sources to search."
+  zh: "选择要搜索的已打开来源。"
+source_unavailable:
+  en: "Source unavailable"
+  zh: "来源不可用"
+loaded_keys:
+  en: "keys"
+  zh: "键"
+fetched_values:
+  en: "values"
+  zh: "值"
+loaded_messages:
+  en: "messages"
+  zh: "消息"
+retained_messages:
+  en: "buffer"
+  zh: "缓冲"
+scan_values:
+  en: "Scan values"
+  zh: "扫描值"
+scan_more_values:
+  en: "Scan more values"
+  zh: "继续扫描值"
+scanning_values:
+  en: "Scanning values..."
+  zh: "正在扫描值..."
+results:
+  en: "Results"
+  zh: "结果"
+enter_query:
+  en: "Enter a query"
+  zh: "输入查询"
+empty_sources:
+  en: "Select sources from currently open KV, stream, or subscriber tabs."
+  zh: "从当前已打开的 KV、流或订阅者标签页中选择来源。"
+empty_query:
+  en: "Enter a query to search selected sources."
+  zh: "输入查询以搜索选中的来源。"
+no_matches:
+  en: "No matches in selected sources."
+  zh: "选中来源中没有匹配项。"
+select_result:
+  en: "Select a result to preview it."
+  zh: "选择结果以预览。"
+stale_result:
+  en: "Source changed; showing saved preview."
+  zh: "来源已变化；显示保存的预览。"
+open_source:
+  en: "Open source"
+  zh: "打开来源"
+field_key:
+  en: "Key"
+  zh: "键"
+field_value:
+  en: "Value"
+  zh: "值"
+field_subject:
+  en: "Subject"
+  zh: "主题"
+field_payload:
+  en: "Payload"
+  zh: "载荷"

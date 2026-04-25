@@ -420,6 +420,7 @@ mod tests {
 
     fn make_msg_with_payload(subject: &str, payload: &[u8]) -> ReceivedMessage {
         ReceivedMessage {
+            id: 0,
             subject: subject.to_string(),
             reply: None,
             headers: Vec::new(),

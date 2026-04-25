@@ -108,6 +108,7 @@ impl EasyNatsApp {
                         {
                             for message in messages {
                                 state.push_message(ReceivedMessage {
+                                    id: 0,
                                     subject: message.subject,
                                     reply: message.reply,
                                     headers: message.headers,

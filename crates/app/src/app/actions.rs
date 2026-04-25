@@ -219,6 +219,7 @@ impl EasyNatsApp {
             state.fetched_values.clear();
             state.value_search_cursor = 0;
             state.value_search_scanning = 0;
+            state.search_generation = state.search_generation.wrapping_add(1);
             state.keys_complete = false;
             self.backend.send(BackendCommand::ListKvKeys {
                 connection_id: *connection_id,

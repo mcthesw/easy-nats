@@ -13,11 +13,15 @@
 
 ## Search
 
-### Full-Text Search Workspace
+### In-Memory Search Workspace
 
-- Add a dedicated in-memory search tab that can aggregate selected KV buckets, stream batches, and Pub/Sub buffers.
-- Keep search indexes ephemeral by default; do not persist message or KV content locally unless a separate future change explicitly defines that behavior.
-- Evaluate a RAM-backed full-text engine only if simple substring search is no longer sufficient for aggregated search.
+- Delivered a dedicated in-memory search tab that aggregates user-selected open KV buckets, stream batches, and Pub/Sub buffers.
+- Keep search state ephemeral: selected sources, cached results, and fetched KV values stay in memory and are not persisted locally.
+- Keep KV value search explicit and bounded through "scan more values" batches instead of silently loading entire buckets.
+
+### Future Full-Text Engine
+
+- Evaluate a RAM-backed full-text engine only if simple substring search becomes insufficient for aggregated search.
 
 ## More Ideas
 
