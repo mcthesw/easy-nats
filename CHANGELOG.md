@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.12](https://github.com/mcthesw/easy-nats/compare/v0.1.11...v0.1.12) (2026-04-25)
+
+
+### Features
+
+* **search:** add scoped tab search ([e3bb8ee](https://github.com/mcthesw/easy-nats/commit/e3bb8ee453f76fd9e9481da144f5f39452704116))
+
+
+### Documentation
+
+* **roadmap:** focus on planned work ([22485db](https://github.com/mcthesw/easy-nats/commit/22485db9736575f4f1c2900c7bb5864a139410d9))
+
 ## [0.1.11](https://github.com/mcthesw/easy-nats/compare/v0.1.10...v0.1.11) (2026-04-23)
 
 
