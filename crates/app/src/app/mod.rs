@@ -6,6 +6,7 @@ mod metrics_results;
 mod model;
 mod obj_store_results;
 mod operation_results;
+mod search_workspace;
 mod server_info_results;
 mod sidebar;
 mod stream_results;

@@ -93,6 +93,12 @@ pub enum TabAction {
         dir: String,
     },
     ClearProtoSchemas,
+    ScanSearchWorkspaceKvValues {
+        source_id: SearchSourceId,
+    },
+    NavigateSearchResult {
+        locator: SearchResultLocator,
+    },
     RecordTopic {
         topic: String,
     },
@@ -135,6 +141,7 @@ pub struct ResponseData {
 
 #[derive(Debug, Clone)]
 pub struct ReceivedMessage {
+    pub id: u64,
     pub subject: String,
     pub reply: Option<String>,
     pub headers: Vec<(String, String)>,
@@ -195,6 +202,164 @@ impl Default for ScopedSearchState {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum SearchSourceId {
+    Kv {
+        connection_id: u64,
+        bucket_name: String,
+    },
+    Stream {
+        connection_id: u64,
+        stream_name: String,
+    },
+    Subscriber {
+        connection_id: u64,
+        backend_id: u64,
+    },
+}
+
+impl SearchSourceId {
+    pub fn fallback_label(&self) -> String {
+        match self {
+            Self::Kv {
+                connection_id,
+                bucket_name,
+            } => format!("KV {bucket_name} #{connection_id}"),
+            Self::Stream {
+                connection_id,
+                stream_name,
+            } => format!("Stream {stream_name} #{connection_id}"),
+            Self::Subscriber {
+                connection_id,
+                backend_id,
+            } => format!("Subscriber #{backend_id} ({connection_id})"),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum SearchSourceCoverage {
+    Kv {
+        loaded_keys: usize,
+        fetched_values: usize,
+        scanning: usize,
+        can_scan_more: bool,
+    },
+    Stream {
+        messages: usize,
+    },
+    Subscriber {
+        messages: usize,
+        max_messages: usize,
+    },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SearchField {
+    Key,
+    Value,
+    Subject,
+    Payload,
+}
+
+impl SearchField {
+    pub fn is_primary(self) -> bool {
+        matches!(self, Self::Key | Self::Subject)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub enum SearchResultLocator {
+    KvKey {
+        connection_id: u64,
+        bucket_name: String,
+        key: String,
+    },
+    StreamMessage {
+        connection_id: u64,
+        stream_name: String,
+        sequence: u64,
+    },
+    SubscriberMessage {
+        connection_id: u64,
+        backend_id: u64,
+        message_id: u64,
+    },
+}
+
+#[derive(Debug, Clone)]
+pub struct SearchRecordSnapshot {
+    pub field: SearchField,
+    pub item_id: String,
+    pub item_label: String,
+    pub text: String,
+    pub snippet: String,
+    pub locator: SearchResultLocator,
+}
+
+#[derive(Debug, Clone)]
+pub struct SearchSourceSnapshot {
+    pub id: SearchSourceId,
+    pub label: String,
+    pub generation: u64,
+    pub coverage: SearchSourceCoverage,
+    pub records: Vec<SearchRecordSnapshot>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SearchResultIdentity {
+    pub source_id: SearchSourceId,
+    pub generation: u64,
+    pub field: SearchField,
+    pub item_id: String,
+}
+
+#[derive(Debug, Clone)]
+pub struct SearchWorkspaceResult {
+    pub identity: SearchResultIdentity,
+    pub source_label: String,
+    pub field: SearchField,
+    pub item_label: String,
+    pub snippet: String,
+    pub preview: String,
+    pub locator: SearchResultLocator,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SearchWorkspaceCacheKey {
+    pub query: String,
+    pub primary: bool,
+    pub secondary: bool,
+    pub sources: Vec<(SearchSourceId, Option<u64>)>,
+}
+
+pub type CachedSearchWorkspaceResults = (SearchWorkspaceCacheKey, Vec<SearchWorkspaceResult>);
+
+#[derive(Debug)]
+pub struct SearchWorkspaceState {
+    pub query: String,
+    pub primary: bool,
+    pub secondary: bool,
+    pub selected_sources: Vec<SearchSourceId>,
+    pub selected_result: Option<SearchResultIdentity>,
+    pub selected_preview: Option<SearchWorkspaceResult>,
+    pub cached_results: Option<CachedSearchWorkspaceResults>,
+}
+
+impl Default for SearchWorkspaceState {
+    fn default() -> Self {
+        Self {
+            query: String::new(),
+            primary: true,
+            secondary: true,
+            selected_sources: Vec::new(),
+            selected_result: None,
+            selected_preview: None,
+            cached_results: None,
+        }
+    }
+}
+
 #[derive(Debug)]
 pub struct SubjectSubscription {
     pub subject: String,
@@ -207,6 +372,7 @@ pub struct SubscriberState {
     pub subject_suggestion_idx: Option<usize>,
     pub subscriptions: Vec<SubjectSubscription>,
     pub messages: VecDeque<ReceivedMessage>,
+    pub next_message_id: u64,
     pub max_messages: usize,
     pub selected_idx: Option<usize>,
     pub payload_format: PayloadFormat,
@@ -225,6 +391,7 @@ impl Default for SubscriberState {
             subject_suggestion_idx: None,
             subscriptions: Vec::new(),
             messages: VecDeque::new(),
+            next_message_id: 1,
             max_messages: 1000,
             selected_idx: None,
             payload_format: PayloadFormat::Auto,
@@ -238,13 +405,15 @@ impl Default for SubscriberState {
 }
 
 impl SubscriberState {
-    pub fn push_message(&mut self, msg: ReceivedMessage) {
+    pub fn push_message(&mut self, mut msg: ReceivedMessage) {
         if self.messages.len() >= self.max_messages {
             self.messages.pop_front();
             if let Some(idx) = self.selected_idx {
                 self.selected_idx = if idx == 0 { None } else { Some(idx - 1) };
             }
         }
+        msg.id = self.next_message_id;
+        self.next_message_id = self.next_message_id.wrapping_add(1).max(1);
         self.messages.push_back(msg);
         self.invalidate_filtered_cache();
     }
@@ -324,6 +493,7 @@ pub struct KvBucketState {
     pub loading_entry: bool,
     pub loading_history: bool,
     pub load_generation: u64,
+    pub search_generation: u64,
     pub entry_key: String,
     pub entry_value: String,
     pub fetched_values: HashMap<String, String>,
@@ -354,6 +524,7 @@ impl Default for KvBucketState {
             loading_entry: false,
             loading_history: false,
             load_generation: 0,
+            search_generation: 0,
             entry_key: String::new(),
             entry_value: String::new(),
             fetched_values: HashMap::new(),
@@ -524,6 +695,9 @@ pub enum TabKind {
         connection_name: String,
         state: MetricsState,
     },
+    SearchWorkspace {
+        state: SearchWorkspaceState,
+    },
     Settings,
     LogViewer,
 }
@@ -595,6 +769,7 @@ impl TabKind {
             } => {
                 format!("{} ({})", t("common.tab_metrics"), connection_name)
             }
+            TabKind::SearchWorkspace { .. } => t("common.tab_search_workspace").to_string(),
             TabKind::Settings => t("settings.title").to_string(),
             TabKind::LogViewer => t("log_viewer.title").to_string(),
         }
@@ -635,6 +810,7 @@ impl TabKind {
             TabKind::Metrics { connection_id, .. } => {
                 egui::Id::new(("tab:metrics", *connection_id))
             }
+            TabKind::SearchWorkspace { .. } => egui::Id::new("tab:search-workspace"),
             TabKind::Settings => egui::Id::new("tab:settings"),
             TabKind::LogViewer => egui::Id::new("tab:log-viewer"),
         }
@@ -644,6 +820,7 @@ impl TabKind {
 pub struct AppTabViewer<'a> {
     pub backend: &'a nats_backend::BackendHandle,
     pub actions: &'a mut Vec<TabAction>,
+    pub search_sources: &'a [SearchSourceSnapshot],
     pub settings: &'a mut crate::settings::AppSettings,
     pub theme_id: &'a mut ThemeId,
     pub log_buffer: &'a crate::log_layer::SharedLogBuffer,
