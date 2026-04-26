@@ -123,6 +123,7 @@ async fn send_err(
             backend_id: None,
             operation,
             message: message.to_string(),
+            data: None,
         })
         .await;
 }
