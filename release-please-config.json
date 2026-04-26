@@ -1,17 +1,12 @@
 {
   "$schema": "https://raw.githubusercontent.com/googleapis/release-please/main/schemas/config.json",
-  "release-type": "rust",
+  "release-type": "simple",
   "bump-minor-pre-major": true,
   "bump-patch-for-minor-pre-major": true,
   "include-v-in-tag": true,
   "include-component-in-tag": false,
   "pull-request-title-pattern": "chore${scope}: release ${version}",
   "separate-pull-requests": true,
-  "plugins": [
-    {
-      "type": "cargo-workspace"
-    }
-  ],
   "changelog-sections": [
     { "type": "feat", "section": "Features" },
     { "type": "fix", "section": "Bug Fixes" },
@@ -26,7 +21,18 @@
   ],
   "packages": {
     ".": {
-      "package-name": "easy-nats"
+      "package-name": "easy-nats",
+      "extra-files": [
+        {
+          "type": "generic",
+          "path": "Cargo.toml"
+        },
+        {
+          "type": "toml",
+          "path": "Cargo.lock",
+          "jsonpath": "$.package[?(@.name.value==\"easy-nats\" || @.name.value==\"nats-backend\")].version"
+        }
+      ]
     }
   }
 }
