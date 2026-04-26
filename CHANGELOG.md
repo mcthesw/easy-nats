@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.1.13](https://github.com/mcthesw/easy-nats/compare/v0.1.12...v0.1.13) (2026-04-26)
+
+
+### Features
+
+* **search:** add in-memory search workspace ([1edbc89](https://github.com/mcthesw/easy-nats/commit/1edbc892eaa11c84628b39d0ce91747ac2470989))
+
+
+### Bug Fixes
+
+* **release:** avoid cargo-workspace version inheritance ([7ef7143](https://github.com/mcthesw/easy-nats/commit/7ef7143e027481d40a39762639bb541d43c7bfe5))
+* **release:** sync Cargo lockfile updates ([2510a58](https://github.com/mcthesw/easy-nats/commit/2510a58c2771c93dd1ed6393af621faf99af3c44))
+* **search:** harden KV scans and sync release metadata ([630437a](https://github.com/mcthesw/easy-nats/commit/630437a5a031972a0db7651ee1ff8a5c297cfcca))
+
 ## [0.1.12](https://github.com/mcthesw/easy-nats/compare/v0.1.11...v0.1.12) (2026-04-25)
 
 
