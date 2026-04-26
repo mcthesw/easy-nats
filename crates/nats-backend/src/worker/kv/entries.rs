@@ -138,12 +138,14 @@ pub(crate) async fn handle_get_entry(
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     tracing::debug!(connection_id, bucket = %bucket, key = %key, "Fetching KV entry");
-    let Some(store) = super::open_store(
+    let error_data = serde_json::json!({ "bucket": &bucket, "key": &key });
+    let Some(store) = super::open_store_with_error_data(
         state,
         connection_id,
         &bucket,
         evt_tx,
         BackendOperation::GetKvEntry,
+        Some(error_data.clone()),
     )
     .await
     else {
@@ -165,11 +167,12 @@ pub(crate) async fn handle_get_entry(
             .await;
         }
         Err(e) => {
-            super::send_err(
+            super::send_err_with_data(
                 evt_tx,
                 connection_id,
                 BackendOperation::GetKvEntry,
                 e.to_string(),
+                Some(error_data),
             )
             .await
         }

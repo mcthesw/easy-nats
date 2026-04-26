@@ -131,8 +131,15 @@ impl EasyNatsApp {
                     backend_id,
                     operation,
                     message,
+                    data,
                 } => {
-                    self.handle_error(connection_id, backend_id, operation, &message);
+                    self.handle_error(
+                        connection_id,
+                        backend_id,
+                        operation,
+                        &message,
+                        data.as_ref(),
+                    );
                 }
             }
         }
