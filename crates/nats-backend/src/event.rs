@@ -132,6 +132,7 @@ pub enum BackendEvent {
         backend_id: Option<u64>,
         operation: BackendOperation,
         message: String,
+        data: Option<serde_json::Value>,
     },
 }
 

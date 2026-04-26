@@ -1,4 +1,4 @@
-use std::collections::{HashMap, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
 use std::time::{Instant, SystemTime};
 
 use eframe::egui;
@@ -488,6 +488,7 @@ pub struct KvBucketState {
     pub keys_complete: bool,
     pub search_more_requested: bool,
     pub value_search_scanning: usize,
+    pub value_search_pending: HashSet<String>,
     pub value_search_cursor: usize,
     pub loading_entries: bool,
     pub loading_entry: bool,
@@ -519,6 +520,7 @@ impl Default for KvBucketState {
             keys_complete: false,
             search_more_requested: false,
             value_search_scanning: 0,
+            value_search_pending: HashSet::new(),
             value_search_cursor: 0,
             loading_entries: false,
             loading_entry: false,

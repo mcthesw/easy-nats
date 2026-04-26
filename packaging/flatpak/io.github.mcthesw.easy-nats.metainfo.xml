@@ -19,10 +19,14 @@
   <screenshots>
     <screenshot type="default">
       <caption>Main workspace showing connections, stream browsing, and publish controls</caption>
-      <image>https://raw.githubusercontent.com/mcthesw/easy-nats/v0.1.8/assets/imgs/main-menu.png</image>
+      <image>https://raw.githubusercontent.com/mcthesw/easy-nats/v0.1.12/assets/imgs/main-menu.png</image>
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.1.12" timestamp="1777092054"/>
+    <release version="0.1.11" timestamp="1776964326"/>
+    <release version="0.1.10" timestamp="1776962414"/>
+    <release version="0.1.9" timestamp="1776697737"/>
     <release version="0.1.8" timestamp="1776505346"/>
     <release version="0.1.7" timestamp="1776499953"/>
     <release version="0.1.6" timestamp="1776489489"/>

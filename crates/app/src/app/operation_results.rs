@@ -38,6 +38,7 @@ impl EasyNatsApp {
         backend_id: Option<u64>,
         operation: BackendOperation,
         message: &str,
+        data: Option<&serde_json::Value>,
     ) {
         if operation == BackendOperation::Request
             && let Some(cid) = connection_id
@@ -90,7 +91,7 @@ impl EasyNatsApp {
         }
 
         if let Some(cid) = connection_id {
-            self.clear_kv_loading_on_error(cid, operation);
+            self.clear_kv_loading_on_error(cid, operation, data);
             self.clear_obj_store_loading_on_error(cid, operation);
             self.clear_server_info_loading_on_error(cid, operation);
         }

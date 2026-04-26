@@ -54,7 +54,8 @@ impl EasyNatsApp {
                     .cloned()
                     .collect();
                 state.value_search_cursor = end;
-                state.value_search_scanning += requests.len();
+                state.value_search_pending.extend(requests.iter().cloned());
+                state.value_search_scanning = state.value_search_pending.len();
                 break;
             }
         }

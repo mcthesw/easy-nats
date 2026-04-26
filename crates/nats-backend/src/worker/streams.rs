@@ -502,6 +502,7 @@ async fn send_err(
             backend_id: None,
             operation,
             message,
+            data: None,
         })
         .await;
 }
