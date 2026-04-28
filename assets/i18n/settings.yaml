@@ -55,26 +55,14 @@ pubsub_tab_mode_reuse:
   en: "Reuse existing tab"
   zh: "复用已有标签页"
 
-section_protobuf:
-  en: "Protobuf Schemas"
-  zh: "Protobuf 模式"
+section_message_schemas:
+  en: "Message Schemas"
+  zh: "消息 Schema"
 
-proto_schema_dir:
-  en: "Schema Directory"
-  zh: "模式目录"
+message_schemas_hint:
+  en: "Manage Protobuf and JSON Schema sources with subject bindings."
+  zh: "管理带主题绑定的 Protobuf 和 JSON Schema。"
 
-proto_not_set:
-  en: "(not configured)"
-  zh: "（未配置）"
-
-proto_browse:
-  en: "Browse…"
-  zh: "浏览…"
-
-proto_reload:
-  en: "Reload"
-  zh: "重新加载"
-
-proto_clear:
-  en: "Clear"
-  zh: "清除"
+open_message_schemas:
+  en: "Open Message Schemas"
+  zh: "打开消息 Schema"

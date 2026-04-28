@@ -22,6 +22,12 @@ impl eframe::App for EasyNatsApp {
         sidebar::render_sidebar(self, ui);
 
         let search_sources = self.search_source_snapshots();
+        let connections: Vec<(u64, String)> = self
+            .config
+            .connections
+            .iter()
+            .map(|connection| (connection.id, connection.name.clone()))
+            .collect();
         let mut tab_actions = Vec::new();
         let prev_style = ui.ctx().global_style();
         let mut dock_egui_style = (*prev_style).clone();
@@ -58,7 +64,8 @@ impl eframe::App for EasyNatsApp {
                     settings: &mut self.settings,
                     theme_id: &mut self.theme_id,
                     log_buffer: &self.log_buffer,
-                    proto_manager: &self.proto_manager,
+                    schema_manager: &self.schema_manager,
+                    connections: &connections,
                 },
             );
 
@@ -141,12 +148,48 @@ impl eframe::App for EasyNatsApp {
                     self.theme_id = theme_id;
                     crate::theme::apply_theme(ui.ctx(), theme_id);
                 }
-                TabAction::LoadProtoSchemas { dir } => {
-                    self.proto_manager
-                        .set_schema_dir(std::path::PathBuf::from(dir));
+                TabAction::OpenMessageSchemas => {
+                    self.open_or_focus_message_schemas();
                 }
-                TabAction::ClearProtoSchemas => {
-                    self.proto_manager.clear();
+                TabAction::AddMessageSchemaSource { name, kind, path } => {
+                    self.schema_manager.add_source(name, kind, path);
+                }
+                TabAction::RemoveMessageSchemaSource { source_id } => {
+                    self.schema_manager.remove_source(source_id);
+                }
+                TabAction::ReloadMessageSchemaSource { source_id } => {
+                    self.schema_manager.reload_source(source_id);
+                }
+                TabAction::SetMessageSchemaSourceEnabled { source_id, enabled } => {
+                    self.schema_manager.set_source_enabled(source_id, enabled);
+                }
+                TabAction::AddMessageSchemaBinding {
+                    name,
+                    connection_id,
+                    subject_pattern,
+                    source_id,
+                    selector,
+                    policy,
+                } => {
+                    if let Err(error) = self.schema_manager.add_binding(
+                        name,
+                        connection_id,
+                        subject_pattern,
+                        source_id,
+                        selector,
+                        policy,
+                    ) {
+                        self.toasts.push(crate::toast::ToastLevel::Error, error);
+                    }
+                }
+                TabAction::RemoveMessageSchemaBinding { binding_id } => {
+                    self.schema_manager.remove_binding(binding_id);
+                }
+                TabAction::SetMessageSchemaBindingEnabled {
+                    binding_id,
+                    enabled,
+                } => {
+                    self.schema_manager.set_binding_enabled(binding_id, enabled);
                 }
                 TabAction::ScanSearchWorkspaceKvValues { source_id } => {
                     self.scan_search_workspace_kv_values(&source_id);

@@ -233,6 +233,7 @@ pub(crate) async fn handle_request(
                     .send(BackendEvent::RequestResponse {
                         connection_id,
                         backend_id,
+                        subject: Some(msg.subject.to_string()),
                         payload: msg.payload.to_vec(),
                         headers: extract_headers(&msg.headers),
                     })

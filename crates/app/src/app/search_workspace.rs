@@ -2,8 +2,8 @@ use nats_backend::BackendCommand;
 
 use crate::i18n::t;
 use crate::tabs::{
-    KV_VALUE_SEARCH_BATCH, SearchResultLocator, SearchSourceId, SearchSourceSnapshot,
-    SearchWorkspaceState, TabKind, source_snapshot_from_tab,
+    KV_VALUE_SEARCH_BATCH, MessageSchemasState, SearchResultLocator, SearchSourceId,
+    SearchSourceSnapshot, SearchWorkspaceState, TabKind, source_snapshot_from_tab,
 };
 use crate::toast::ToastLevel;
 
@@ -20,6 +20,12 @@ impl EasyNatsApp {
     pub(crate) fn open_or_focus_search_workspace(&mut self) {
         self.open_or_focus_tab_kind(TabKind::SearchWorkspace {
             state: SearchWorkspaceState::default(),
+        });
+    }
+
+    pub(crate) fn open_or_focus_message_schemas(&mut self) {
+        self.open_or_focus_tab_kind(TabKind::MessageSchemas {
+            state: MessageSchemasState::default(),
         });
     }
 

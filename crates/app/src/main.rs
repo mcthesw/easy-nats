@@ -5,6 +5,7 @@ mod format;
 mod i18n;
 mod log_layer;
 mod proto;
+mod schema;
 mod settings;
 mod tabs;
 mod theme;

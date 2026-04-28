@@ -1,3 +1,4 @@
+use prost::Message;
 use prost_reflect::{DescriptorPool, DynamicMessage, ReflectMessage};
 
 use super::AutoDetectResult;
@@ -22,6 +23,26 @@ pub(crate) fn decode_message(
     .map_err(|e| format!("JSON serialization failed: {e}"))?;
 
     String::from_utf8(serializer.into_inner()).map_err(|e| format!("UTF-8 conversion failed: {e}"))
+}
+
+/// Encode JSON using a specific message type from the pool.
+///
+/// `prost-reflect` follows the canonical protobuf JSON mapping, so users can
+/// edit a readable JSON representation while the publisher sends wire bytes.
+pub(crate) fn encode_json_message(
+    pool: &DescriptorPool,
+    message_type: &str,
+    json: &str,
+) -> Result<Vec<u8>, String> {
+    let desc = pool
+        .get_message_by_name(message_type)
+        .ok_or_else(|| format!("Unknown message type: {message_type}"))?;
+
+    let mut deserializer = serde_json::Deserializer::from_str(json);
+    let msg = DynamicMessage::deserialize(desc, &mut deserializer)
+        .map_err(|e| format!("JSON protobuf mapping failed: {e}"))?;
+
+    Ok(msg.encode_to_vec())
 }
 
 /// Try decoding with all known message types and categorize the result.

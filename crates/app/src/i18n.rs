@@ -101,6 +101,10 @@ pub fn init(lang: Language) {
             "search_workspace",
             include_str!("../../../assets/i18n/search_workspace.yaml"),
         ),
+        (
+            "message_schema",
+            include_str!("../../../assets/i18n/message_schema.yaml"),
+        ),
     ];
 
     let mut en = HashMap::new();

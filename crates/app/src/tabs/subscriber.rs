@@ -3,7 +3,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 
 use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
-use crate::proto::ProtoSchemaManager;
+use crate::schema::MessageSchemaManager;
 
 use super::common::{
     SEARCH_RESULT_LIMIT, SearchStatus, format_timestamp, matches_query, render_search_row,
@@ -22,7 +22,7 @@ pub fn subscriber_ui(
     guard: &TabGuard,
     state: &mut SubscriberState,
     backend: &BackendHandle,
-    proto_manager: &ProtoSchemaManager,
+    schema_manager: &MessageSchemaManager,
     actions: &mut Vec<TabAction>,
     topic_suggestions: &[&str],
 ) {
@@ -53,10 +53,11 @@ pub fn subscriber_ui(
         if let Some(msg) = &selected_msg {
             message_detail_ui(
                 ui,
+                connection_id,
                 msg,
                 &mut state.payload_format,
                 &mut state.proto_view,
-                proto_manager,
+                schema_manager,
             );
         } else {
             ui.centered_and_justified(|ui| {
@@ -344,10 +345,11 @@ fn subscriber_message_matches(
 
 fn message_detail_ui(
     ui: &mut egui::Ui,
+    connection_id: u64,
     msg: &ReceivedMessage,
     payload_format: &mut PayloadFormat,
     proto_view: &mut crate::proto::ProtoViewState,
-    proto_manager: &ProtoSchemaManager,
+    schema_manager: &MessageSchemaManager,
 ) {
     ui.horizontal(|ui| {
         ui.label(t("subscriber.detail"));
@@ -397,13 +399,17 @@ fn message_detail_ui(
     egui::ScrollArea::vertical()
         .id_salt("msg_detail_payload")
         .show(ui, |ui| {
-            format::render_payload_with_proto(
+            format::render_payload_with_schema(
                 ui,
                 &msg.payload,
                 *payload_format,
                 "sub_proto",
                 proto_view,
-                proto_manager,
+                format::SchemaRenderContext {
+                    manager: schema_manager,
+                    connection_id,
+                    subject: &msg.subject,
+                },
             );
         });
 }
