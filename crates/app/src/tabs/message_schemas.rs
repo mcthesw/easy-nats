@@ -95,11 +95,12 @@ fn render_sources(ui: &mut egui::Ui, manager: &MessageSchemaManager, actions: &m
         .id_salt("message_schema_sources_scroll")
         .show(ui, |ui| {
             egui::Grid::new("message_schema_sources")
-                .num_columns(8)
+                .num_columns(7)
                 .spacing([10.0, 4.0])
                 .striped(true)
                 .show(ui, |ui| {
                     ui.strong(t("message_schema.enabled"));
+                    ui.strong(t("message_schema.actions"));
                     ui.strong(t("message_schema.name"));
                     ui.strong(t("message_schema.kind"));
                     ui.strong(t("message_schema.path"));
@@ -115,26 +116,28 @@ fn render_sources(ui: &mut egui::Ui, manager: &MessageSchemaManager, actions: &m
                                 enabled,
                             });
                         }
+                        ui.horizontal(|ui| {
+                            if ui.small_button(t("message_schema.reload")).clicked() {
+                                actions.push(TabAction::ReloadMessageSchemaSource {
+                                    source_id: source.id,
+                                });
+                            }
+                            if ui.small_button(t("message_schema.remove")).clicked() {
+                                actions.push(TabAction::RemoveMessageSchemaSource {
+                                    source_id: source.id,
+                                });
+                            }
+                        });
                         clipped_label(ui, &source.name, 170.0);
                         clipped_label(ui, t(source.kind.label_key()), 110.0);
                         clipped_monospace(ui, &source.path, 420.0);
                         let status = manager.status(source.id);
-                        clipped_label(ui, &source_status_text(status), 260.0);
+                        clipped_label(ui, &source_status_text(status), 120.0);
                         ui.label(
                             status
                                 .map(|status| status.entries.len().to_string())
                                 .unwrap_or_else(|| "0".to_string()),
                         );
-                        if ui.small_button(t("message_schema.reload")).clicked() {
-                            actions.push(TabAction::ReloadMessageSchemaSource {
-                                source_id: source.id,
-                            });
-                        }
-                        if ui.small_button(t("message_schema.remove")).clicked() {
-                            actions.push(TabAction::RemoveMessageSchemaSource {
-                                source_id: source.id,
-                            });
-                        }
                         ui.end_row();
                     }
                 });
@@ -310,6 +313,7 @@ fn render_bindings(
                 .striped(true)
                 .show(ui, |ui| {
                     ui.strong(t("message_schema.enabled"));
+                    ui.strong(t("message_schema.actions"));
                     ui.strong(t("message_schema.name"));
                     ui.strong(t("message_schema.connection"));
                     ui.strong(t("message_schema.subject_pattern"));
@@ -324,6 +328,11 @@ fn render_bindings(
                             actions.push(TabAction::SetMessageSchemaBindingEnabled {
                                 binding_id: binding.id,
                                 enabled,
+                            });
+                        }
+                        if ui.small_button(t("message_schema.remove")).clicked() {
+                            actions.push(TabAction::RemoveMessageSchemaBinding {
+                                binding_id: binding.id,
                             });
                         }
                         clipped_label(ui, &binding.name, 150.0);
@@ -342,13 +351,8 @@ fn render_bindings(
                                 binding.source_id,
                                 binding.selector.entry(),
                             ),
-                            150.0,
+                            110.0,
                         );
-                        if ui.small_button(t("message_schema.remove")).clicked() {
-                            actions.push(TabAction::RemoveMessageSchemaBinding {
-                                binding_id: binding.id,
-                            });
-                        }
                         ui.end_row();
                     }
                 });
