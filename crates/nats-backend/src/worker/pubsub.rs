@@ -215,6 +215,7 @@ pub(crate) async fn handle_request(
         timeout_ms,
     } = params;
     if let Some(client) = state.clients.get(&connection_id) {
+        let request_subject = subject.clone();
         let payload = Bytes::from(payload);
         let timeout = std::time::Duration::from_millis(timeout_ms);
         let result = tokio::time::timeout(timeout, async {
@@ -233,7 +234,7 @@ pub(crate) async fn handle_request(
                     .send(BackendEvent::RequestResponse {
                         connection_id,
                         backend_id,
-                        subject: Some(msg.subject.to_string()),
+                        subject: Some(request_subject),
                         payload: msg.payload.to_vec(),
                         headers: extract_headers(&msg.headers),
                     })
