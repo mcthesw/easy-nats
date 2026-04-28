@@ -420,6 +420,10 @@ pub enum BindingResolution<'a> {
     Ambiguous(Vec<&'a SchemaBinding>),
 }
 
+pub fn kv_subject(bucket: &str, key: &str) -> String {
+    format!("$KV.{bucket}.{key}")
+}
+
 #[derive(Default)]
 pub struct MessageSchemaManager {
     config: MessageSchemaConfig,
@@ -677,6 +681,23 @@ impl MessageSchemaManager {
         }
     }
 
+    pub fn payload_template(
+        &self,
+        connection_id: u64,
+        subject: &str,
+    ) -> Result<Option<String>, String> {
+        if subject.trim().is_empty() {
+            return Ok(None);
+        }
+        match self.resolve_binding(connection_id, subject) {
+            BindingResolution::NoMatch => Ok(None),
+            BindingResolution::Ambiguous(bindings) => {
+                Err(format!("{} bindings match this subject", bindings.len()))
+            }
+            BindingResolution::Match(binding) => self.template_with_binding(binding).map(Some),
+        }
+    }
+
     pub fn manual_message_types(&self) -> Vec<String> {
         let mut types = BTreeMap::new();
         for manager in self.proto_sources.values() {
@@ -868,6 +889,23 @@ impl MessageSchemaManager {
         }
     }
 
+    fn template_with_binding(&self, binding: &SchemaBinding) -> Result<String, String> {
+        match &binding.selector {
+            SchemaSelector::ProtobufMessage { type_name } => {
+                let Some(manager) = self.proto_sources.get(&binding.source_id) else {
+                    return Err("Schema source is unavailable".to_string());
+                };
+                manager.json_template(type_name)
+            }
+            SchemaSelector::JsonSchema { entry } => {
+                let Some(catalog) = self.json_sources.get(&binding.source_id) else {
+                    return Err("Schema source is unavailable".to_string());
+                };
+                catalog.template(entry)
+            }
+        }
+    }
+
     fn unavailable_outgoing(&self, binding: &SchemaBinding, payload_text: &str) -> OutgoingPayload {
         let status = self.unavailable_status(binding);
         let can_send = status.can_send;
@@ -931,6 +969,7 @@ impl MessageSchemaManager {
 
 struct JsonSchemaCatalog {
     validators: HashMap<String, jsonschema::Validator>,
+    schemas: HashMap<String, serde_json::Value>,
 }
 
 impl JsonSchemaCatalog {
@@ -946,6 +985,16 @@ impl JsonSchemaCatalog {
             .get(entry)
             .ok_or_else(|| format!("Unknown JSON Schema entry: {entry}"))?;
         validator.validate(value).map_err(|error| error.to_string())
+    }
+
+    fn template(&self, entry: &str) -> Result<String, String> {
+        let schema = self
+            .schemas
+            .get(entry)
+            .ok_or_else(|| format!("Unknown JSON Schema entry: {entry}"))?;
+        let template = json_schema_template(schema);
+        serde_json::to_string_pretty(&template)
+            .map_err(|error| format!("JSON template serialization failed: {error}"))
     }
 }
 
@@ -964,6 +1013,7 @@ fn load_json_schema_catalog(path: &Path) -> Result<JsonSchemaCatalog, String> {
     }
 
     let mut validators = HashMap::new();
+    let mut schemas = HashMap::new();
     let mut used_entries = HashSet::new();
     for file in files {
         let content = std::fs::read_to_string(&file)
@@ -976,9 +1026,13 @@ fn load_json_schema_catalog(path: &Path) -> Result<JsonSchemaCatalog, String> {
         if !used_entries.insert(entry.clone()) {
             entry = file.to_string_lossy().replace('\\', "/");
         }
-        validators.insert(entry, validator);
+        validators.insert(entry.clone(), validator);
+        schemas.insert(entry, schema);
     }
-    Ok(JsonSchemaCatalog { validators })
+    Ok(JsonSchemaCatalog {
+        validators,
+        schemas,
+    })
 }
 
 fn collect_json_files(dir: &Path, out: &mut Vec<PathBuf>) -> std::io::Result<()> {
@@ -1003,6 +1057,160 @@ fn schema_entry_name(root: &Path, file: &Path) -> String {
         .with_extension("")
         .to_string_lossy()
         .replace('\\', "/")
+}
+
+fn json_schema_template(schema: &serde_json::Value) -> serde_json::Value {
+    json_schema_template_inner(schema, schema, &mut HashSet::new())
+}
+
+fn json_schema_template_inner(
+    root: &serde_json::Value,
+    schema: &serde_json::Value,
+    seen_refs: &mut HashSet<String>,
+) -> serde_json::Value {
+    if let Some(reference) = schema["$ref"].as_str()
+        && let Some(referenced_schema) = resolve_local_json_schema_ref(root, reference)
+    {
+        if !seen_refs.insert(reference.to_string()) {
+            return serde_json::Value::Null;
+        }
+        let value = json_schema_template_inner(root, referenced_schema, seen_refs);
+        seen_refs.remove(reference);
+        return value;
+    }
+
+    for key in ["default", "const"] {
+        if !schema[key].is_null() {
+            return schema[key].clone();
+        }
+    }
+    if let Some(example) = schema["examples"]
+        .as_array()
+        .and_then(|examples| examples.first())
+    {
+        return example.clone();
+    }
+    if let Some(value) = schema["enum"].as_array().and_then(|values| values.first()) {
+        return value.clone();
+    }
+    if let Some(value) = json_schema_template_from_combinator(root, schema, seen_refs) {
+        return value;
+    }
+
+    match json_schema_type(schema) {
+        Some("object") => json_schema_object_template(root, schema, seen_refs),
+        None if schema["properties"].is_object() => {
+            json_schema_object_template(root, schema, seen_refs)
+        }
+        Some("array") => {
+            let item = if schema["items"].is_object() {
+                json_schema_template_inner(root, &schema["items"], seen_refs)
+            } else {
+                serde_json::Value::Null
+            };
+            serde_json::Value::Array(vec![item])
+        }
+        Some("integer") => schema["minimum"].clone().as_i64().map_or_else(
+            || serde_json::json!(0),
+            |minimum| serde_json::json!(minimum),
+        ),
+        Some("number") => schema["minimum"].clone().as_f64().map_or_else(
+            || serde_json::json!(0.0),
+            |minimum| serde_json::json!(minimum),
+        ),
+        Some("boolean") => serde_json::json!(false),
+        Some("null") => serde_json::Value::Null,
+        Some("string") => json_schema_string_template(schema),
+        _ => json_schema_string_template(schema),
+    }
+}
+
+fn json_schema_template_from_combinator(
+    root: &serde_json::Value,
+    schema: &serde_json::Value,
+    seen_refs: &mut HashSet<String>,
+) -> Option<serde_json::Value> {
+    for key in ["oneOf", "anyOf"] {
+        if let Some(first) = schema[key].as_array().and_then(|schemas| schemas.first()) {
+            return Some(json_schema_template_inner(root, first, seen_refs));
+        }
+    }
+
+    let schemas = schema["allOf"].as_array()?;
+    let mut merged = serde_json::Map::new();
+    for item in schemas {
+        match json_schema_template_inner(root, item, seen_refs) {
+            serde_json::Value::Object(object) => merged.extend(object),
+            value if merged.is_empty() => return Some(value),
+            _ => {}
+        }
+    }
+    Some(serde_json::Value::Object(merged))
+}
+
+fn json_schema_object_template(
+    root: &serde_json::Value,
+    schema: &serde_json::Value,
+    seen_refs: &mut HashSet<String>,
+) -> serde_json::Value {
+    let mut object = serde_json::Map::new();
+    let Some(properties) = schema["properties"].as_object() else {
+        return serde_json::Value::Object(object);
+    };
+
+    let mut keys = Vec::new();
+    if let Some(required) = schema["required"].as_array() {
+        for key in required.iter().filter_map(|key| key.as_str()) {
+            if properties.contains_key(key) {
+                keys.push(key.to_string());
+            }
+        }
+    }
+    for key in properties.keys() {
+        if !keys.iter().any(|existing| existing == key) {
+            keys.push(key.clone());
+        }
+    }
+
+    for key in keys {
+        if let Some(property_schema) = properties.get(&key) {
+            object.insert(
+                key,
+                json_schema_template_inner(root, property_schema, seen_refs),
+            );
+        }
+    }
+    serde_json::Value::Object(object)
+}
+
+fn json_schema_type(schema: &serde_json::Value) -> Option<&str> {
+    if let Some(schema_type) = schema["type"].as_str() {
+        return Some(schema_type);
+    }
+    schema["type"].as_array().and_then(|types| {
+        types
+            .iter()
+            .filter_map(|schema_type| schema_type.as_str())
+            .find(|schema_type| *schema_type != "null")
+    })
+}
+
+fn json_schema_string_template(schema: &serde_json::Value) -> serde_json::Value {
+    match schema["format"].as_str() {
+        Some("date-time") => serde_json::json!("2026-01-01T00:00:00Z"),
+        Some("date") => serde_json::json!("2026-01-01"),
+        Some("email") => serde_json::json!("user@example.com"),
+        Some("uri") | Some("url") => serde_json::json!("https://example.com"),
+        _ => serde_json::json!(""),
+    }
+}
+
+fn resolve_local_json_schema_ref<'a>(
+    root: &'a serde_json::Value,
+    reference: &str,
+) -> Option<&'a serde_json::Value> {
+    let pointer = reference.strip_prefix('#')?;
+    root.pointer(pointer)
 }
 
 fn default_true() -> bool {
@@ -1167,6 +1375,7 @@ mod tests {
     fn json_schema_validation_reports_invalid_payload() {
         let mut catalog = JsonSchemaCatalog {
             validators: HashMap::new(),
+            schemas: HashMap::new(),
         };
         let schema = serde_json::json!({
             "type": "object",
@@ -1177,6 +1386,7 @@ mod tests {
             "order".to_string(),
             jsonschema::validator_for(&schema).unwrap(),
         );
+        catalog.schemas.insert("order".to_string(), schema);
 
         assert!(
             catalog
@@ -1198,6 +1408,31 @@ mod tests {
 
         assert_eq!(schema_entry_name(root, direct), "order-created");
         assert_eq!(schema_entry_name(root, nested), "orders/created.schema");
+    }
+
+    #[test]
+    fn json_schema_template_uses_schema_hints() {
+        let schema = serde_json::json!({
+            "type": "object",
+            "required": ["id", "items"],
+            "properties": {
+                "id": { "type": "string", "default": "ORD-1" },
+                "items": {
+                    "type": "array",
+                    "items": { "type": "string", "examples": ["sku-1"] }
+                },
+                "paid": { "type": "boolean" }
+            }
+        });
+
+        assert_eq!(
+            json_schema_template(&schema),
+            serde_json::json!({
+                "id": "ORD-1",
+                "items": ["sku-1"],
+                "paid": false
+            })
+        );
     }
 
     #[test]
@@ -1231,9 +1466,13 @@ mod tests {
             "order".to_string(),
             jsonschema::validator_for(&schema).unwrap(),
         );
-        manager
-            .json_sources
-            .insert(source_id, JsonSchemaCatalog { validators });
+        manager.json_sources.insert(
+            source_id,
+            JsonSchemaCatalog {
+                validators,
+                schemas: HashMap::from([("order".to_string(), schema)]),
+            },
+        );
         manager.statuses.insert(
             source_id,
             SchemaSourceStatus::loaded(vec!["order".to_string()]),
@@ -1274,9 +1513,12 @@ mod tests {
             .encode_json(r#"{"id":"A1","count":2}"#, "demo.Order")
             .unwrap();
         let json = manager.decode(&bytes, "demo.Order").unwrap();
+        let template = manager.json_template("demo.Order").unwrap();
 
         assert!(json.contains(r#""id": "A1""#));
         assert!(json.contains(r#""count": 2"#));
+        assert!(template.contains(r#""id": """#));
+        assert!(template.contains(r#""count": 0"#));
 
         let _ = std::fs::remove_dir_all(dir);
     }

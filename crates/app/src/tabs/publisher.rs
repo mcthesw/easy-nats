@@ -61,6 +61,7 @@ pub fn publisher_ui(
         });
 
     ui.add_space(4.0);
+    let payload_template = schema_manager.payload_template(connection_id, state.subject.trim());
     ui.horizontal(|ui| {
         ui.label(t("publisher.payload"));
         if ui.small_button(t("publisher.format_json")).clicked()
@@ -69,6 +70,7 @@ pub fn publisher_ui(
         {
             state.payload = pretty;
         }
+        render_generate_json_button(ui, &payload_template, &mut state.payload);
     });
     egui::ScrollArea::vertical()
         .id_salt("publisher_payload")
@@ -161,6 +163,35 @@ pub fn publisher_ui(
         format::format_selector(ui, "pub_resp_fmt", &mut state.response_format);
     });
     render_response(ui, connection_id, state, schema_manager);
+}
+
+fn render_generate_json_button(
+    ui: &mut egui::Ui,
+    payload_template: &Result<Option<String>, String>,
+    payload: &mut String,
+) {
+    let template = payload_template
+        .as_ref()
+        .ok()
+        .and_then(|value| value.as_ref());
+    let response = ui.add_enabled(
+        template.is_some(),
+        egui::Button::new(t("publisher.generate_json")),
+    );
+    if response.clicked()
+        && let Some(template) = template
+    {
+        *payload = template.clone();
+    }
+    match payload_template {
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            response.on_hover_text(t("publisher.generate_json_unavailable"));
+        }
+        Err(error) => {
+            response.on_hover_text(error);
+        }
+    }
 }
 
 fn render_response(

@@ -44,3 +44,9 @@ waiting:
 format_json:
   en: "Format JSON"
   zh: "格式化 JSON"
+generate_json:
+  en: "Generate JSON"
+  zh: "生成 JSON"
+generate_json_unavailable:
+  en: "Enter a subject with a schema binding to generate a JSON template."
+  zh: "输入已绑定 Schema 的主题后可生成 JSON 模板。"
