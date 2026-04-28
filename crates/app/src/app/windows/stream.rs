@@ -1,5 +1,6 @@
 use eframe::egui;
 
+use crate::format;
 use crate::i18n::t;
 
 use super::super::model::EasyNatsApp;
@@ -166,6 +167,16 @@ fn render_publish(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     });
 
                 ui.add_space(4.0);
+                let stream_subject = app.stream_publish_editor.subject.trim().to_string();
+                let outgoing_preview = if !stream_subject.is_empty() {
+                    Some(app.schema_manager.prepare_outgoing(
+                        app.stream_publish_editor.connection_id,
+                        &stream_subject,
+                        &app.stream_publish_editor.payload,
+                    ))
+                } else {
+                    None
+                };
                 ui.horizontal(|ui| {
                     ui.label(t("publisher.payload"));
                     if ui.small_button(t("publisher.format_json")).clicked()
@@ -176,7 +187,21 @@ fn render_publish(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     {
                         app.stream_publish_editor.payload = pretty;
                     }
+                    render_generate_json_button(
+                        ui,
+                        &app.schema_manager.payload_template(
+                            app.stream_publish_editor.connection_id,
+                            &stream_subject,
+                        ),
+                        &mut app.stream_publish_editor.payload,
+                    );
                 });
+                if let Some(status) = outgoing_preview
+                    .as_ref()
+                    .and_then(|outgoing| outgoing.status.as_ref())
+                {
+                    format::render_schema_status(ui, status);
+                }
                 egui::ScrollArea::vertical()
                     .id_salt("stream_publish_payload")
                     .max_height(220.0)
@@ -191,7 +216,10 @@ fn render_publish(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
 
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    let valid = !app.stream_publish_editor.subject.trim().is_empty();
+                    let valid = !app.stream_publish_editor.subject.trim().is_empty()
+                        && outgoing_preview
+                            .as_ref()
+                            .is_none_or(|outgoing| outgoing.can_send);
                     if ui
                         .add_enabled(valid, egui::Button::new(t("publisher.publish")))
                         .clicked()
@@ -206,5 +234,34 @@ fn render_publish(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     }
     if publish_requested {
         app.publish_stream_editor();
+    }
+}
+
+fn render_generate_json_button(
+    ui: &mut egui::Ui,
+    payload_template: &Result<Option<String>, String>,
+    payload: &mut String,
+) {
+    let template = payload_template
+        .as_ref()
+        .ok()
+        .and_then(|value| value.as_ref());
+    let response = ui.add_enabled(
+        template.is_some(),
+        egui::Button::new(t("publisher.generate_json")),
+    );
+    if response.clicked()
+        && let Some(template) = template
+    {
+        *payload = template.clone();
+    }
+    match payload_template {
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            response.on_hover_text(t("publisher.generate_json_unavailable"));
+        }
+        Err(error) => {
+            response.on_hover_text(error);
+        }
     }
 }

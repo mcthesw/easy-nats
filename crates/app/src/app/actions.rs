@@ -2,6 +2,7 @@ use eframe::egui;
 use nats_backend::{AuthMethod, BackendCommand, ConnectionConfig, MonitoringConfig};
 use tokio_util::sync::CancellationToken;
 
+use crate::schema::kv_subject;
 use crate::settings::PubSubTabMode;
 use crate::tabs::{
     MetricsState, PublisherState, SubscriberState, TabGuard, TabKind, next_backend_id,
@@ -343,10 +344,23 @@ impl EasyNatsApp {
     }
 
     pub(crate) fn publish_stream_editor(&mut self) {
+        let subject = self.stream_publish_editor.subject.trim().to_string();
+        let outgoing = self.schema_manager.prepare_outgoing(
+            self.stream_publish_editor.connection_id,
+            &subject,
+            &self.stream_publish_editor.payload,
+        );
+        if !outgoing.can_send {
+            if let Some(status) = outgoing.status {
+                self.toasts
+                    .push(crate::toast::ToastLevel::Error, status.message);
+            }
+            return;
+        }
         self.backend.send(BackendCommand::Publish {
             connection_id: self.stream_publish_editor.connection_id,
-            subject: self.stream_publish_editor.subject.trim().to_string(),
-            payload: self.stream_publish_editor.payload.as_bytes().to_vec(),
+            subject,
+            payload: outgoing.payload,
             headers: collect_non_empty_headers(&self.stream_publish_editor.headers),
         });
     }
@@ -468,11 +482,27 @@ impl EasyNatsApp {
     }
 
     pub(crate) fn save_kv_entry_create_editor(&mut self) {
+        let subject = kv_subject(
+            &self.kv_entry_create_editor.bucket_name,
+            self.kv_entry_create_editor.key.trim(),
+        );
+        let outgoing = self.schema_manager.prepare_outgoing(
+            self.kv_entry_create_editor.connection_id,
+            &subject,
+            &self.kv_entry_create_editor.value,
+        );
+        if !outgoing.can_send {
+            if let Some(status) = outgoing.status {
+                self.toasts
+                    .push(crate::toast::ToastLevel::Error, status.message);
+            }
+            return;
+        }
         self.backend.send(BackendCommand::PutKvEntry {
             connection_id: self.kv_entry_create_editor.connection_id,
             bucket: self.kv_entry_create_editor.bucket_name.clone(),
             key: self.kv_entry_create_editor.key.trim().to_string(),
-            value: self.kv_entry_create_editor.value.as_bytes().to_vec(),
+            value: outgoing.payload,
         });
         self.kv_entry_create_editor.visible = false;
     }

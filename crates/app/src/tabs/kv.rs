@@ -3,7 +3,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 
 use crate::format;
 use crate::i18n::t;
-use crate::schema::MessageSchemaManager;
+use crate::schema::{MessageSchemaManager, kv_subject};
 use crate::tabs::guard::TabGuard;
 
 use super::common::{
@@ -318,6 +318,10 @@ fn filtered_keys(state: &KvBucketState) -> Vec<String> {
         .collect()
 }
 
+fn normalized_entry_key(key: &str) -> String {
+    key.trim().to_owned()
+}
+
 fn refresh_kv_keys(
     connection_id: u64,
     bucket_name: &str,
@@ -366,17 +370,34 @@ fn render_detail_panel(
     }
 
     // Action toolbar
+    let entry_key = normalized_entry_key(&state.entry_key);
+    let can_save = !entry_key.is_empty();
+    let subject = kv_subject(bucket_name, &entry_key);
+    let outgoing_preview = if can_save {
+        Some(schema_manager.prepare_outgoing(connection_id, &subject, &state.entry_value))
+    } else {
+        None
+    };
     ui.horizontal(|ui| {
-        let can_save = !state.entry_key.trim().is_empty();
         if ui
-            .add_enabled(can_save, egui::Button::new(t("common.save")))
+            .add_enabled(
+                can_save
+                    && outgoing_preview
+                        .as_ref()
+                        .is_none_or(|outgoing| outgoing.can_send),
+                egui::Button::new(t("common.save")),
+            )
             .clicked()
         {
+            let payload = outgoing_preview
+                .as_ref()
+                .map(|outgoing| outgoing.payload.clone())
+                .unwrap_or_else(|| state.entry_value.as_bytes().to_vec());
             backend.send(BackendCommand::PutKvEntry {
                 connection_id,
                 bucket: bucket_name.to_string(),
-                key: state.entry_key.clone(),
-                value: state.entry_value.as_bytes().to_vec(),
+                key: entry_key.clone(),
+                value: payload,
             });
             state.loading_entries = true;
         }
@@ -387,7 +408,7 @@ fn render_detail_panel(
             backend.send(BackendCommand::DeleteKvEntry {
                 connection_id,
                 bucket: bucket_name.to_string(),
-                key: state.entry_key.clone(),
+                key: entry_key.clone(),
             });
             state.loading_entries = true;
         }
@@ -398,7 +419,7 @@ fn render_detail_panel(
             backend.send(BackendCommand::PurgeKvEntry {
                 connection_id,
                 bucket: bucket_name.to_string(),
-                key: state.entry_key.clone(),
+                key: entry_key.clone(),
             });
             state.loading_entries = true;
         }
@@ -409,6 +430,12 @@ fn render_detail_panel(
             state.show_history = true;
         }
     });
+    if let Some(status) = outgoing_preview
+        .as_ref()
+        .and_then(|outgoing| outgoing.status.as_ref())
+    {
+        format::render_schema_status(ui, status);
+    }
 
     ui.separator();
 
@@ -451,6 +478,11 @@ fn render_detail_panel(
         {
             state.entry_value = pretty;
         }
+        render_generate_json_button(
+            ui,
+            &schema_manager.payload_template(connection_id, &subject),
+            &mut state.entry_value,
+        );
     });
     egui::ScrollArea::vertical()
         .id_salt(("kv_value_editor", connection_id, bucket_name))
@@ -516,17 +548,52 @@ fn render_history(
                         .id_salt(("kv_history_item", connection_id, bucket_name, revision))
                         .show(ui, |ui| {
                             let payload = decode_base64_payload(item["value_base64"].as_str());
-                            format::render_payload_with_proto(
+                            let subject =
+                                kv_subject(bucket_name, &normalized_entry_key(&state.entry_key));
+                            format::render_payload_with_schema(
                                 ui,
                                 &payload,
                                 state.history_format,
                                 "kv_history_proto",
                                 &mut state.history_proto_view,
-                                schema_manager,
+                                format::SchemaRenderContext {
+                                    manager: schema_manager,
+                                    connection_id,
+                                    subject: &subject,
+                                },
                             );
                         });
                 }
             });
+    }
+}
+
+fn render_generate_json_button(
+    ui: &mut egui::Ui,
+    payload_template: &Result<Option<String>, String>,
+    payload: &mut String,
+) {
+    let template = payload_template
+        .as_ref()
+        .ok()
+        .and_then(|value| value.as_ref());
+    let response = ui.add_enabled(
+        template.is_some(),
+        egui::Button::new(t("publisher.generate_json")),
+    );
+    if response.clicked()
+        && let Some(template) = template
+    {
+        *payload = template.clone();
+    }
+    match payload_template {
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            response.on_hover_text(t("publisher.generate_json_unavailable"));
+        }
+        Err(error) => {
+            response.on_hover_text(error);
+        }
     }
 }
 
@@ -600,5 +667,11 @@ mod tests {
         state.search.secondary = true;
 
         assert_eq!(filtered_keys(&state), vec!["users.bob".to_string()]);
+    }
+
+    #[test]
+    fn normalized_entry_key_trims_schema_and_write_target() {
+        assert_eq!(normalized_entry_key("  orders.1  "), "orders.1");
+        assert_eq!(normalized_entry_key("\tusers.alice\n"), "users.alice");
     }
 }
