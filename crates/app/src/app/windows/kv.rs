@@ -1,6 +1,8 @@
 use eframe::egui;
 
+use crate::format;
 use crate::i18n::t;
+use crate::schema::kv_subject;
 
 use super::super::{editors::StorageSelection, model::EasyNatsApp};
 
@@ -196,6 +198,19 @@ fn render_entry_create_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     });
 
                 ui.add_space(4.0);
+                let entry_subject = kv_subject(
+                    &app.kv_entry_create_editor.bucket_name,
+                    app.kv_entry_create_editor.key.trim(),
+                );
+                let outgoing_preview = if !app.kv_entry_create_editor.key.trim().is_empty() {
+                    Some(app.schema_manager.prepare_outgoing(
+                        app.kv_entry_create_editor.connection_id,
+                        &entry_subject,
+                        &app.kv_entry_create_editor.value,
+                    ))
+                } else {
+                    None
+                };
                 ui.horizontal(|ui| {
                     ui.label(t("kv.value_editor"));
                     if ui.small_button(t("kv.format_json")).clicked()
@@ -206,7 +221,21 @@ fn render_entry_create_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     {
                         app.kv_entry_create_editor.value = pretty;
                     }
+                    render_generate_json_button(
+                        ui,
+                        &app.schema_manager.payload_template(
+                            app.kv_entry_create_editor.connection_id,
+                            &entry_subject,
+                        ),
+                        &mut app.kv_entry_create_editor.value,
+                    );
                 });
+                if let Some(status) = outgoing_preview
+                    .as_ref()
+                    .and_then(|outgoing| outgoing.status.as_ref())
+                {
+                    format::render_schema_status(ui, status);
+                }
                 egui::ScrollArea::vertical()
                     .id_salt("kv_entry_create_value")
                     .max_height(220.0)
@@ -221,7 +250,10 @@ fn render_entry_create_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
 
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    let valid = !app.kv_entry_create_editor.key.trim().is_empty();
+                    let valid = !app.kv_entry_create_editor.key.trim().is_empty()
+                        && outgoing_preview
+                            .as_ref()
+                            .is_none_or(|outgoing| outgoing.can_send);
                     if ui
                         .add_enabled(valid, egui::Button::new(t("common.save")))
                         .clicked()
@@ -236,5 +268,34 @@ fn render_entry_create_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     }
     if save_requested {
         app.save_kv_entry_create_editor();
+    }
+}
+
+fn render_generate_json_button(
+    ui: &mut egui::Ui,
+    payload_template: &Result<Option<String>, String>,
+    payload: &mut String,
+) {
+    let template = payload_template
+        .as_ref()
+        .ok()
+        .and_then(|value| value.as_ref());
+    let response = ui.add_enabled(
+        template.is_some(),
+        egui::Button::new(t("publisher.generate_json")),
+    );
+    if response.clicked()
+        && let Some(template) = template
+    {
+        *payload = template.clone();
+    }
+    match payload_template {
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            response.on_hover_text(t("publisher.generate_json_unavailable"));
+        }
+        Err(error) => {
+            response.on_hover_text(error);
+        }
     }
 }
