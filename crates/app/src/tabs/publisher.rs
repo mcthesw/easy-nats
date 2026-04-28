@@ -3,7 +3,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 
 use crate::format;
 use crate::i18n::t;
-use crate::proto::ProtoSchemaManager;
+use crate::schema::MessageSchemaManager;
 
 use super::common::topic_history_text_edit;
 use super::types::{PublisherState, TabAction};
@@ -15,7 +15,7 @@ pub fn publisher_ui(
     backend_id: u64,
     state: &mut PublisherState,
     backend: &BackendHandle,
-    proto_manager: &ProtoSchemaManager,
+    schema_manager: &MessageSchemaManager,
     actions: &mut Vec<TabAction>,
     topic_suggestions: &[&str],
 ) {
@@ -83,21 +83,37 @@ pub fn publisher_ui(
         });
 
     ui.add_space(4.0);
+    let can_send = !state.subject.trim().is_empty();
+    let outgoing_preview = if can_send {
+        schema_manager.prepare_outgoing(connection_id, state.subject.trim(), &state.payload)
+    } else {
+        crate::schema::OutgoingPayload {
+            payload: Vec::new(),
+            status: None,
+            can_send: false,
+        }
+    };
     ui.horizontal(|ui| {
-        let can_send = !state.subject.trim().is_empty();
         if ui
             .add_enabled(can_send, egui::Button::new(t("publisher.publish")))
             .clicked()
         {
-            actions.push(TabAction::RecordTopic {
-                topic: state.subject.clone(),
-            });
-            backend.send(BackendCommand::Publish {
+            let outgoing = schema_manager.prepare_outgoing(
                 connection_id,
-                subject: state.subject.clone(),
-                payload: state.payload.as_bytes().to_vec(),
-                headers: collect_headers(&state.headers),
-            });
+                state.subject.trim(),
+                &state.payload,
+            );
+            if outgoing.can_send {
+                actions.push(TabAction::RecordTopic {
+                    topic: state.subject.clone(),
+                });
+                backend.send(BackendCommand::Publish {
+                    connection_id,
+                    subject: state.subject.clone(),
+                    payload: outgoing.payload,
+                    headers: collect_headers(&state.headers),
+                });
+            }
         }
 
         ui.separator();
@@ -111,22 +127,32 @@ pub fn publisher_ui(
             )
             .clicked()
         {
-            actions.push(TabAction::RecordTopic {
-                topic: state.subject.clone(),
-            });
-            let timeout_ms = state.timeout_ms.parse::<u64>().unwrap_or(5000);
-            backend.send(BackendCommand::Request {
+            let outgoing = schema_manager.prepare_outgoing(
                 connection_id,
-                backend_id,
-                subject: state.subject.clone(),
-                payload: state.payload.as_bytes().to_vec(),
-                headers: collect_headers(&state.headers),
-                timeout_ms,
-            });
-            state.response = None;
-            state.waiting = true;
+                state.subject.trim(),
+                &state.payload,
+            );
+            if outgoing.can_send {
+                actions.push(TabAction::RecordTopic {
+                    topic: state.subject.clone(),
+                });
+                let timeout_ms = state.timeout_ms.parse::<u64>().unwrap_or(5000);
+                backend.send(BackendCommand::Request {
+                    connection_id,
+                    backend_id,
+                    subject: state.subject.clone(),
+                    payload: outgoing.payload,
+                    headers: collect_headers(&state.headers),
+                    timeout_ms,
+                });
+                state.response = None;
+                state.waiting = true;
+            }
         }
     });
+    if let Some(status) = &outgoing_preview.status {
+        format::render_schema_status(ui, status);
+    }
 
     ui.add_space(8.0);
     ui.separator();
@@ -134,13 +160,14 @@ pub fn publisher_ui(
         ui.label(t("publisher.response"));
         format::format_selector(ui, "pub_resp_fmt", &mut state.response_format);
     });
-    render_response(ui, state, proto_manager);
+    render_response(ui, connection_id, state, schema_manager);
 }
 
 fn render_response(
     ui: &mut egui::Ui,
+    connection_id: u64,
     state: &mut PublisherState,
-    proto_manager: &ProtoSchemaManager,
+    schema_manager: &MessageSchemaManager,
 ) {
     if state.waiting {
         ui.spinner();
@@ -169,14 +196,29 @@ fn render_response(
             .id_salt("resp_payload")
             .max_height(200.0)
             .show(ui, |ui| {
-                format::render_payload_with_proto(
-                    ui,
-                    &resp.payload,
-                    state.response_format,
-                    "pub_proto",
-                    &mut state.proto_view,
-                    proto_manager,
-                );
+                if let Some(subject) = resp.subject.as_deref() {
+                    format::render_payload_with_schema(
+                        ui,
+                        &resp.payload,
+                        state.response_format,
+                        "pub_proto",
+                        &mut state.proto_view,
+                        format::SchemaRenderContext {
+                            manager: schema_manager,
+                            connection_id,
+                            subject,
+                        },
+                    );
+                } else {
+                    format::render_payload_with_proto(
+                        ui,
+                        &resp.payload,
+                        state.response_format,
+                        "pub_proto",
+                        &mut state.proto_view,
+                        schema_manager,
+                    );
+                }
             });
     } else {
         ui.label(t("publisher.no_response"));

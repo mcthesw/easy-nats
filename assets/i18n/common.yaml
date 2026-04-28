@@ -62,6 +62,9 @@ tab_metrics:
 tab_search_workspace:
   en: "Search"
   zh: "搜索"
+tab_message_schemas:
+  en: "Message Schemas"
+  zh: "消息 Schema"
 
 # Welcome
 welcome_heading:

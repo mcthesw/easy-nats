@@ -65,6 +65,14 @@ fn render_sidebar_header(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
             }
 
             if ui
+                .small_button("SC")
+                .on_hover_text(t("message_schema.title"))
+                .clicked()
+            {
+                app.open_or_focus_message_schemas();
+            }
+
+            if ui
                 .small_button("＋")
                 .on_hover_text(t("sidebar.connection_new"))
                 .clicked()

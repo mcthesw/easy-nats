@@ -5,7 +5,7 @@ use std::time::{Duration, SystemTime};
 
 use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
-use crate::proto::ProtoSchemaManager;
+use crate::schema::MessageSchemaManager;
 
 use super::common::{
     SEARCH_RESULT_LIMIT, SearchStatus, auto_refresh_ui, format_bytes, matches_query,
@@ -21,7 +21,7 @@ pub fn stream_ui(
     state: &mut StreamState,
     backend: &BackendHandle,
     actions: &mut Vec<TabAction>,
-    proto_manager: &ProtoSchemaManager,
+    schema_manager: &MessageSchemaManager,
 ) {
     // Auto-refresh toggle
     ui.horizontal(|ui| {
@@ -92,10 +92,11 @@ pub fn stream_ui(
                     if let Some(msg) = state.messages.get(idx) {
                         stream_message_detail(
                             ui,
+                            connection_id,
                             msg,
                             &mut state.payload_format,
                             &mut state.proto_view,
-                            proto_manager,
+                            schema_manager,
                         );
                     }
                 } else {
@@ -508,10 +509,11 @@ fn stream_info_panel(ui: &mut egui::Ui, info: &serde_json::Value) {
 
 fn stream_message_detail(
     ui: &mut egui::Ui,
+    connection_id: u64,
     msg: &serde_json::Value,
     payload_format: &mut PayloadFormat,
     proto_view: &mut crate::proto::ProtoViewState,
-    proto_manager: &ProtoSchemaManager,
+    schema_manager: &MessageSchemaManager,
 ) {
     ui.horizontal(|ui| {
         ui.label(t("stream.msg_detail"));
@@ -566,14 +568,31 @@ fn stream_message_detail(
     ui.label(t("stream.msg_payload"));
     if let Some(payload_b64) = msg["payload_base64"].as_str() {
         match base64::engine::general_purpose::STANDARD.decode(payload_b64) {
-            Ok(data) => format::render_payload_with_proto(
-                ui,
-                &data,
-                *payload_format,
-                "stream_proto",
-                proto_view,
-                proto_manager,
-            ),
+            Ok(data) => {
+                if let Some(subject) = msg["subject"].as_str() {
+                    format::render_payload_with_schema(
+                        ui,
+                        &data,
+                        *payload_format,
+                        "stream_proto",
+                        proto_view,
+                        format::SchemaRenderContext {
+                            manager: schema_manager,
+                            connection_id,
+                            subject,
+                        },
+                    );
+                } else {
+                    format::render_payload_with_proto(
+                        ui,
+                        &data,
+                        *payload_format,
+                        "stream_proto",
+                        proto_view,
+                        schema_manager,
+                    );
+                }
+            }
             Err(_) => {
                 ui.label(t("stream.invalid_base64"));
             }

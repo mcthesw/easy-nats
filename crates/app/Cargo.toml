@@ -35,6 +35,7 @@ tracing-appender = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "registry", "fmt"] }
 tokio-util = "0.7"
 image = { version = "0.25", default-features = false, features = ["png"] }
+jsonschema = { version = "0.46.2", default-features = false }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Linux desktop support still needs both backends enabled.

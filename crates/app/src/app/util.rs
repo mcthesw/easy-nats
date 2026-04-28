@@ -69,6 +69,7 @@ pub(crate) fn same_tab(a: &TabKind, b: &TabKind) -> bool {
             },
         ) => a1 == a2,
         (TabKind::SearchWorkspace { .. }, TabKind::SearchWorkspace { .. }) => true,
+        (TabKind::MessageSchemas { .. }, TabKind::MessageSchemas { .. }) => true,
         (TabKind::Settings, TabKind::Settings) => true,
         (TabKind::LogViewer, TabKind::LogViewer) => true,
         _ => false,

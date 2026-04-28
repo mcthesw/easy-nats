@@ -2,7 +2,8 @@ use base64::Engine;
 use eframe::egui;
 use egui::text::LayoutJob;
 
-use crate::proto::{AutoDetectResult, ProtoSchemaManager, ProtoViewState};
+use crate::proto::{AutoDetectResult, ProtoViewState};
+use crate::schema::{MessageSchemaManager, PayloadSchemaStatus, SchemaStatusLevel};
 
 /// Display format for message payloads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -266,7 +267,7 @@ pub fn render_payload(ui: &mut egui::Ui, data: &[u8], format: PayloadFormat) {
         }
         PayloadFormat::Protobuf => {
             // Wire-format fallback when called without proto state
-            let text = ProtoSchemaManager::decode_wire_format(data);
+            let text = MessageSchemaManager::decode_wire_format(data);
             ui.label(egui::RichText::new(text).monospace());
         }
         _ => {
@@ -286,7 +287,7 @@ pub fn render_payload_with_proto(
     format: PayloadFormat,
     id_salt: &str,
     proto_state: &mut ProtoViewState,
-    manager: &ProtoSchemaManager,
+    manager: &MessageSchemaManager,
 ) {
     let resolved = resolve_format(format, data);
     if resolved == PayloadFormat::Protobuf {
@@ -296,24 +297,68 @@ pub fn render_payload_with_proto(
     }
 }
 
+/// Render formatted payload with subject-bound schema support.
+pub struct SchemaRenderContext<'a> {
+    pub manager: &'a MessageSchemaManager,
+    pub connection_id: u64,
+    pub subject: &'a str,
+}
+
+pub fn render_payload_with_schema(
+    ui: &mut egui::Ui,
+    data: &[u8],
+    format: PayloadFormat,
+    id_salt: &str,
+    proto_state: &mut ProtoViewState,
+    schema: SchemaRenderContext<'_>,
+) {
+    if let Some(rendered) =
+        schema
+            .manager
+            .render_schema_payload(schema.connection_id, schema.subject, data)
+    {
+        render_schema_status(ui, &rendered.status);
+        ui.add_space(4.0);
+        if format == PayloadFormat::Auto {
+            if let Some(json) = rendered.json {
+                let job = json_syntax_highlight(&json, ui.style());
+                ui.label(job);
+            } else {
+                render_payload(ui, data, PayloadFormat::Auto);
+            }
+        } else {
+            render_payload_with_proto(ui, data, format, id_salt, proto_state, schema.manager);
+        }
+    } else {
+        render_payload_with_proto(ui, data, format, id_salt, proto_state, schema.manager);
+    }
+}
+
+pub fn render_schema_status(ui: &mut egui::Ui, status: &PayloadSchemaStatus) {
+    let color = match status.level {
+        SchemaStatusLevel::Info => ui.visuals().weak_text_color(),
+        SchemaStatusLevel::Success => egui::Color32::from_rgb(57, 153, 83),
+        SchemaStatusLevel::Warning => ui.visuals().warn_fg_color,
+        SchemaStatusLevel::Error => ui.visuals().error_fg_color,
+    };
+    ui.colored_label(color, format!("{}: {}", status.label, status.message));
+}
+
 /// Render protobuf-specific controls and decoded output.
 fn render_protobuf_payload(
     ui: &mut egui::Ui,
     data: &[u8],
     id_salt: &str,
     proto_state: &mut ProtoViewState,
-    manager: &ProtoSchemaManager,
+    manager: &MessageSchemaManager,
 ) {
-    if manager.has_schemas() {
-        render_proto_type_selector(ui, id_salt, proto_state, manager);
+    let message_types = manager.manual_message_types();
+    if !message_types.is_empty() {
+        render_proto_type_selector(ui, id_salt, proto_state, &message_types);
         ui.add_space(4.0);
         render_proto_decoded(ui, data, proto_state, manager);
     } else {
-        if let Some(err) = manager.last_error() {
-            ui.colored_label(ui.visuals().error_fg_color, format!("Schema error: {err}"));
-            ui.add_space(4.0);
-        }
-        let text = ProtoSchemaManager::decode_wire_format(data);
+        let text = MessageSchemaManager::decode_wire_format(data);
         ui.label(egui::RichText::new(text).monospace());
     }
 }
@@ -322,12 +367,12 @@ fn render_proto_type_selector(
     ui: &mut egui::Ui,
     id_salt: &str,
     state: &mut ProtoViewState,
-    manager: &ProtoSchemaManager,
+    message_types: &[String],
 ) {
     // Reset stale selection if schemas changed
     if !state.auto_detect
         && !state.selected_type.is_empty()
-        && !manager.message_types().contains(&state.selected_type)
+        && !message_types.contains(&state.selected_type)
     {
         state.selected_type.clear();
         state.cached_output = None;
@@ -352,7 +397,7 @@ fn render_proto_type_selector(
                 {
                     state.cached_output = None;
                 }
-                for t in manager.message_types() {
+                for t in message_types {
                     if ui
                         .selectable_label(!state.auto_detect && state.selected_type == *t, t)
                         .clicked()
@@ -370,7 +415,7 @@ fn render_proto_decoded(
     ui: &mut egui::Ui,
     data: &[u8],
     state: &mut ProtoViewState,
-    manager: &ProtoSchemaManager,
+    manager: &MessageSchemaManager,
 ) {
     if data.is_empty() {
         ui.label("(empty payload)");
@@ -378,7 +423,7 @@ fn render_proto_decoded(
     }
 
     if state.auto_detect {
-        match manager.auto_detect_and_decode(data) {
+        match manager.auto_detect_manual_proto(data) {
             AutoDetectResult::Match { type_name, json } => {
                 ui.label(
                     egui::RichText::new(format!("Detected: {type_name}"))
@@ -396,30 +441,30 @@ fn render_proto_decoded(
                         types.len()
                     ),
                 );
-                let text = ProtoSchemaManager::decode_wire_format(data);
+                let text = MessageSchemaManager::decode_wire_format(data);
                 ui.label(egui::RichText::new(text).monospace());
             }
             AutoDetectResult::NoMatch => {
                 ui.label(egui::RichText::new("No matching message type found").weak());
-                let text = ProtoSchemaManager::decode_wire_format(data);
+                let text = MessageSchemaManager::decode_wire_format(data);
                 ui.label(egui::RichText::new(text).monospace());
             }
         }
     } else if !state.selected_type.is_empty() {
-        match manager.decode(data, &state.selected_type) {
+        match manager.decode_manual_proto(data, &state.selected_type) {
             Ok(json) => {
                 let job = json_syntax_highlight(&json, ui.style());
                 ui.label(job);
             }
             Err(e) => {
                 ui.colored_label(ui.visuals().error_fg_color, format!("Decode error: {e}"));
-                let text = ProtoSchemaManager::decode_wire_format(data);
+                let text = MessageSchemaManager::decode_wire_format(data);
                 ui.label(egui::RichText::new(text).monospace());
             }
         }
     } else {
         ui.label(egui::RichText::new("Select a message type above").weak());
-        let text = ProtoSchemaManager::decode_wire_format(data);
+        let text = MessageSchemaManager::decode_wire_format(data);
         ui.label(egui::RichText::new(text).monospace());
     }
 }

@@ -2,8 +2,8 @@ use eframe::egui;
 
 use crate::i18n::t;
 use crate::tabs::{
-    kv_bucket_ui, metrics_ui, obj_store_bucket_ui, publisher_ui, search_workspace_ui,
-    server_info_ui, stream_ui, subscriber_ui,
+    kv_bucket_ui, message_schemas_ui, metrics_ui, obj_store_bucket_ui, publisher_ui,
+    search_workspace_ui, server_info_ui, stream_ui, subscriber_ui,
 };
 
 use super::log_viewer::log_viewer_ui;
@@ -47,6 +47,7 @@ fn tab_scope_id(tab: &TabKind) -> String {
         TabKind::ServerInfo { connection_id, .. } => format!("srvinfo:{connection_id}"),
         TabKind::Metrics { connection_id, .. } => format!("metrics:{connection_id}"),
         TabKind::SearchWorkspace { .. } => "search-workspace".into(),
+        TabKind::MessageSchemas { .. } => "message-schemas".into(),
         TabKind::Settings => "settings".into(),
         TabKind::LogViewer => "log-viewer".into(),
     }
@@ -95,7 +96,7 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
                 *backend_id,
                 state,
                 viewer.backend,
-                viewer.proto_manager,
+                viewer.schema_manager,
                 viewer.actions,
                 &suggestions,
             );
@@ -115,7 +116,7 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
                 guard,
                 state,
                 viewer.backend,
-                viewer.proto_manager,
+                viewer.schema_manager,
                 viewer.actions,
                 &suggestions,
             );
@@ -133,7 +134,7 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
                 state,
                 viewer.backend,
                 viewer.actions,
-                viewer.proto_manager,
+                viewer.schema_manager,
             );
         }
         TabKind::KvBucket {
@@ -150,7 +151,7 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
                 state,
                 viewer.backend,
                 viewer.actions,
-                viewer.proto_manager,
+                viewer.schema_manager,
                 guard,
             );
         }
@@ -185,6 +186,15 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
         }
         TabKind::SearchWorkspace { state } => {
             search_workspace_ui(ui, state, viewer.search_sources, viewer.actions);
+        }
+        TabKind::MessageSchemas { state } => {
+            message_schemas_ui(
+                ui,
+                state,
+                viewer.schema_manager,
+                viewer.connections,
+                viewer.actions,
+            );
         }
         TabKind::Settings => {
             settings_ui(ui, viewer.settings, viewer.theme_id, viewer.actions);
