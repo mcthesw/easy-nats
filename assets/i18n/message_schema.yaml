@@ -37,6 +37,9 @@ remove:
 enabled:
   en: "Enabled"
   zh: "启用"
+actions:
+  en: "Actions"
+  zh: "操作"
 name:
   en: "Name"
   zh: "名称"

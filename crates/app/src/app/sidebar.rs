@@ -35,51 +35,43 @@ pub(crate) fn render_sidebar(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
 }
 
 fn render_sidebar_header(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
+    ui.heading(t("sidebar.connections_heading"));
     ui.horizontal(|ui| {
-        ui.heading(t("sidebar.connections_heading"));
-        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-            // Settings button
-            if ui
-                .small_button("⚙")
-                .on_hover_text(t("settings.title"))
-                .clicked()
-            {
-                app.open_or_focus_tab_kind(crate::tabs::TabKind::Settings);
-            }
-
-            // Log viewer button
-            if ui
-                .small_button("📋")
-                .on_hover_text(t("log_viewer.title"))
-                .clicked()
-            {
-                app.open_or_focus_tab_kind(crate::tabs::TabKind::LogViewer);
-            }
-
-            if ui
-                .small_button("🔍")
-                .on_hover_text(t("search_workspace.title"))
-                .clicked()
-            {
-                app.open_or_focus_search_workspace();
-            }
-
-            if ui
-                .small_button("SC")
-                .on_hover_text(t("message_schema.title"))
-                .clicked()
-            {
-                app.open_or_focus_message_schemas();
-            }
-
-            if ui
-                .small_button("＋")
-                .on_hover_text(t("sidebar.connection_new"))
-                .clicked()
-            {
-                app.open_new_editor();
-            }
-        });
+        if ui
+            .small_button("＋")
+            .on_hover_text(t("sidebar.connection_new"))
+            .clicked()
+        {
+            app.open_new_editor();
+        }
+        if ui
+            .small_button("📝")
+            .on_hover_text(t("message_schema.title"))
+            .clicked()
+        {
+            app.open_or_focus_message_schemas();
+        }
+        if ui
+            .small_button("🔍")
+            .on_hover_text(t("search_workspace.title"))
+            .clicked()
+        {
+            app.open_or_focus_search_workspace();
+        }
+        if ui
+            .small_button("📋")
+            .on_hover_text(t("log_viewer.title"))
+            .clicked()
+        {
+            app.open_or_focus_tab_kind(crate::tabs::TabKind::LogViewer);
+        }
+        if ui
+            .small_button("⚙")
+            .on_hover_text(t("settings.title"))
+            .clicked()
+        {
+            app.open_or_focus_tab_kind(crate::tabs::TabKind::Settings);
+        }
     });
 }
 
