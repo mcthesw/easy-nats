@@ -8,7 +8,8 @@ use nats_backend::MetricsSnapshot;
 
 use crate::format::PayloadFormat;
 use crate::i18n::t;
-use crate::proto::{ProtoSchemaManager, ProtoViewState};
+use crate::proto::ProtoViewState;
+use crate::schema::{MessageSchemaManager, SchemaSelector, SchemaSourceKind, ValidationPolicy};
 use crate::theme::ThemeId;
 
 use super::guard::TabGuard;
@@ -89,10 +90,37 @@ pub enum TabAction {
     ApplyTheme {
         theme_id: ThemeId,
     },
-    LoadProtoSchemas {
-        dir: String,
+    OpenMessageSchemas,
+    AddMessageSchemaSource {
+        name: String,
+        kind: SchemaSourceKind,
+        path: String,
     },
-    ClearProtoSchemas,
+    RemoveMessageSchemaSource {
+        source_id: u64,
+    },
+    ReloadMessageSchemaSource {
+        source_id: u64,
+    },
+    SetMessageSchemaSourceEnabled {
+        source_id: u64,
+        enabled: bool,
+    },
+    AddMessageSchemaBinding {
+        name: String,
+        connection_id: Option<u64>,
+        subject_pattern: String,
+        source_id: u64,
+        selector: SchemaSelector,
+        policy: ValidationPolicy,
+    },
+    RemoveMessageSchemaBinding {
+        binding_id: u64,
+    },
+    SetMessageSchemaBindingEnabled {
+        binding_id: u64,
+        enabled: bool,
+    },
     ScanSearchWorkspaceKvValues {
         source_id: SearchSourceId,
     },
@@ -135,6 +163,7 @@ impl Default for PublisherState {
 
 #[derive(Debug, Clone)]
 pub struct ResponseData {
+    pub subject: Option<String>,
     pub payload: Vec<u8>,
     pub headers: Vec<(String, String)>,
 }
@@ -344,6 +373,37 @@ pub struct SearchWorkspaceState {
     pub selected_result: Option<SearchResultIdentity>,
     pub selected_preview: Option<SearchWorkspaceResult>,
     pub cached_results: Option<CachedSearchWorkspaceResults>,
+}
+
+#[derive(Debug)]
+pub struct MessageSchemasState {
+    pub source_name: String,
+    pub source_kind: SchemaSourceKind,
+    pub source_path: String,
+    pub binding_name: String,
+    pub binding_connection_id: Option<u64>,
+    pub binding_subject_pattern: String,
+    pub binding_source_id: Option<u64>,
+    pub binding_schema_entry: String,
+    pub binding_policy: ValidationPolicy,
+    pub last_error: Option<String>,
+}
+
+impl Default for MessageSchemasState {
+    fn default() -> Self {
+        Self {
+            source_name: String::new(),
+            source_kind: SchemaSourceKind::Protobuf,
+            source_path: String::new(),
+            binding_name: String::new(),
+            binding_connection_id: None,
+            binding_subject_pattern: String::new(),
+            binding_source_id: None,
+            binding_schema_entry: String::new(),
+            binding_policy: ValidationPolicy::Inspect,
+            last_error: None,
+        }
+    }
 }
 
 impl Default for SearchWorkspaceState {
@@ -700,6 +760,9 @@ pub enum TabKind {
     SearchWorkspace {
         state: SearchWorkspaceState,
     },
+    MessageSchemas {
+        state: MessageSchemasState,
+    },
     Settings,
     LogViewer,
 }
@@ -772,6 +835,7 @@ impl TabKind {
                 format!("{} ({})", t("common.tab_metrics"), connection_name)
             }
             TabKind::SearchWorkspace { .. } => t("common.tab_search_workspace").to_string(),
+            TabKind::MessageSchemas { .. } => t("common.tab_message_schemas").to_string(),
             TabKind::Settings => t("settings.title").to_string(),
             TabKind::LogViewer => t("log_viewer.title").to_string(),
         }
@@ -813,6 +877,7 @@ impl TabKind {
                 egui::Id::new(("tab:metrics", *connection_id))
             }
             TabKind::SearchWorkspace { .. } => egui::Id::new("tab:search-workspace"),
+            TabKind::MessageSchemas { .. } => egui::Id::new("tab:message-schemas"),
             TabKind::Settings => egui::Id::new("tab:settings"),
             TabKind::LogViewer => egui::Id::new("tab:log-viewer"),
         }
@@ -826,7 +891,8 @@ pub struct AppTabViewer<'a> {
     pub settings: &'a mut crate::settings::AppSettings,
     pub theme_id: &'a mut ThemeId,
     pub log_buffer: &'a crate::log_layer::SharedLogBuffer,
-    pub proto_manager: &'a ProtoSchemaManager,
+    pub schema_manager: &'a MessageSchemaManager,
+    pub connections: &'a [(u64, String)],
 }
 
 impl TabViewer for AppTabViewer<'_> {

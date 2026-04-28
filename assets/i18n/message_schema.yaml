@@ -1,0 +1,114 @@
+title:
+  en: "Message Schemas"
+  zh: "消息 Schema"
+sources:
+  en: "Sources"
+  zh: "来源"
+bindings:
+  en: "Bindings"
+  zh: "绑定"
+source_name:
+  en: "Source name"
+  zh: "来源名称"
+source_path:
+  en: "Path"
+  zh: "路径"
+binding_name:
+  en: "Binding name"
+  zh: "绑定名称"
+subject_pattern:
+  en: "Subject pattern"
+  zh: "主题模式"
+browse:
+  en: "Browse..."
+  zh: "浏览..."
+add_source:
+  en: "Add source"
+  zh: "添加来源"
+add_binding:
+  en: "Add binding"
+  zh: "添加绑定"
+reload:
+  en: "Reload"
+  zh: "重新加载"
+remove:
+  en: "Remove"
+  zh: "移除"
+enabled:
+  en: "Enabled"
+  zh: "启用"
+name:
+  en: "Name"
+  zh: "名称"
+kind:
+  en: "Kind"
+  zh: "类型"
+path:
+  en: "Path"
+  zh: "路径"
+status:
+  en: "Status"
+  zh: "状态"
+entries:
+  en: "Entries"
+  zh: "条目"
+connection:
+  en: "Connection"
+  zh: "连接"
+schema:
+  en: "Schema"
+  zh: "Schema"
+policy:
+  en: "Policy"
+  zh: "策略"
+kind_protobuf:
+  en: "Protobuf"
+  zh: "Protobuf"
+kind_json_schema:
+  en: "JSON Schema"
+  zh: "JSON Schema"
+policy_inspect:
+  en: "Inspect"
+  zh: "检查"
+policy_warn:
+  en: "Warn"
+  zh: "警告"
+policy_block:
+  en: "Block"
+  zh: "阻止"
+all_connections:
+  en: "All connections"
+  zh: "全部连接"
+select_source:
+  en: "Select source"
+  zh: "选择来源"
+select_schema:
+  en: "Select schema"
+  zh: "选择 Schema"
+no_sources:
+  en: "No schema sources configured."
+  zh: "尚未配置 Schema 来源。"
+no_bindings:
+  en: "No subject bindings configured."
+  zh: "尚未配置主题绑定。"
+add_source_first:
+  en: "Add a source before creating bindings."
+  zh: "先添加来源再创建绑定。"
+status_disabled:
+  en: "Disabled"
+  zh: "已禁用"
+status_loaded:
+  en: "Loaded"
+  zh: "已加载"
+status_error:
+  en: "Error"
+  zh: "错误"
+status_unknown:
+  en: "Unknown"
+  zh: "未知"
+status_ready:
+  en: "Ready"
+  zh: "就绪"
+status_missing_schema:
+  en: "Missing schema"
+  zh: "缺少 Schema"

@@ -113,6 +113,7 @@ pub enum BackendEvent {
     RequestResponse {
         connection_id: u64,
         backend_id: u64,
+        subject: Option<String>,
         payload: Vec<u8>,
         headers: Vec<(String, String)>,
     },

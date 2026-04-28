@@ -3,7 +3,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 
 use crate::format;
 use crate::i18n::t;
-use crate::proto::ProtoSchemaManager;
+use crate::schema::MessageSchemaManager;
 use crate::tabs::guard::TabGuard;
 
 use super::common::{
@@ -20,7 +20,7 @@ pub fn kv_bucket_ui(
     state: &mut KvBucketState,
     backend: &BackendHandle,
     actions: &mut Vec<TabAction>,
-    proto_manager: &ProtoSchemaManager,
+    schema_manager: &MessageSchemaManager,
     guard: &TabGuard,
 ) {
     ui.horizontal(|ui| {
@@ -97,7 +97,7 @@ pub fn kv_bucket_ui(
     // Right panel: detail or history
     egui::CentralPanel::default().show_inside(ui, |ui| {
         if state.show_history {
-            render_history(ui, connection_id, bucket_name, state, proto_manager);
+            render_history(ui, connection_id, bucket_name, state, schema_manager);
         } else {
             render_detail_panel(
                 ui,
@@ -105,7 +105,7 @@ pub fn kv_bucket_ui(
                 bucket_name,
                 state,
                 backend,
-                proto_manager,
+                schema_manager,
             );
         }
     });
@@ -348,7 +348,7 @@ fn render_detail_panel(
     bucket_name: &str,
     state: &mut KvBucketState,
     backend: &BackendHandle,
-    proto_manager: &ProtoSchemaManager,
+    schema_manager: &MessageSchemaManager,
 ) {
     if state.selected_key.is_none() {
         ui.centered_and_justified(|ui| {
@@ -475,7 +475,7 @@ fn render_detail_panel(
                 state.editor_format,
                 "kv_editor_proto",
                 &mut state.editor_proto_view,
-                proto_manager,
+                schema_manager,
             );
         });
 }
@@ -485,7 +485,7 @@ fn render_history(
     connection_id: u64,
     bucket_name: &str,
     state: &mut KvBucketState,
-    proto_manager: &ProtoSchemaManager,
+    schema_manager: &MessageSchemaManager,
 ) {
     ui.horizontal(|ui| {
         if ui.button(t("kv.back_to_detail")).clicked() {
@@ -522,7 +522,7 @@ fn render_history(
                                 state.history_format,
                                 "kv_history_proto",
                                 &mut state.history_proto_view,
-                                proto_manager,
+                                schema_manager,
                             );
                         });
                 }

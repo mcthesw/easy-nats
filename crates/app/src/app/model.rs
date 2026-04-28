@@ -4,7 +4,7 @@ use egui_dock::DockState;
 use nats_backend::{AppConfig, ConnectionStatusKind};
 
 use crate::log_layer::SharedLogBuffer;
-use crate::proto::ProtoSchemaManager;
+use crate::schema::MessageSchemaManager;
 use crate::settings::AppSettings;
 use crate::tabs::TabKind;
 use crate::theme::ThemeId;
@@ -83,15 +83,12 @@ pub struct EasyNatsApp {
     pub(crate) obj_store_bucket_delete_confirm: Option<(u64, String)>,
     pub(crate) tab_id_alloc: TabIdAllocator,
     pub(crate) log_buffer: SharedLogBuffer,
-    pub(crate) proto_manager: ProtoSchemaManager,
+    pub(crate) schema_manager: MessageSchemaManager,
 }
 
 impl EasyNatsApp {
     pub fn new(settings: AppSettings, theme_id: ThemeId, log_buffer: SharedLogBuffer) -> Self {
-        let mut proto_manager = ProtoSchemaManager::default();
-        if let Some(dir) = &settings.proto_schema_dir {
-            proto_manager.set_schema_dir(std::path::PathBuf::from(dir));
-        }
+        let schema_manager = MessageSchemaManager::load(settings.proto_schema_dir.as_deref());
         Self {
             backend: nats_backend::BackendHandle::spawn(),
             config: AppConfig::load(),
@@ -118,7 +115,7 @@ impl EasyNatsApp {
             obj_store_bucket_delete_confirm: None,
             tab_id_alloc: TabIdAllocator::default(),
             log_buffer,
-            proto_manager,
+            schema_manager,
         }
     }
 

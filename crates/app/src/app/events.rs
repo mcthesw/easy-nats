@@ -70,6 +70,7 @@ impl EasyNatsApp {
                 BackendEvent::RequestResponse {
                     connection_id,
                     backend_id: response_backend_id,
+                    subject,
                     payload,
                     headers,
                 } => {
@@ -84,6 +85,7 @@ impl EasyNatsApp {
                             && *backend_id == response_backend_id
                         {
                             state.response = Some(ResponseData {
+                                subject: subject.clone(),
                                 payload: payload.clone(),
                                 headers: headers.clone(),
                             });

@@ -66,19 +66,8 @@ impl ProtoSchemaManager {
         }
     }
 
-    pub fn clear(&mut self) {
-        self.schema_dir = None;
-        self.pool = None;
-        self.message_types.clear();
-        self.last_error = None;
-    }
-
     pub fn message_types(&self) -> &[String] {
         &self.message_types
-    }
-
-    pub fn has_schemas(&self) -> bool {
-        self.pool.is_some() && !self.message_types.is_empty()
     }
 
     pub fn last_error(&self) -> Option<&str> {
@@ -89,6 +78,12 @@ impl ProtoSchemaManager {
     pub fn decode(&self, data: &[u8], message_type: &str) -> Result<String, String> {
         let pool = self.pool.as_ref().ok_or("No schemas loaded")?;
         decoder::decode_message(pool, message_type, data)
+    }
+
+    /// Encode JSON into protobuf wire bytes using the specified fully-qualified message type.
+    pub fn encode_json(&self, json: &str, message_type: &str) -> Result<Vec<u8>, String> {
+        let pool = self.pool.as_ref().ok_or("No schemas loaded")?;
+        decoder::encode_json_message(pool, message_type, json)
     }
 
     /// Try all known message types and return categorized results.
