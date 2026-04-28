@@ -632,7 +632,7 @@ pub struct MetricsState {
 }
 
 impl MetricsState {
-    const MAX_SAMPLES: usize = 120;
+    const MAX_SAMPLES: usize = 720;
 
     pub fn with_endpoint(endpoint: String) -> Self {
         let mut state = Self {
@@ -1048,5 +1048,30 @@ mod tests {
 
         assert!(state.auto_refresh.enabled);
         assert_eq!(state.auto_refresh.interval_secs, 5);
+    }
+
+    #[test]
+    fn metrics_state_keeps_one_hour_at_default_refresh() {
+        let mut state = MetricsState::with_endpoint("http://localhost:8222".to_string());
+        for idx in 0..=MetricsState::MAX_SAMPLES {
+            state.apply_snapshot(sample_snapshot(
+                "http://localhost:8222",
+                SystemTime::UNIX_EPOCH + Duration::from_secs(idx as u64 * 5),
+                idx as u64,
+            ));
+        }
+
+        assert_eq!(state.history().len(), MetricsState::MAX_SAMPLES);
+        assert_eq!(
+            state
+                .history()
+                .front()
+                .unwrap()
+                .varz
+                .as_ref()
+                .unwrap()
+                .in_msgs,
+            1
+        );
     }
 }
