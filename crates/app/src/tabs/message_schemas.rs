@@ -91,49 +91,53 @@ fn render_sources(ui: &mut egui::Ui, manager: &MessageSchemaManager, actions: &m
         return;
     }
 
-    egui::Grid::new("message_schema_sources")
-        .num_columns(8)
-        .spacing([10.0, 4.0])
-        .striped(true)
+    egui::ScrollArea::horizontal()
+        .id_salt("message_schema_sources_scroll")
         .show(ui, |ui| {
-            ui.strong(t("message_schema.enabled"));
-            ui.strong(t("message_schema.name"));
-            ui.strong(t("message_schema.kind"));
-            ui.strong(t("message_schema.path"));
-            ui.strong(t("message_schema.status"));
-            ui.strong(t("message_schema.entries"));
-            ui.end_row();
+            egui::Grid::new("message_schema_sources")
+                .num_columns(8)
+                .spacing([10.0, 4.0])
+                .striped(true)
+                .show(ui, |ui| {
+                    ui.strong(t("message_schema.enabled"));
+                    ui.strong(t("message_schema.name"));
+                    ui.strong(t("message_schema.kind"));
+                    ui.strong(t("message_schema.path"));
+                    ui.strong(t("message_schema.status"));
+                    ui.strong(t("message_schema.entries"));
+                    ui.end_row();
 
-            for source in &manager.config().sources {
-                let mut enabled = source.enabled;
-                if ui.checkbox(&mut enabled, "").changed() {
-                    actions.push(TabAction::SetMessageSchemaSourceEnabled {
-                        source_id: source.id,
-                        enabled,
-                    });
-                }
-                ui.label(&source.name);
-                ui.label(t(source.kind.label_key()));
-                ui.monospace(&source.path);
-                let status = manager.status(source.id);
-                ui.label(source_status_text(status));
-                ui.label(
-                    status
-                        .map(|status| status.entries.len().to_string())
-                        .unwrap_or_else(|| "0".to_string()),
-                );
-                if ui.small_button(t("message_schema.reload")).clicked() {
-                    actions.push(TabAction::ReloadMessageSchemaSource {
-                        source_id: source.id,
-                    });
-                }
-                if ui.small_button(t("message_schema.remove")).clicked() {
-                    actions.push(TabAction::RemoveMessageSchemaSource {
-                        source_id: source.id,
-                    });
-                }
-                ui.end_row();
-            }
+                    for source in &manager.config().sources {
+                        let mut enabled = source.enabled;
+                        if ui.checkbox(&mut enabled, "").changed() {
+                            actions.push(TabAction::SetMessageSchemaSourceEnabled {
+                                source_id: source.id,
+                                enabled,
+                            });
+                        }
+                        clipped_label(ui, &source.name, 170.0);
+                        clipped_label(ui, t(source.kind.label_key()), 110.0);
+                        clipped_monospace(ui, &source.path, 420.0);
+                        let status = manager.status(source.id);
+                        clipped_label(ui, &source_status_text(status), 260.0);
+                        ui.label(
+                            status
+                                .map(|status| status.entries.len().to_string())
+                                .unwrap_or_else(|| "0".to_string()),
+                        );
+                        if ui.small_button(t("message_schema.reload")).clicked() {
+                            actions.push(TabAction::ReloadMessageSchemaSource {
+                                source_id: source.id,
+                            });
+                        }
+                        if ui.small_button(t("message_schema.remove")).clicked() {
+                            actions.push(TabAction::RemoveMessageSchemaSource {
+                                source_id: source.id,
+                            });
+                        }
+                        ui.end_row();
+                    }
+                });
         });
 }
 
@@ -161,6 +165,7 @@ fn render_binding_editor(
                 .desired_width(140.0),
         );
         egui::ComboBox::from_id_salt("schema_binding_connection")
+            .width(155.0)
             .selected_text(connection_label(state.binding_connection_id, connections))
             .show_ui(ui, |ui| {
                 ui.selectable_value(
@@ -184,6 +189,7 @@ fn render_binding_editor(
         render_source_selector(ui, state, manager);
         render_entry_selector(ui, state, manager);
         egui::ComboBox::from_id_salt("schema_binding_policy")
+            .width(95.0)
             .selected_text(t(state.binding_policy.label_key()))
             .show_ui(ui, |ui| {
                 for policy in ValidationPolicy::ALL {
@@ -242,6 +248,7 @@ fn render_source_selector(
         .map(|source| source.name.clone())
         .unwrap_or_else(|| t("message_schema.select_source").to_string());
     egui::ComboBox::from_id_salt("schema_binding_source")
+        .width(170.0)
         .selected_text(selected_text)
         .show_ui(ui, |ui| {
             for source in &manager.config().sources {
@@ -270,6 +277,7 @@ fn render_entry_selector(
         state.binding_schema_entry = first.clone();
     }
     egui::ComboBox::from_id_salt("schema_binding_entry")
+        .width(230.0)
         .selected_text(if state.binding_schema_entry.is_empty() {
             t("message_schema.select_schema").to_string()
         } else {
@@ -293,45 +301,57 @@ fn render_bindings(
         return;
     }
 
-    egui::Grid::new("message_schema_bindings")
-        .num_columns(8)
-        .spacing([10.0, 4.0])
-        .striped(true)
+    egui::ScrollArea::horizontal()
+        .id_salt("message_schema_bindings_scroll")
         .show(ui, |ui| {
-            ui.strong(t("message_schema.enabled"));
-            ui.strong(t("message_schema.name"));
-            ui.strong(t("message_schema.connection"));
-            ui.strong(t("message_schema.subject_pattern"));
-            ui.strong(t("message_schema.schema"));
-            ui.strong(t("message_schema.policy"));
-            ui.strong(t("message_schema.status"));
-            ui.end_row();
+            egui::Grid::new("message_schema_bindings")
+                .num_columns(8)
+                .spacing([10.0, 4.0])
+                .striped(true)
+                .show(ui, |ui| {
+                    ui.strong(t("message_schema.enabled"));
+                    ui.strong(t("message_schema.name"));
+                    ui.strong(t("message_schema.connection"));
+                    ui.strong(t("message_schema.subject_pattern"));
+                    ui.strong(t("message_schema.schema"));
+                    ui.strong(t("message_schema.policy"));
+                    ui.strong(t("message_schema.status"));
+                    ui.end_row();
 
-            for binding in &manager.config().bindings {
-                let mut enabled = binding.enabled;
-                if ui.checkbox(&mut enabled, "").changed() {
-                    actions.push(TabAction::SetMessageSchemaBindingEnabled {
-                        binding_id: binding.id,
-                        enabled,
-                    });
-                }
-                ui.label(&binding.name);
-                ui.label(connection_label(binding.connection_id, connections));
-                ui.monospace(&binding.subject_pattern);
-                ui.label(binding.selector.entry());
-                ui.label(t(binding.policy.label_key()));
-                ui.label(binding_status_text(
-                    manager,
-                    binding.source_id,
-                    binding.selector.entry(),
-                ));
-                if ui.small_button(t("message_schema.remove")).clicked() {
-                    actions.push(TabAction::RemoveMessageSchemaBinding {
-                        binding_id: binding.id,
-                    });
-                }
-                ui.end_row();
-            }
+                    for binding in &manager.config().bindings {
+                        let mut enabled = binding.enabled;
+                        if ui.checkbox(&mut enabled, "").changed() {
+                            actions.push(TabAction::SetMessageSchemaBindingEnabled {
+                                binding_id: binding.id,
+                                enabled,
+                            });
+                        }
+                        clipped_label(ui, &binding.name, 150.0);
+                        clipped_label(
+                            ui,
+                            &connection_label(binding.connection_id, connections),
+                            170.0,
+                        );
+                        clipped_monospace(ui, &binding.subject_pattern, 220.0);
+                        clipped_label(ui, binding.selector.entry(), 240.0);
+                        clipped_label(ui, t(binding.policy.label_key()), 90.0);
+                        clipped_label(
+                            ui,
+                            &binding_status_text(
+                                manager,
+                                binding.source_id,
+                                binding.selector.entry(),
+                            ),
+                            150.0,
+                        );
+                        if ui.small_button(t("message_schema.remove")).clicked() {
+                            actions.push(TabAction::RemoveMessageSchemaBinding {
+                                binding_id: binding.id,
+                            });
+                        }
+                        ui.end_row();
+                    }
+                });
         });
 }
 
@@ -412,4 +432,20 @@ fn fallback_name(path: &str) -> String {
         .filter(|name| !name.is_empty())
         .unwrap_or(path)
         .to_string()
+}
+
+fn clipped_label(ui: &mut egui::Ui, text: &str, width: f32) {
+    ui.add_sized(
+        [width, ui.spacing().interact_size.y],
+        egui::Label::new(text).truncate(),
+    )
+    .on_hover_text(text);
+}
+
+fn clipped_monospace(ui: &mut egui::Ui, text: &str, width: f32) {
+    ui.add_sized(
+        [width, ui.spacing().interact_size.y],
+        egui::Label::new(egui::RichText::new(text).monospace()).truncate(),
+    )
+    .on_hover_text(text);
 }
