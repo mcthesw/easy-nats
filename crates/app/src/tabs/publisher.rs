@@ -61,6 +61,8 @@ pub fn publisher_ui(
         });
 
     ui.add_space(4.0);
+    let subject = state.subject.trim().to_owned();
+    let payload_template = schema_manager.payload_template(connection_id, &subject);
     ui.horizontal(|ui| {
         ui.label(t("publisher.payload"));
         if ui.small_button(t("publisher.format_json")).clicked()
@@ -69,6 +71,7 @@ pub fn publisher_ui(
         {
             state.payload = pretty;
         }
+        render_generate_json_button(ui, &payload_template, &mut state.payload);
     });
     egui::ScrollArea::vertical()
         .id_salt("publisher_payload")
@@ -83,9 +86,9 @@ pub fn publisher_ui(
         });
 
     ui.add_space(4.0);
-    let can_send = !state.subject.trim().is_empty();
+    let can_send = !subject.is_empty();
     let outgoing_preview = if can_send {
-        schema_manager.prepare_outgoing(connection_id, state.subject.trim(), &state.payload)
+        schema_manager.prepare_outgoing(connection_id, &subject, &state.payload)
     } else {
         crate::schema::OutgoingPayload {
             payload: Vec::new(),
@@ -98,18 +101,14 @@ pub fn publisher_ui(
             .add_enabled(can_send, egui::Button::new(t("publisher.publish")))
             .clicked()
         {
-            let outgoing = schema_manager.prepare_outgoing(
-                connection_id,
-                state.subject.trim(),
-                &state.payload,
-            );
+            let outgoing = schema_manager.prepare_outgoing(connection_id, &subject, &state.payload);
             if outgoing.can_send {
                 actions.push(TabAction::RecordTopic {
-                    topic: state.subject.clone(),
+                    topic: subject.clone(),
                 });
                 backend.send(BackendCommand::Publish {
                     connection_id,
-                    subject: state.subject.clone(),
+                    subject: subject.clone(),
                     payload: outgoing.payload,
                     headers: collect_headers(&state.headers),
                 });
@@ -127,20 +126,16 @@ pub fn publisher_ui(
             )
             .clicked()
         {
-            let outgoing = schema_manager.prepare_outgoing(
-                connection_id,
-                state.subject.trim(),
-                &state.payload,
-            );
+            let outgoing = schema_manager.prepare_outgoing(connection_id, &subject, &state.payload);
             if outgoing.can_send {
                 actions.push(TabAction::RecordTopic {
-                    topic: state.subject.clone(),
+                    topic: subject.clone(),
                 });
                 let timeout_ms = state.timeout_ms.parse::<u64>().unwrap_or(5000);
                 backend.send(BackendCommand::Request {
                     connection_id,
                     backend_id,
-                    subject: state.subject.clone(),
+                    subject: subject.clone(),
                     payload: outgoing.payload,
                     headers: collect_headers(&state.headers),
                     timeout_ms,
@@ -161,6 +156,35 @@ pub fn publisher_ui(
         format::format_selector(ui, "pub_resp_fmt", &mut state.response_format);
     });
     render_response(ui, connection_id, state, schema_manager);
+}
+
+fn render_generate_json_button(
+    ui: &mut egui::Ui,
+    payload_template: &Result<Option<String>, String>,
+    payload: &mut String,
+) {
+    let template = payload_template
+        .as_ref()
+        .ok()
+        .and_then(|value| value.as_ref());
+    let response = ui.add_enabled(
+        template.is_some(),
+        egui::Button::new(t("publisher.generate_json")),
+    );
+    if response.clicked()
+        && let Some(template) = template
+    {
+        *payload = template.clone();
+    }
+    match payload_template {
+        Ok(Some(_)) => {}
+        Ok(None) => {
+            response.on_hover_text(t("publisher.generate_json_unavailable"));
+        }
+        Err(error) => {
+            response.on_hover_text(error);
+        }
+    }
 }
 
 fn render_response(
