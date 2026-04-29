@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.1.14](https://github.com/mcthesw/easy-nats/compare/v0.1.13...v0.1.14) (2026-04-29)
+
+
+### Features
+
+* add message schema management ([72b395d](https://github.com/mcthesw/easy-nats/commit/72b395d863c689cb0edf5b7af7260be98db95abd))
+* add schema payload templates ([fb2d566](https://github.com/mcthesw/easy-nats/commit/fb2d5664fe1ae8bdca292098c89435294a7421a2))
+* apply schemas to stream and kv payloads ([22d93d1](https://github.com/mcthesw/easy-nats/commit/22d93d1e52c876ccf5ac434c015ea08693bd7ae2))
+* retain longer metrics history ([df16596](https://github.com/mcthesw/easy-nats/commit/df16596c55f8855cf517ccf8fa30e935761ffe6c))
+
+
+### Code Refactoring
+
+* split message schema modules ([e168929](https://github.com/mcthesw/easy-nats/commit/e168929958f4be8361e5ce528ca1fb149f6a3ed8))
+
 ## [0.1.13](https://github.com/mcthesw/easy-nats/compare/v0.1.12...v0.1.13) (2026-04-26)
 
 
