@@ -1,5 +1,5 @@
 use eframe::egui;
-use nats_backend::{BackendCommand, BackendHandle};
+use nats_backend::{BackendCommand, BackendHandle, ObjectStoreBucketInfo, ObjectStoreObjectInfo};
 
 use crate::i18n::t;
 
@@ -118,12 +118,11 @@ fn render_object_list(
     let filter_lower = state.object_filter.to_lowercase();
     egui::ScrollArea::vertical().show(ui, |ui| {
         for obj in &state.objects {
-            let name = obj["name"].as_str().unwrap_or("?");
+            let name = obj.name.as_str();
             if !filter_lower.is_empty() && !name.to_lowercase().contains(&filter_lower) {
                 continue;
             }
-            let size = obj["size"].as_u64().unwrap_or(0);
-            let label = format!("{name}  ({})", format_bytes(size));
+            let label = format!("{name}  ({})", format_bytes(obj.size as u64));
             let selected = state.selected_object.as_deref() == Some(name);
             if ui.selectable_label(selected, &label).clicked() {
                 state.selected_object = Some(name.to_string());
@@ -148,10 +147,7 @@ fn render_detail_panel(
     };
     let obj_name = obj_name.clone();
 
-    let obj = state
-        .objects
-        .iter()
-        .find(|o| o["name"].as_str() == Some(obj_name.as_str()));
+    let obj = state.objects.iter().find(|object| object.name == obj_name);
 
     ui.heading(&obj_name);
     ui.separator();
@@ -195,27 +191,25 @@ fn render_detail_panel(
     });
 }
 
-fn render_object_metadata(ui: &mut egui::Ui, obj: &serde_json::Value) {
+fn render_object_metadata(ui: &mut egui::Ui, obj: &ObjectStoreObjectInfo) {
     egui::Grid::new("obj_metadata")
         .num_columns(2)
         .spacing([12.0, 4.0])
         .show(ui, |ui| {
-            if let Some(size) = obj["size"].as_u64() {
-                ui.label(t("obj_store.size"));
-                ui.label(format_bytes(size));
-                ui.end_row();
-            }
-            if let Some(chunks) = obj["chunks"].as_u64() {
-                ui.label(t("obj_store.chunks"));
-                ui.label(chunks.to_string());
-                ui.end_row();
-            }
-            if let Some(digest) = obj["digest"].as_str() {
+            ui.label(t("obj_store.size"));
+            ui.label(format_bytes(obj.size as u64));
+            ui.end_row();
+
+            ui.label(t("obj_store.chunks"));
+            ui.label(obj.chunks.to_string());
+            ui.end_row();
+
+            if let Some(digest) = obj.digest.as_deref() {
                 ui.label(t("obj_store.digest"));
                 ui.label(digest);
                 ui.end_row();
             }
-            if let Some(modified) = obj["modified"].as_str() {
+            if let Some(modified) = obj.modified.as_deref() {
                 ui.label(t("obj_store.modified"));
                 ui.label(modified);
                 ui.end_row();
@@ -223,35 +217,29 @@ fn render_object_metadata(ui: &mut egui::Ui, obj: &serde_json::Value) {
         });
 }
 
-fn bucket_info_panel(ui: &mut egui::Ui, info: &serde_json::Value) {
+fn bucket_info_panel(ui: &mut egui::Ui, info: &ObjectStoreBucketInfo) {
     egui::Grid::new("objstore_info_grid")
         .num_columns(2)
         .spacing([12.0, 4.0])
         .show(ui, |ui| {
-            if let Some(bucket) = info["bucket"].as_str() {
-                ui.label(t("obj_store.bucket_name"));
-                ui.label(bucket);
-                ui.end_row();
-            }
-            if let Some(bytes) = info["bytes"].as_u64() {
-                ui.label(t("obj_store.total_bytes"));
-                ui.label(format_bytes(bytes));
-                ui.end_row();
-            }
-            if let Some(count) = info["values"].as_u64() {
-                ui.label(t("obj_store.object_count"));
-                ui.label(count.to_string());
-                ui.end_row();
-            }
-            if let Some(storage) = info["storage"].as_str() {
-                ui.label(t("common.storage_label"));
-                ui.label(storage);
-                ui.end_row();
-            }
-            if let Some(replicas) = info["replicas"].as_u64() {
-                ui.label(t("common.replicas"));
-                ui.label(replicas.to_string());
-                ui.end_row();
-            }
+            ui.label(t("obj_store.bucket_name"));
+            ui.label(&info.bucket);
+            ui.end_row();
+
+            ui.label(t("obj_store.total_bytes"));
+            ui.label(format_bytes(info.bytes));
+            ui.end_row();
+
+            ui.label(t("obj_store.object_count"));
+            ui.label(info.object_count.to_string());
+            ui.end_row();
+
+            ui.label(t("common.storage_label"));
+            ui.label(&info.storage);
+            ui.end_row();
+
+            ui.label(t("common.replicas"));
+            ui.label(info.num_replicas.to_string());
+            ui.end_row();
         });
 }

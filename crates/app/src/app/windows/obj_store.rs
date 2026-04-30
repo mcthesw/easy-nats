@@ -1,4 +1,5 @@
 use eframe::egui;
+use nats_backend::{BackendCommand, ObjectStoreBucketConfigInput, StorageKind};
 
 use crate::i18n::t;
 
@@ -108,36 +109,29 @@ fn save_obj_store_bucket(app: &mut EasyNatsApp) {
     if bucket.is_empty() {
         return;
     }
-    let storage = match app.obj_store_bucket_editor.storage {
-        StorageSelection::File => "file",
-        StorageSelection::Memory => "memory",
-    };
-
-    let mut config = serde_json::json!({
-        "bucket": bucket,
-        "storage": storage,
-    });
-
-    if let Ok(v) = app.obj_store_bucket_editor.max_bytes.trim().parse::<i64>() {
-        config["max_bytes"] = serde_json::json!(v);
-    }
-    if let Ok(v) = app
-        .obj_store_bucket_editor
-        .num_replicas
-        .trim()
-        .parse::<usize>()
-    {
-        config["num_replicas"] = serde_json::json!(v);
-    }
-    if !app.obj_store_bucket_editor.description.trim().is_empty() {
-        config["description"] = serde_json::json!(app.obj_store_bucket_editor.description.trim());
-    }
     let connection_id = app.obj_store_bucket_editor.connection_id;
 
-    app.backend
-        .send(nats_backend::BackendCommand::CreateObjectStoreBucket {
-            connection_id,
-            config,
-        });
+    app.backend.send(BackendCommand::CreateObjectStoreBucket {
+        connection_id,
+        config: ObjectStoreBucketConfigInput {
+            bucket,
+            storage: match app.obj_store_bucket_editor.storage {
+                StorageSelection::File => StorageKind::File,
+                StorageSelection::Memory => StorageKind::Memory,
+            },
+            max_bytes: parse_optional(&app.obj_store_bucket_editor.max_bytes),
+            num_replicas: parse_optional(&app.obj_store_bucket_editor.num_replicas),
+            description: trimmed_optional(&app.obj_store_bucket_editor.description),
+        },
+    });
     app.obj_store_bucket_editor.visible = false;
+}
+
+fn parse_optional<T: std::str::FromStr>(value: &str) -> Option<T> {
+    value.trim().parse::<T>().ok()
+}
+
+fn trimmed_optional(value: &str) -> Option<String> {
+    let value = value.trim();
+    (!value.is_empty()).then(|| value.to_string())
 }
