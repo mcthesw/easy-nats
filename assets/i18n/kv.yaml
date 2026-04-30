@@ -20,9 +20,12 @@ delete_bucket_confirm_prompt:
 bucket:
   en: "Bucket:"
   zh: "存储桶:"
-values:
-  en: "Values:"
-  zh: "键值对数:"
+current_keys:
+  en: "Current keys:"
+  zh: "当前键数:"
+values_stored:
+  en: "Values stored:"
+  zh: "历史消息数:"
 history_depth:
   en: "History depth:"
   zh: "历史深度:"
