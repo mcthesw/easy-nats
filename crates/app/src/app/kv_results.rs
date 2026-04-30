@@ -1,215 +1,222 @@
-use nats_backend::{BackendCommand, BackendOperation};
+use nats_backend::{
+    BackendCommand, BackendErrorContext, BackendOperation, KvBucketInfo, KvEntryInfo,
+    KvHistoryItem, KvKeyBatch,
+};
 
 use crate::tabs::TabKind;
 use crate::toast::ToastLevel;
 
-use super::{model::EasyNatsApp, util::decode_kv_value};
+use super::model::EasyNatsApp;
 
 impl EasyNatsApp {
-    pub(crate) fn apply_kv_operation(
+    pub(crate) fn apply_kv_buckets(&mut self, connection_id: u64, buckets: Vec<KvBucketInfo>) {
+        for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+            if let TabKind::KvBucket {
+                connection_id: cid,
+                bucket_name,
+                state,
+                ..
+            } = tab
+                && *cid == connection_id
+            {
+                state.info = buckets
+                    .iter()
+                    .find(|info| info.bucket == *bucket_name)
+                    .cloned();
+            }
+        }
+        self.kv_lists.insert(connection_id, buckets);
+    }
+
+    pub(crate) fn apply_kv_bucket_changed(
         &mut self,
         connection_id: u64,
         operation: BackendOperation,
-        data: &serde_json::Value,
-    ) -> bool {
-        match operation {
-            BackendOperation::ListKvBuckets => {
-                if let Some(arr) = data.as_array() {
-                    let infos = arr.clone();
-                    for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
-                        if let TabKind::KvBucket {
-                            connection_id: cid,
-                            bucket_name,
-                            state,
-                            ..
-                        } = tab
-                            && *cid == connection_id
-                        {
-                            state.info = infos
-                                .iter()
-                                .find(|i| i["bucket"].as_str() == Some(bucket_name.as_str()))
-                                .cloned();
-                        }
-                    }
-                    self.kv_lists.insert(connection_id, infos);
-                }
-                true
+        bucket: KvBucketInfo,
+    ) {
+        self.toasts
+            .push(ToastLevel::Success, format!("{operation} succeeded"));
+        upsert_kv_bucket(
+            self.kv_lists.entry(connection_id).or_default(),
+            bucket.clone(),
+        );
+        for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+            if let TabKind::KvBucket {
+                connection_id: cid,
+                bucket_name,
+                state,
+                ..
+            } = tab
+                && *cid == connection_id
+                && *bucket_name == bucket.bucket
+            {
+                state.info = Some(bucket.clone());
             }
-            BackendOperation::CreateKvBucket
-            | BackendOperation::DeleteKvBucket
-            | BackendOperation::UpdateKvBucket => {
-                self.toasts
-                    .push(ToastLevel::Success, format!("{operation} succeeded"));
-                if operation == BackendOperation::DeleteKvBucket
-                    && let Some(bucket) = data["bucket"].as_str()
-                {
-                    self.remove_tabs_matching(|tab| {
-                        matches!(tab, TabKind::KvBucket { connection_id: cid, bucket_name, .. }
-                            if *cid == connection_id && bucket_name == bucket)
-                    });
-                }
-                self.backend
-                    .send(BackendCommand::ListKvBuckets { connection_id });
-                true
-            }
-            BackendOperation::ListKvKeys => {
-                let bucket = data["bucket"].as_str().unwrap_or("").to_string();
-                let generation = data["generation"].as_u64().unwrap_or(0);
-                let done = data["done"].as_bool().unwrap_or(true);
-                let new_keys: Vec<String> = data["entries"]
-                    .as_array()
-                    .map(|arr| {
-                        arr.iter()
-                            .filter_map(|v| v["key"].as_str().map(str::to_owned))
-                            .collect()
-                    })
-                    .unwrap_or_default();
+        }
+        self.backend
+            .send(BackendCommand::ListKvBuckets { connection_id });
+    }
 
-                for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
-                    if let TabKind::KvBucket {
-                        connection_id: cid,
-                        bucket_name,
-                        state,
-                        ..
-                    } = tab
-                        && *cid == connection_id
-                        && *bucket_name == bucket
-                        && state.load_generation == generation
-                    {
-                        state.keys.extend(new_keys.clone());
-                        if !new_keys.is_empty() {
-                            state.search_generation = state.search_generation.wrapping_add(1);
-                        }
-                        if done {
-                            state.keys.sort();
-                            state.keys_complete = true;
-                            state.loading_entries = false;
-                            state.search_generation = state.search_generation.wrapping_add(1);
-                        }
-                    }
+    pub(crate) fn apply_kv_bucket_deleted(&mut self, connection_id: u64, bucket: String) {
+        self.toasts.push(
+            ToastLevel::Success,
+            format!("{} succeeded", BackendOperation::DeleteKvBucket),
+        );
+        if let Some(buckets) = self.kv_lists.get_mut(&connection_id) {
+            buckets.retain(|info| info.bucket != bucket);
+        }
+        self.remove_tabs_matching(|tab| {
+            matches!(tab, TabKind::KvBucket { connection_id: cid, bucket_name, .. }
+                if *cid == connection_id && bucket_name == &bucket)
+        });
+        self.backend
+            .send(BackendCommand::ListKvBuckets { connection_id });
+    }
+
+    pub(crate) fn apply_kv_key_batch(&mut self, connection_id: u64, batch: KvKeyBatch) {
+        for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+            if let TabKind::KvBucket {
+                connection_id: cid,
+                bucket_name,
+                state,
+                ..
+            } = tab
+                && *cid == connection_id
+                && *bucket_name == batch.bucket
+                && state.load_generation == batch.generation
+            {
+                state.keys.extend(batch.keys.clone());
+                if !batch.keys.is_empty() {
+                    state.search_generation = state.search_generation.wrapping_add(1);
                 }
-                true
-            }
-            BackendOperation::GetKvEntry => {
-                let bucket = data["bucket"].as_str().unwrap_or("").to_string();
-                let entry = data["entry"].clone();
-                let entry_key = entry["key"].as_str().unwrap_or("");
-                for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
-                    if let TabKind::KvBucket {
-                        connection_id: cid,
-                        bucket_name,
-                        state,
-                        ..
-                    } = tab
-                        && *cid == connection_id
-                        && *bucket_name == bucket
-                    {
-                        let entry_value = decode_kv_value(&entry);
-                        state
-                            .fetched_values
-                            .insert(entry_key.to_string(), entry_value.clone());
-                        state.search_generation = state.search_generation.wrapping_add(1);
-                        if state.value_search_pending.remove(entry_key) {
-                            state.value_search_scanning = state.value_search_pending.len();
-                        }
-                        if state.selected_key.as_deref() == Some(entry_key) {
-                            state.loading_entry = false;
-                            state.entry_key = entry_key.to_string();
-                            state.entry_value = entry_value;
-                            state.entry_revision = entry["revision"].as_u64();
-                            state.entry_operation = entry["operation"].as_str().map(str::to_owned);
-                            state.entry_created = entry["created"].as_str().map(str::to_owned);
-                        }
-                    }
+                if batch.done {
+                    state.keys.sort();
+                    state.keys_complete = true;
+                    state.loading_entries = false;
+                    state.search_generation = state.search_generation.wrapping_add(1);
                 }
-                true
             }
-            BackendOperation::GetKvHistory => {
-                let bucket = data["bucket"].as_str().unwrap_or("").to_string();
-                let key = data["key"].as_str().unwrap_or("");
-                let history = data["history"].as_array().cloned().unwrap_or_default();
-                for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
-                    if let TabKind::KvBucket {
-                        connection_id: cid,
-                        bucket_name,
-                        state,
-                        ..
-                    } = tab
-                        && *cid == connection_id
-                        && *bucket_name == bucket
-                        && state.selected_key.as_deref() == Some(key)
-                    {
-                        state.history = history.clone();
-                        state.loading_history = false;
-                    }
+        }
+    }
+
+    pub(crate) fn apply_kv_entry(&mut self, connection_id: u64, entry: KvEntryInfo) {
+        let entry_key = entry.key.as_str();
+        let entry_value = decode_kv_bytes(&entry.value);
+        for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+            if let TabKind::KvBucket {
+                connection_id: cid,
+                bucket_name,
+                state,
+                ..
+            } = tab
+                && *cid == connection_id
+                && *bucket_name == entry.bucket
+            {
+                state
+                    .fetched_values
+                    .insert(entry_key.to_string(), entry_value.clone());
+                state.search_generation = state.search_generation.wrapping_add(1);
+                if state.value_search_pending.remove(entry_key) {
+                    state.value_search_scanning = state.value_search_pending.len();
                 }
-                true
-            }
-            BackendOperation::PutKvEntry
-            | BackendOperation::DeleteKvEntry
-            | BackendOperation::PurgeKvEntry => {
-                let bucket = data["bucket"].as_str().unwrap_or("").to_string();
-                let key = data["key"].as_str().unwrap_or("").to_string();
-                let is_put = operation == BackendOperation::PutKvEntry;
-                self.toasts
-                    .push(ToastLevel::Success, format!("{operation} succeeded"));
-                if !bucket.is_empty() {
-                    let mut refresh_cancel = None;
-                    for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
-                        if let TabKind::KvBucket {
-                            connection_id: cid,
-                            bucket_name,
-                            state,
-                            guard,
-                            ..
-                        } = tab
-                            && *cid == connection_id
-                            && *bucket_name == bucket
-                        {
-                            let new_gen = crate::tabs::next_generation();
-                            state.loading_entries = true;
-                            state.load_generation = new_gen;
-                            state.keys.clear();
-                            state.fetched_values.clear();
-                            state.value_search_cursor = 0;
-                            state.value_search_scanning = 0;
-                            state.value_search_pending.clear();
-                            state.search_generation = state.search_generation.wrapping_add(1);
-                            state.keys_complete = false;
-                            if is_put && !key.is_empty() {
-                                state.selected_key = Some(key.clone());
-                                state.show_history = false;
-                            }
-                            if state.selected_key.as_deref() == Some(key.as_str()) {
-                                state.loading_history = true;
-                            }
-                            refresh_cancel = Some((guard.cancellation(), new_gen));
-                        }
-                    }
-                    if let Some((cancel, generation)) = refresh_cancel {
-                        self.backend.send(BackendCommand::ListKvKeys {
-                            connection_id,
-                            bucket: bucket.clone(),
-                            cancel,
-                            generation,
-                        });
-                    }
-                    if !key.is_empty() {
-                        self.backend.send(BackendCommand::GetKvEntry {
-                            connection_id,
-                            bucket: bucket.clone(),
-                            key: key.clone(),
-                        });
-                        self.backend.send(BackendCommand::GetKvHistory {
-                            connection_id,
-                            bucket,
-                            key,
-                        });
-                    }
+                if state.selected_key.as_deref() == Some(entry_key) {
+                    state.loading_entry = false;
+                    state.entry_key = entry_key.to_string();
+                    state.entry_value = entry_value.clone();
+                    state.entry_revision = entry.revision;
+                    state.entry_operation = entry.operation.clone();
+                    state.entry_created = entry.created.clone();
                 }
-                true
             }
-            _ => false,
+        }
+    }
+
+    pub(crate) fn apply_kv_history(
+        &mut self,
+        connection_id: u64,
+        bucket: String,
+        key: String,
+        history: Vec<KvHistoryItem>,
+    ) {
+        for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+            if let TabKind::KvBucket {
+                connection_id: cid,
+                bucket_name,
+                state,
+                ..
+            } = tab
+                && *cid == connection_id
+                && *bucket_name == bucket
+                && state.selected_key.as_deref() == Some(key.as_str())
+            {
+                state.history = history.clone();
+                state.loading_history = false;
+            }
+        }
+    }
+
+    pub(crate) fn apply_kv_entry_mutation(
+        &mut self,
+        connection_id: u64,
+        operation: BackendOperation,
+        bucket: String,
+        key: String,
+    ) {
+        let is_put = operation == BackendOperation::PutKvEntry;
+        self.toasts
+            .push(ToastLevel::Success, format!("{operation} succeeded"));
+
+        let mut refresh_cancel = None;
+        for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+            if let TabKind::KvBucket {
+                connection_id: cid,
+                bucket_name,
+                state,
+                guard,
+                ..
+            } = tab
+                && *cid == connection_id
+                && *bucket_name == bucket
+            {
+                let new_gen = crate::tabs::next_generation();
+                state.loading_entries = true;
+                state.load_generation = new_gen;
+                state.keys.clear();
+                state.fetched_values.clear();
+                state.value_search_cursor = 0;
+                state.value_search_scanning = 0;
+                state.value_search_pending.clear();
+                state.search_generation = state.search_generation.wrapping_add(1);
+                state.keys_complete = false;
+                if is_put && !key.is_empty() {
+                    state.selected_key = Some(key.clone());
+                    state.show_history = false;
+                }
+                if state.selected_key.as_deref() == Some(key.as_str()) {
+                    state.loading_history = true;
+                }
+                refresh_cancel = Some((guard.cancellation(), new_gen));
+            }
+        }
+        if let Some((cancel, generation)) = refresh_cancel {
+            self.backend.send(BackendCommand::ListKvKeys {
+                connection_id,
+                bucket: bucket.clone(),
+                cancel,
+                generation,
+            });
+        }
+        if !key.is_empty() {
+            self.backend.send(BackendCommand::GetKvEntry {
+                connection_id,
+                bucket: bucket.clone(),
+                key: key.clone(),
+            });
+            self.backend.send(BackendCommand::GetKvHistory {
+                connection_id,
+                bucket,
+                key,
+            });
         }
     }
 
@@ -217,7 +224,7 @@ impl EasyNatsApp {
         &mut self,
         connection_id: u64,
         operation: BackendOperation,
-        data: Option<&serde_json::Value>,
+        context: Option<&BackendErrorContext>,
     ) {
         match operation {
             BackendOperation::ListKvKeys => {
@@ -247,8 +254,12 @@ impl EasyNatsApp {
                 }
             }
             BackendOperation::GetKvEntry => {
-                let failed_bucket = data.and_then(|data| data["bucket"].as_str());
-                let failed_key = data.and_then(|data| data["key"].as_str());
+                let (failed_bucket, failed_key) = match context {
+                    Some(BackendErrorContext::KvEntry { bucket, key }) => {
+                        (Some(bucket.as_str()), Some(key.as_str()))
+                    }
+                    None => (None, None),
+                };
                 for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
                     if let TabKind::KvBucket {
                         connection_id: tab_cid,
@@ -282,12 +293,25 @@ impl EasyNatsApp {
     }
 }
 
+fn upsert_kv_bucket(buckets: &mut Vec<KvBucketInfo>, bucket: KvBucketInfo) {
+    if let Some(existing) = buckets.iter_mut().find(|info| info.bucket == bucket.bucket) {
+        *existing = bucket;
+    } else {
+        buckets.push(bucket);
+        buckets.sort_by(|a, b| a.bucket.cmp(&b.bucket));
+    }
+}
+
+fn decode_kv_bytes(value: &[u8]) -> String {
+    String::from_utf8_lossy(value).to_string()
+}
+
 #[cfg(test)]
 mod tests {
     use std::sync::{Arc, Mutex};
 
     use egui_dock::DockState;
-    use nats_backend::BackendOperation;
+    use nats_backend::{BackendErrorContext, BackendOperation};
     use tokio_util::sync::CancellationToken;
 
     use super::EasyNatsApp;
@@ -324,12 +348,12 @@ mod tests {
         };
         state.value_search_pending.insert("orders/1".to_string());
         let mut app = test_app_with_kv_tab(7, "ORDERS", state);
-        let data = serde_json::json!({
-            "bucket": "ORDERS",
-            "key": "orders/1"
-        });
+        let context = BackendErrorContext::KvEntry {
+            bucket: "ORDERS".to_string(),
+            key: "orders/1".to_string(),
+        };
 
-        app.clear_kv_loading_on_error(7, BackendOperation::GetKvEntry, Some(&data));
+        app.clear_kv_loading_on_error(7, BackendOperation::GetKvEntry, Some(&context));
 
         let (_, tab) = app
             .dock_state
@@ -353,12 +377,12 @@ mod tests {
         };
         state.value_search_pending.insert("orders/1".to_string());
         let mut app = test_app_with_kv_tab(7, "ORDERS", state);
-        let data = serde_json::json!({
-            "bucket": "ORDERS",
-            "key": "orders/1"
-        });
+        let context = BackendErrorContext::KvEntry {
+            bucket: "ORDERS".to_string(),
+            key: "orders/1".to_string(),
+        };
 
-        app.clear_kv_loading_on_error(7, BackendOperation::GetKvEntry, Some(&data));
+        app.clear_kv_loading_on_error(7, BackendOperation::GetKvEntry, Some(&context));
 
         let (_, tab) = app
             .dock_state
