@@ -4,6 +4,7 @@ use futures_util::TryStreamExt;
 use tokio::sync::mpsc;
 
 use crate::event::{BackendEvent, BackendOperation};
+use crate::models::{ObjectStoreDownloadResult, ObjectStoreObjectInfo};
 
 use super::super::state::WorkerState;
 
@@ -47,7 +48,7 @@ pub(crate) async fn handle_list_objects(
                 if info.deleted {
                     continue;
                 }
-                objects.push(obj_info_to_json(&info));
+                objects.push(ObjectStoreObjectInfo::from_info(&info));
             }
             Ok(None) => break,
             Err(e) => {
@@ -63,14 +64,14 @@ pub(crate) async fn handle_list_objects(
         }
     }
 
-    objects.sort_by(|a, b| a["name"].as_str().cmp(&b["name"].as_str()));
-    super::send_ok(
-        evt_tx,
-        connection_id,
-        BackendOperation::ListObjects,
-        serde_json::json!({ "bucket": bucket, "objects": objects }),
-    )
-    .await;
+    objects.sort_by(|a, b| a.name.cmp(&b.name));
+    let _ = evt_tx
+        .send(BackendEvent::ObjectStoreObjectsListed {
+            connection_id,
+            bucket,
+            objects,
+        })
+        .await;
 }
 
 pub(crate) async fn handle_upload_object(
@@ -96,13 +97,12 @@ pub(crate) async fn handle_upload_object(
     let mut cursor = tokio::io::BufReader::new(std::io::Cursor::new(data));
     match store.put(name.as_str(), &mut cursor).await {
         Ok(info) => {
-            super::send_ok(
-                evt_tx,
-                connection_id,
-                BackendOperation::UploadObject,
-                obj_info_to_json(&info),
-            )
-            .await
+            let _ = evt_tx
+                .send(BackendEvent::ObjectStoreObjectUploaded {
+                    connection_id,
+                    object: ObjectStoreObjectInfo::from_info(&info),
+                })
+                .await;
         }
         Err(e) => {
             super::send_err(
@@ -167,18 +167,17 @@ pub(crate) async fn handle_download_object(
 
     match tokio::io::copy(&mut object, &mut writer).await {
         Ok(bytes_written) => {
-            super::send_ok(
-                evt_tx,
-                connection_id,
-                BackendOperation::DownloadObject,
-                serde_json::json!({
-                    "bucket": bucket,
-                    "name": name,
-                    "file_path": file_path.to_string_lossy(),
-                    "size": bytes_written,
-                }),
-            )
-            .await;
+            let _ = evt_tx
+                .send(BackendEvent::ObjectStoreObjectDownloaded {
+                    connection_id,
+                    result: ObjectStoreDownloadResult {
+                        bucket,
+                        name,
+                        file_path: file_path.to_string_lossy().to_string(),
+                        size: bytes_written,
+                    },
+                })
+                .await;
         }
         Err(e) => {
             // Clean up partial file on failure
@@ -215,13 +214,13 @@ pub(crate) async fn handle_delete_object(
 
     match store.delete(&name).await {
         Ok(_) => {
-            super::send_ok(
-                evt_tx,
-                connection_id,
-                BackendOperation::DeleteObject,
-                serde_json::json!({ "bucket": bucket, "name": name }),
-            )
-            .await
+            let _ = evt_tx
+                .send(BackendEvent::ObjectStoreObjectDeleted {
+                    connection_id,
+                    bucket,
+                    name,
+                })
+                .await;
         }
         Err(e) => {
             super::send_err(
@@ -233,16 +232,4 @@ pub(crate) async fn handle_delete_object(
             .await
         }
     }
-}
-
-fn obj_info_to_json(info: &async_nats::jetstream::object_store::ObjectInfo) -> serde_json::Value {
-    serde_json::json!({
-        "name": info.name,
-        "description": info.description,
-        "size": info.size,
-        "chunks": info.chunks,
-        "modified": info.modified.map(|t| t.to_string()),
-        "digest": info.digest,
-        "bucket": info.bucket,
-    })
 }

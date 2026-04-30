@@ -2,8 +2,8 @@ use futures_util::TryStreamExt;
 use tokio::sync::mpsc;
 
 use crate::event::{BackendEvent, BackendOperation};
+use crate::models::{KvBucketConfigInput, KvBucketInfo};
 
-use super::super::helpers::kv_status_to_json;
 use super::super::state::WorkerState;
 
 pub(crate) async fn handle_list_buckets(
@@ -32,7 +32,7 @@ pub(crate) async fn handle_list_buckets(
                 };
                 match js.get_key_value(bucket_name).await {
                     Ok(store) => match store.status().await {
-                        Ok(status) => buckets.push(kv_status_to_json(&status)),
+                        Ok(status) => buckets.push(KvBucketInfo::from_status(&status)),
                         Err(e) => {
                             tracing::warn!(bucket = bucket_name, %e, "Error loading KV status")
                         }
@@ -53,20 +53,19 @@ pub(crate) async fn handle_list_buckets(
             }
         }
     }
-    buckets.sort_by(|a, b| a["bucket"].as_str().cmp(&b["bucket"].as_str()));
-    super::send_ok(
-        evt_tx,
-        connection_id,
-        BackendOperation::ListKvBuckets,
-        serde_json::Value::Array(buckets),
-    )
-    .await;
+    buckets.sort_by(|a, b| a.bucket.cmp(&b.bucket));
+    let _ = evt_tx
+        .send(BackendEvent::KvBucketsListed {
+            connection_id,
+            buckets,
+        })
+        .await;
 }
 
 pub(crate) async fn handle_create_bucket(
     state: &WorkerState,
     connection_id: u64,
-    config: serde_json::Value,
+    config: KvBucketConfigInput,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(js) = super::jetstream(
@@ -80,8 +79,7 @@ pub(crate) async fn handle_create_bucket(
         return;
     };
 
-    let bucket = config["bucket"].as_str().unwrap_or("").trim().to_string();
-    if bucket.is_empty() {
+    if config.bucket.trim().is_empty() {
         super::send_err(
             evt_tx,
             connection_id,
@@ -92,38 +90,15 @@ pub(crate) async fn handle_create_bucket(
         return;
     }
 
-    let storage = match config["storage"].as_str() {
-        Some("memory") | Some("Memory") => async_nats::jetstream::stream::StorageType::Memory,
-        _ => async_nats::jetstream::stream::StorageType::File,
-    };
-
-    let mut bucket_config = async_nats::jetstream::kv::Config {
-        bucket,
-        history: config["history"].as_i64().unwrap_or(1),
-        storage,
-        description: config["description"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string(),
-        max_value_size: config["max_value_size"].as_i64().unwrap_or_default() as i32,
-        max_bytes: config["max_bytes"].as_i64().unwrap_or_default(),
-        num_replicas: config["num_replicas"].as_u64().unwrap_or(1) as usize,
-        ..Default::default()
-    };
-    if let Some(max_age) = config["max_age"].as_u64() {
-        bucket_config.max_age = std::time::Duration::from_nanos(max_age);
-    }
-
-    match js.create_key_value(bucket_config).await {
+    match js.create_key_value(config.into_async_nats()).await {
         Ok(store) => match store.status().await {
             Ok(status) => {
-                super::send_ok(
-                    evt_tx,
-                    connection_id,
-                    BackendOperation::CreateKvBucket,
-                    kv_status_to_json(&status),
-                )
-                .await
+                let _ = evt_tx
+                    .send(BackendEvent::KvBucketCreated {
+                        connection_id,
+                        bucket: KvBucketInfo::from_status(&status),
+                    })
+                    .await;
             }
             Err(e) => {
                 super::send_err(
@@ -166,13 +141,12 @@ pub(crate) async fn handle_delete_bucket(
 
     match js.delete_key_value(&bucket).await {
         Ok(_) => {
-            super::send_ok(
-                evt_tx,
-                connection_id,
-                BackendOperation::DeleteKvBucket,
-                serde_json::json!({ "bucket": bucket }),
-            )
-            .await
+            let _ = evt_tx
+                .send(BackendEvent::KvBucketDeleted {
+                    connection_id,
+                    bucket,
+                })
+                .await;
         }
         Err(e) => {
             super::send_err(
@@ -189,7 +163,7 @@ pub(crate) async fn handle_delete_bucket(
 pub(crate) async fn handle_update_bucket(
     state: &WorkerState,
     connection_id: u64,
-    config: serde_json::Value,
+    config: KvBucketConfigInput,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(js) = super::jetstream(
@@ -203,8 +177,7 @@ pub(crate) async fn handle_update_bucket(
         return;
     };
 
-    let bucket = config["bucket"].as_str().unwrap_or("").trim().to_string();
-    if bucket.is_empty() {
+    if config.bucket.trim().is_empty() {
         super::send_err(
             evt_tx,
             connection_id,
@@ -215,38 +188,15 @@ pub(crate) async fn handle_update_bucket(
         return;
     }
 
-    let storage = match config["storage"].as_str() {
-        Some("memory") | Some("Memory") => async_nats::jetstream::stream::StorageType::Memory,
-        _ => async_nats::jetstream::stream::StorageType::File,
-    };
-
-    let mut bucket_config = async_nats::jetstream::kv::Config {
-        bucket,
-        history: config["history"].as_i64().unwrap_or(1),
-        storage,
-        description: config["description"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string(),
-        max_value_size: config["max_value_size"].as_i64().unwrap_or_default() as i32,
-        max_bytes: config["max_bytes"].as_i64().unwrap_or_default(),
-        num_replicas: config["num_replicas"].as_u64().unwrap_or(1) as usize,
-        ..Default::default()
-    };
-    if let Some(max_age) = config["max_age"].as_u64() {
-        bucket_config.max_age = std::time::Duration::from_nanos(max_age);
-    }
-
-    match js.update_key_value(bucket_config).await {
+    match js.update_key_value(config.into_async_nats()).await {
         Ok(store) => match store.status().await {
             Ok(status) => {
-                super::send_ok(
-                    evt_tx,
-                    connection_id,
-                    BackendOperation::UpdateKvBucket,
-                    kv_status_to_json(&status),
-                )
-                .await
+                let _ = evt_tx
+                    .send(BackendEvent::KvBucketUpdated {
+                        connection_id,
+                        bucket: KvBucketInfo::from_status(&status),
+                    })
+                    .await;
             }
             Err(e) => {
                 super::send_err(

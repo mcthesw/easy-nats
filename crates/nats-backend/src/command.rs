@@ -1,5 +1,8 @@
 use crate::cancellation::TaskCancellation;
 use crate::connection::ConnectionConfig;
+use crate::models::{
+    ConsumerConfigInput, KvBucketConfigInput, ObjectStoreBucketConfigInput, StreamConfigInput,
+};
 
 /// Commands sent from the UI thread to the async backend worker.
 #[derive(Debug)]
@@ -43,11 +46,11 @@ pub enum BackendCommand {
     },
     CreateStream {
         connection_id: u64,
-        config: serde_json::Value,
+        config: StreamConfigInput,
     },
     UpdateStream {
         connection_id: u64,
-        config: serde_json::Value,
+        config: StreamConfigInput,
     },
     DeleteStream {
         connection_id: u64,
@@ -78,7 +81,7 @@ pub enum BackendCommand {
     CreateConsumer {
         connection_id: u64,
         stream: String,
-        config: serde_json::Value,
+        config: ConsumerConfigInput,
     },
     DeleteConsumer {
         connection_id: u64,
@@ -88,7 +91,7 @@ pub enum BackendCommand {
     UpdateConsumer {
         connection_id: u64,
         stream: String,
-        config: serde_json::Value,
+        config: ConsumerConfigInput,
     },
     FetchConsumerMessages {
         connection_id: u64,
@@ -102,7 +105,7 @@ pub enum BackendCommand {
     },
     CreateKvBucket {
         connection_id: u64,
-        config: serde_json::Value,
+        config: KvBucketConfigInput,
     },
     DeleteKvBucket {
         connection_id: u64,
@@ -110,7 +113,7 @@ pub enum BackendCommand {
     },
     UpdateKvBucket {
         connection_id: u64,
-        config: serde_json::Value,
+        config: KvBucketConfigInput,
     },
     ListKvKeys {
         connection_id: u64,
@@ -150,7 +153,7 @@ pub enum BackendCommand {
     },
     CreateObjectStoreBucket {
         connection_id: u64,
-        config: serde_json::Value,
+        config: ObjectStoreBucketConfigInput,
     },
     DeleteObjectStoreBucket {
         connection_id: u64,
