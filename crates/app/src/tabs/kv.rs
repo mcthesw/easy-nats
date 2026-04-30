@@ -1,5 +1,5 @@
 use eframe::egui;
-use nats_backend::{BackendCommand, BackendHandle};
+use nats_backend::{BackendCommand, BackendHandle, KvBucketInfo, KvHistoryItem};
 
 use crate::format;
 use crate::i18n::t;
@@ -7,8 +7,8 @@ use crate::schema::{MessageSchemaManager, kv_subject};
 use crate::tabs::guard::TabGuard;
 
 use super::common::{
-    KV_VALUE_SEARCH_BATCH, SearchStatus, auto_refresh_ui, decode_base64_payload, format_bytes,
-    matches_query, render_search_row, searchable_json_payload,
+    KV_VALUE_SEARCH_BATCH, SearchStatus, auto_refresh_ui, format_bytes, matches_query,
+    render_search_row,
 };
 use super::types::{KvBucketState, TabAction};
 
@@ -30,7 +30,7 @@ pub fn kv_bucket_ui(
         {
             actions.push(TabAction::OpenKvBucketEdit {
                 connection_id,
-                bucket_json: info.clone(),
+                bucket_info: info.clone(),
             });
         }
         if ui.button(t("kv.delete_bucket")).clicked() {
@@ -72,7 +72,7 @@ pub fn kv_bucket_ui(
         egui::CollapsingHeader::new(t("kv.bucket_info"))
             .id_salt(("kv_bucket_info", connection_id, bucket_name))
             .default_open(false)
-            .show(ui, |ui| kv_bucket_info_panel(ui, info));
+            .show(ui, |ui| kv_bucket_info_panel(ui, info, state));
     }
     ui.separator();
 
@@ -311,7 +311,7 @@ fn filtered_keys(state: &KvBucketState) -> Vec<String> {
                 && state
                     .history
                     .iter()
-                    .any(|item| matches_query(&searchable_json_payload(item), &query));
+                    .any(|item| matches_query(&searchable_kv_history_item(item), &query));
             key_matches || fetched_value_matches || history_matches
         })
         .cloned()
@@ -541,18 +541,17 @@ fn render_history(
             .max_height(220.0)
             .show(ui, |ui| {
                 for item in &state.history {
-                    let revision = item["revision"].as_u64().unwrap_or(0);
-                    let operation = item["operation"].as_str().unwrap_or(t("kv.none"));
-                    let created = item["created"].as_str().unwrap_or("");
+                    let revision = item.revision;
+                    let operation = item.operation.as_str();
+                    let created = item.created.as_str();
                     egui::CollapsingHeader::new(format!("r{revision} — {operation} — {created}"))
                         .id_salt(("kv_history_item", connection_id, bucket_name, revision))
                         .show(ui, |ui| {
-                            let payload = decode_base64_payload(item["value_base64"].as_str());
                             let subject =
                                 kv_subject(bucket_name, &normalized_entry_key(&state.entry_key));
                             format::render_payload_with_schema(
                                 ui,
-                                &payload,
+                                &item.value,
                                 state.history_format,
                                 "kv_history_proto",
                                 &mut state.history_proto_view,
@@ -597,26 +596,30 @@ fn render_generate_json_button(
     }
 }
 
-fn kv_bucket_info_panel(ui: &mut egui::Ui, info: &serde_json::Value) {
+fn current_kv_count_text(state: &KvBucketState) -> String {
+    let suffix = if state.keys_complete { "" } else { "+" };
+    format!("{}{}", state.keys.len(), suffix)
+}
+
+fn searchable_kv_history_item(item: &KvHistoryItem) -> String {
+    String::from_utf8_lossy(&item.value).into_owned()
+}
+
+fn kv_bucket_info_panel(ui: &mut egui::Ui, info: &KvBucketInfo, state: &KvBucketState) {
     egui::Grid::new("kv_bucket_info_grid")
         .num_columns(2)
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
             for (label, value) in [
-                (t("kv.bucket"), info["bucket"].as_str().map(str::to_owned)),
+                (t("kv.bucket"), Some(info.bucket.clone())),
+                (t("kv.current_keys"), Some(current_kv_count_text(state))),
                 (
-                    t("kv.values"),
-                    Some(info["values"].as_u64().unwrap_or(0).to_string()),
+                    t("kv.values_stored"),
+                    Some(info.stored_history_values.to_string()),
                 ),
-                (
-                    t("kv.history_depth"),
-                    Some(info["history"].as_i64().unwrap_or(0).to_string()),
-                ),
-                (t("kv.storage"), info["storage"].as_str().map(str::to_owned)),
-                (
-                    t("kv.bytes"),
-                    Some(format_bytes(info["bytes"].as_u64().unwrap_or(0))),
-                ),
+                (t("kv.history_depth"), Some(info.history_depth.to_string())),
+                (t("kv.storage"), Some(info.storage.clone())),
+                (t("kv.bytes"), Some(format_bytes(info.bytes))),
             ] {
                 ui.label(label);
                 ui.label(value.unwrap_or_default());
@@ -651,6 +654,18 @@ mod tests {
         state.value_search_cursor = 100;
         assert_eq!(state.value_search_cursor, 100);
         assert_eq!(state.keys.len(), 150);
+    }
+
+    #[test]
+    fn current_kv_count_marks_incomplete_key_lists() {
+        let mut state = KvBucketState {
+            keys: vec!["a".to_string(), "b".to_string()],
+            ..Default::default()
+        };
+        assert_eq!(current_kv_count_text(&state), "2+");
+
+        state.keys_complete = true;
+        assert_eq!(current_kv_count_text(&state), "2");
     }
 
     #[test]

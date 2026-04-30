@@ -1,14 +1,4 @@
-use base64::Engine;
-
 use crate::tabs::TabKind;
-
-pub(crate) fn decode_kv_value(entry: &serde_json::Value) -> String {
-    entry["value_base64"]
-        .as_str()
-        .and_then(|value| base64::engine::general_purpose::STANDARD.decode(value).ok())
-        .map(|bytes| String::from_utf8_lossy(&bytes).to_string())
-        .unwrap_or_default()
-}
 
 pub(crate) fn same_tab(a: &TabKind, b: &TabKind) -> bool {
     match (a, b) {
