@@ -1,5 +1,11 @@
+use std::time::Duration;
+
 use eframe::egui;
-use nats_backend::{AuthMethod, BackendCommand, ConnectionConfig, MonitoringConfig};
+use nats_backend::{
+    AuthMethod, BackendCommand, ConnectionConfig, ConsumerAckPolicyKind, ConsumerConfigInput,
+    ConsumerDeliverPolicyKind, KvBucketConfigInput, MonitoringConfig, StorageKind,
+    StreamConfigInput, StreamRetentionKind,
+};
 use tokio_util::sync::CancellationToken;
 
 use crate::schema::kv_subject;
@@ -303,42 +309,19 @@ impl EasyNatsApp {
             .filter(|s| !s.is_empty())
             .collect();
 
-        let storage = match self.stream_editor.storage {
-            super::editors::StorageSelection::File => "file",
-            super::editors::StorageSelection::Memory => "memory",
-        };
-        let retention = match self.stream_editor.retention {
-            super::editors::RetentionSelection::Limits => "limits",
-            super::editors::RetentionSelection::Interest => "interest",
-            super::editors::RetentionSelection::WorkQueue => "workqueue",
-        };
-
-        let mut config = serde_json::json!({
-            "name": self.stream_editor.name.trim(),
-            "subjects": subjects,
-            "storage": storage,
-            "retention": retention,
-        });
-
-        if let Ok(v) = self.stream_editor.max_messages.parse::<i64>() {
-            config["max_msgs"] = serde_json::json!(v);
-        }
-        if let Ok(v) = self.stream_editor.max_bytes.parse::<i64>() {
-            config["max_bytes"] = serde_json::json!(v);
-        }
-        if let Ok(secs) = self.stream_editor.max_age_secs.parse::<u64>() {
-            config["max_age"] = serde_json::json!(secs * 1_000_000_000_u64);
-        }
-        if let Ok(v) = self.stream_editor.num_replicas.parse::<usize>() {
-            config["num_replicas"] = serde_json::json!(v);
-        }
-        if !self.stream_editor.description.trim().is_empty() {
-            config["description"] = serde_json::json!(self.stream_editor.description.trim());
-        }
-
         self.backend.send(BackendCommand::CreateStream {
             connection_id: self.stream_editor.connection_id,
-            config,
+            config: StreamConfigInput {
+                name: self.stream_editor.name.trim().to_string(),
+                subjects,
+                storage: storage_kind(self.stream_editor.storage),
+                retention: retention_kind(self.stream_editor.retention),
+                max_messages: parse_optional(&self.stream_editor.max_messages),
+                max_bytes: parse_optional(&self.stream_editor.max_bytes),
+                max_age: parse_seconds(&self.stream_editor.max_age_secs),
+                num_replicas: parse_optional(&self.stream_editor.num_replicas),
+                description: trimmed_optional(&self.stream_editor.description),
+            },
         });
         self.stream_editor.visible = false;
     }
@@ -366,117 +349,75 @@ impl EasyNatsApp {
     }
 
     pub(crate) fn save_consumer_editor(&mut self) {
-        let mut config = serde_json::json!({
-            "name": self.consumer_editor.name.trim(),
-            "deliver_policy": self.consumer_editor.deliver_policy.as_wire(),
-            "ack_policy": self.consumer_editor.ack_policy.as_wire(),
-        });
-
-        if self.consumer_editor.durable {
-            config["durable_name"] = serde_json::json!(self.consumer_editor.name.trim());
-        }
-        if !self.consumer_editor.filter_subject.trim().is_empty() {
-            config["filter_subject"] =
-                serde_json::json!(self.consumer_editor.filter_subject.trim());
-        }
-        if let Ok(v) = self.consumer_editor.max_deliver.parse::<i64>() {
-            config["max_deliver"] = serde_json::json!(v);
-        }
-        if let Ok(v) = self.consumer_editor.max_ack_pending.parse::<i64>() {
-            config["max_ack_pending"] = serde_json::json!(v);
-        }
-        if !self.consumer_editor.description.trim().is_empty() {
-            config["description"] = serde_json::json!(self.consumer_editor.description.trim());
-        }
-
+        let name = self.consumer_editor.name.trim().to_string();
         self.backend.send(BackendCommand::CreateConsumer {
             connection_id: self.consumer_editor.connection_id,
             stream: self.consumer_editor.stream_name.clone(),
-            config,
+            config: ConsumerConfigInput {
+                name: name.clone(),
+                durable_name: self.consumer_editor.durable.then_some(name),
+                filter_subject: trimmed_optional(&self.consumer_editor.filter_subject),
+                deliver_policy: deliver_policy_kind(self.consumer_editor.deliver_policy),
+                ack_policy: ack_policy_kind(self.consumer_editor.ack_policy),
+                max_deliver: parse_optional(&self.consumer_editor.max_deliver),
+                max_ack_pending: parse_optional(&self.consumer_editor.max_ack_pending),
+                description: trimmed_optional(&self.consumer_editor.description),
+            },
         });
         self.consumer_editor.visible = false;
     }
 
     pub(crate) fn save_kv_bucket_editor(&mut self) {
-        let storage = match self.kv_bucket_editor.storage {
-            super::editors::StorageSelection::File => "file",
-            super::editors::StorageSelection::Memory => "memory",
-        };
-
-        let mut config = serde_json::json!({
-            "bucket": self.kv_bucket_editor.bucket.trim(),
-            "history": self.kv_bucket_editor.history.parse::<i64>().unwrap_or(1),
-            "storage": storage,
-        });
-
-        if let Ok(v) = self.kv_bucket_editor.max_value_size.parse::<i32>() {
-            config["max_value_size"] = serde_json::json!(v);
-        }
-        if let Ok(v) = self.kv_bucket_editor.max_bytes.parse::<i64>() {
-            config["max_bytes"] = serde_json::json!(v);
-        }
-        if let Ok(secs) = self.kv_bucket_editor.max_age_secs.parse::<u64>() {
-            config["max_age"] = serde_json::json!(secs * 1_000_000_000_u64);
-        }
-        if let Ok(v) = self.kv_bucket_editor.num_replicas.parse::<usize>() {
-            config["num_replicas"] = serde_json::json!(v);
-        }
-        if !self.kv_bucket_editor.description.trim().is_empty() {
-            config["description"] = serde_json::json!(self.kv_bucket_editor.description.trim());
-        }
-
         self.backend.send(BackendCommand::CreateKvBucket {
             connection_id: self.kv_bucket_editor.connection_id,
-            config,
+            config: KvBucketConfigInput {
+                bucket: self.kv_bucket_editor.bucket.trim().to_string(),
+                history: self.kv_bucket_editor.history.parse::<i64>().unwrap_or(1),
+                storage: storage_kind(self.kv_bucket_editor.storage),
+                max_value_size: parse_optional(&self.kv_bucket_editor.max_value_size),
+                max_bytes: parse_optional(&self.kv_bucket_editor.max_bytes),
+                max_age: parse_seconds(&self.kv_bucket_editor.max_age_secs),
+                num_replicas: parse_optional(&self.kv_bucket_editor.num_replicas),
+                description: trimmed_optional(&self.kv_bucket_editor.description),
+            },
         });
         self.kv_bucket_editor.visible = false;
     }
 
     pub(crate) fn save_consumer_edit_editor(&mut self) {
-        let mut config = self.consumer_edit_editor.original_config["config"].clone();
-        config["description"] = serde_json::json!(self.consumer_edit_editor.description.trim());
-        if let Ok(v) = self.consumer_edit_editor.max_deliver.parse::<i64>() {
-            config["max_deliver"] = serde_json::json!(v);
-        }
-        if let Ok(v) = self.consumer_edit_editor.max_ack_pending.parse::<i64>() {
-            config["max_ack_pending"] = serde_json::json!(v);
-        }
-
+        let original = &self.consumer_edit_editor.original_config;
         self.backend.send(BackendCommand::UpdateConsumer {
             connection_id: self.consumer_edit_editor.connection_id,
             stream: self.consumer_edit_editor.stream_name.clone(),
-            config,
+            config: ConsumerConfigInput {
+                name: original.name.clone(),
+                durable_name: original.durable_name.clone(),
+                filter_subject: original.filter_subject.clone(),
+                deliver_policy: original.deliver_policy,
+                ack_policy: original.ack_policy,
+                max_deliver: parse_optional(&self.consumer_edit_editor.max_deliver),
+                max_ack_pending: parse_optional(&self.consumer_edit_editor.max_ack_pending),
+                description: trimmed_optional(&self.consumer_edit_editor.description),
+            },
         });
         self.consumer_edit_editor.visible = false;
     }
 
     pub(crate) fn save_kv_bucket_edit_editor(&mut self) {
         let ed = &self.kv_bucket_edit_editor;
-        let mut config = serde_json::json!({
-            "bucket": ed.bucket,
-            "history": ed.history.parse::<i64>().unwrap_or(1),
-        });
-
-        if let Ok(v) = ed.max_value_size.parse::<i32>() {
-            config["max_value_size"] = serde_json::json!(v);
-        }
-        if let Ok(v) = ed.max_bytes.parse::<i64>() {
-            config["max_bytes"] = serde_json::json!(v);
-        }
-        if let Ok(secs) = ed.max_age_secs.parse::<u64>() {
-            config["max_age"] = serde_json::json!(secs * 1_000_000_000_u64);
-        }
-        if let Ok(v) = ed.num_replicas.parse::<usize>() {
-            config["num_replicas"] = serde_json::json!(v);
-        }
-        if !ed.description.trim().is_empty() {
-            config["description"] = serde_json::json!(ed.description.trim());
-        }
-
         let connection_id = ed.connection_id;
         self.backend.send(BackendCommand::UpdateKvBucket {
             connection_id,
-            config,
+            config: KvBucketConfigInput {
+                bucket: ed.bucket.clone(),
+                history: ed.history.parse::<i64>().unwrap_or(1),
+                storage: ed.storage,
+                max_value_size: parse_optional(&ed.max_value_size),
+                max_bytes: parse_optional(&ed.max_bytes),
+                max_age: parse_seconds(&ed.max_age_secs),
+                num_replicas: parse_optional(&ed.num_replicas),
+                description: trimmed_optional(&ed.description),
+            },
         });
         self.kv_bucket_edit_editor.visible = false;
     }
@@ -675,6 +616,52 @@ fn collect_non_empty_headers(headers: &[(String, String)]) -> Option<Vec<(String
     }
 }
 
+fn parse_optional<T: std::str::FromStr>(value: &str) -> Option<T> {
+    value.trim().parse::<T>().ok()
+}
+
+fn parse_seconds(value: &str) -> Option<Duration> {
+    parse_optional::<u64>(value).map(Duration::from_secs)
+}
+
+fn trimmed_optional(value: &str) -> Option<String> {
+    let value = value.trim();
+    (!value.is_empty()).then(|| value.to_string())
+}
+
+fn storage_kind(selection: super::editors::StorageSelection) -> StorageKind {
+    match selection {
+        super::editors::StorageSelection::File => StorageKind::File,
+        super::editors::StorageSelection::Memory => StorageKind::Memory,
+    }
+}
+
+fn retention_kind(selection: super::editors::RetentionSelection) -> StreamRetentionKind {
+    match selection {
+        super::editors::RetentionSelection::Limits => StreamRetentionKind::Limits,
+        super::editors::RetentionSelection::Interest => StreamRetentionKind::Interest,
+        super::editors::RetentionSelection::WorkQueue => StreamRetentionKind::WorkQueue,
+    }
+}
+
+fn deliver_policy_kind(
+    selection: super::editors::DeliverPolicySelection,
+) -> ConsumerDeliverPolicyKind {
+    match selection {
+        super::editors::DeliverPolicySelection::All => ConsumerDeliverPolicyKind::All,
+        super::editors::DeliverPolicySelection::Last => ConsumerDeliverPolicyKind::Last,
+        super::editors::DeliverPolicySelection::New => ConsumerDeliverPolicyKind::New,
+    }
+}
+
+fn ack_policy_kind(selection: super::editors::AckPolicySelection) -> ConsumerAckPolicyKind {
+    match selection {
+        super::editors::AckPolicySelection::Explicit => ConsumerAckPolicyKind::Explicit,
+        super::editors::AckPolicySelection::All => ConsumerAckPolicyKind::All,
+        super::editors::AckPolicySelection::None => ConsumerAckPolicyKind::None,
+    }
+}
+
 fn matches_pubsub_tab(tab: &TabKind, connection_id: u64, tab_kind: PubSubTabKind) -> bool {
     match (tab_kind, tab) {
         (
@@ -696,115 +683,4 @@ fn matches_pubsub_tab(tab: &TabKind, connection_id: u64, tab_kind: PubSubTabKind
 }
 
 #[cfg(test)]
-mod tests {
-    use std::sync::{Arc, Mutex};
-
-    use nats_backend::{AuthMethod, ConnectionConfig, MonitoringConfig};
-
-    use super::EasyNatsApp;
-    use crate::log_layer::LogBuffer;
-    use crate::settings::{AppSettings, PubSubTabMode};
-    use crate::tabs::TabKind;
-    use crate::theme::ThemeId;
-
-    fn test_app(mode: PubSubTabMode) -> EasyNatsApp {
-        EasyNatsApp::new(
-            AppSettings {
-                pubsub_tab_mode: mode,
-                ..Default::default()
-            },
-            ThemeId::EguiDark,
-            Arc::new(Mutex::new(LogBuffer::default())),
-        )
-    }
-
-    fn push_metrics_connection(app: &mut EasyNatsApp, connection_id: u64) {
-        app.config.connections.push(ConnectionConfig {
-            id: connection_id,
-            name: "local".to_string(),
-            urls: vec!["nats://localhost:4222".to_string()],
-            auth: AuthMethod::None,
-            tls_enabled: false,
-            tls_first: false,
-            monitoring: Some(MonitoringConfig {
-                endpoint: "http://localhost:8222".to_string(),
-            }),
-        });
-    }
-
-    fn count_publisher_tabs(app: &EasyNatsApp, connection_id: u64) -> usize {
-        app.dock_state
-            .iter_all_tabs()
-            .filter(|(_, tab)| {
-                matches!(
-                    tab,
-                    TabKind::Publisher {
-                        connection_id: existing_id,
-                        ..
-                    } if *existing_id == connection_id
-                )
-            })
-            .count()
-    }
-
-    fn count_subscriber_tabs(app: &EasyNatsApp, connection_id: u64) -> usize {
-        app.dock_state
-            .iter_all_tabs()
-            .filter(|(_, tab)| {
-                matches!(
-                    tab,
-                    TabKind::Subscriber {
-                        connection_id: existing_id,
-                        ..
-                    } if *existing_id == connection_id
-                )
-            })
-            .count()
-    }
-
-    fn count_metrics_tabs(app: &EasyNatsApp, connection_id: u64) -> usize {
-        app.dock_state
-            .iter_all_tabs()
-            .filter(|(_, tab)| {
-                matches!(
-                    tab,
-                    TabKind::Metrics {
-                        connection_id: existing_id,
-                        ..
-                    } if *existing_id == connection_id
-                )
-            })
-            .count()
-    }
-
-    #[test]
-    fn publisher_reuses_existing_tab_when_configured() {
-        let mut app = test_app(PubSubTabMode::ReuseExisting);
-
-        app.open_or_focus_publisher_tab(7);
-        app.open_or_focus_publisher_tab(7);
-
-        assert_eq!(count_publisher_tabs(&app, 7), 1);
-    }
-
-    #[test]
-    fn subscriber_opens_new_tabs_by_default() {
-        let mut app = test_app(PubSubTabMode::NewTab);
-
-        app.open_or_focus_subscriber_tab(7);
-        app.open_or_focus_subscriber_tab(7);
-
-        assert_eq!(count_subscriber_tabs(&app, 7), 2);
-    }
-
-    #[test]
-    fn metrics_tab_focuses_existing_tab_for_same_connection() {
-        let mut app = test_app(PubSubTabMode::NewTab);
-        push_metrics_connection(&mut app, 7);
-
-        app.open_or_focus_metrics_tab(7);
-        app.open_or_focus_metrics_tab(7);
-
-        assert_eq!(count_metrics_tabs(&app, 7), 1);
-    }
-}
+mod tests;

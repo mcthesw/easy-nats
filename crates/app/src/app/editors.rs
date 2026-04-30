@@ -1,4 +1,7 @@
 use crate::i18n::t;
+use nats_backend::{
+    ConsumerAckPolicyKind, ConsumerDeliverPolicyKind, ConsumerInfo, KvBucketInfo, StorageKind,
+};
 
 #[derive(Default)]
 pub(crate) struct ConnectionEditor {
@@ -185,14 +188,6 @@ impl DeliverPolicySelection {
             Self::New => t("consumer.policy_new"),
         }
     }
-
-    pub(crate) fn as_wire(self) -> &'static str {
-        match self {
-            Self::All => "All",
-            Self::Last => "Last",
-            Self::New => "New",
-        }
-    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -208,14 +203,6 @@ impl AckPolicySelection {
             Self::Explicit => t("consumer.ack_explicit"),
             Self::All => t("consumer.ack_all"),
             Self::None => t("consumer.ack_none"),
-        }
-    }
-
-    pub(crate) fn as_wire(self) -> &'static str {
-        match self {
-            Self::Explicit => "Explicit",
-            Self::All => "All",
-            Self::None => "None",
         }
     }
 }
@@ -254,6 +241,7 @@ impl RetentionSelection {
     }
 }
 
+#[derive(Default)]
 pub(crate) struct ConsumerEditEditor {
     pub(crate) visible: bool,
     pub(crate) connection_id: u64,
@@ -262,57 +250,39 @@ pub(crate) struct ConsumerEditEditor {
     pub(crate) description: String,
     pub(crate) max_deliver: String,
     pub(crate) max_ack_pending: String,
-    /// Full original config JSON, used as base for update
-    pub(crate) original_config: serde_json::Value,
+    pub(crate) original_config: ConsumerEditableConfig,
 }
 
-impl Default for ConsumerEditEditor {
-    fn default() -> Self {
-        Self {
-            visible: false,
-            connection_id: 0,
-            stream_name: String::new(),
-            consumer_name: String::new(),
-            description: String::new(),
-            max_deliver: String::new(),
-            max_ack_pending: String::new(),
-            original_config: serde_json::Value::Null,
-        }
-    }
+#[derive(Default, Debug, Clone)]
+pub(crate) struct ConsumerEditableConfig {
+    pub(crate) name: String,
+    pub(crate) durable_name: Option<String>,
+    pub(crate) filter_subject: Option<String>,
+    pub(crate) deliver_policy: ConsumerDeliverPolicyKind,
+    pub(crate) ack_policy: ConsumerAckPolicyKind,
 }
 
 impl ConsumerEditEditor {
-    pub(crate) fn from_json(
-        connection_id: u64,
-        stream_name: String,
-        json: &serde_json::Value,
-    ) -> Self {
-        let name = json["config"]["name"]
-            .as_str()
-            .or_else(|| json["config"]["durable_name"].as_str())
-            .unwrap_or_default()
-            .to_string();
-        let desc = json["config"]["description"]
-            .as_str()
-            .unwrap_or_default()
-            .to_string();
-        let max_d = json["config"]["max_deliver"]
-            .as_i64()
-            .map(|v| v.to_string())
-            .unwrap_or_default();
-        let max_a = json["config"]["max_ack_pending"]
-            .as_i64()
-            .map(|v| v.to_string())
-            .unwrap_or_default();
+    pub(crate) fn from_info(connection_id: u64, stream_name: String, info: &ConsumerInfo) -> Self {
+        let name = info
+            .durable_name
+            .clone()
+            .unwrap_or_else(|| info.name.clone());
         Self {
             visible: true,
             connection_id,
             stream_name,
-            consumer_name: name,
-            description: desc,
-            max_deliver: max_d,
-            max_ack_pending: max_a,
-            original_config: json.clone(),
+            consumer_name: name.clone(),
+            description: info.description.clone().unwrap_or_default(),
+            max_deliver: info.max_deliver.to_string(),
+            max_ack_pending: info.max_ack_pending.to_string(),
+            original_config: ConsumerEditableConfig {
+                name,
+                durable_name: info.durable_name.clone(),
+                filter_subject: info.filter_subject.clone(),
+                deliver_policy: ConsumerDeliverPolicyKind::from_display(&info.deliver_policy),
+                ack_policy: ConsumerAckPolicyKind::from_display(&info.ack_policy),
+            },
         }
     }
 }
@@ -327,46 +297,38 @@ pub(crate) struct KvBucketEditEditor {
     pub(crate) max_age_secs: String,
     pub(crate) max_value_size: String,
     pub(crate) max_bytes: String,
+    pub(crate) storage: StorageKind,
     pub(crate) num_replicas: String,
 }
 
 impl KvBucketEditEditor {
-    pub(crate) fn from_json(connection_id: u64, json: &serde_json::Value) -> Self {
-        let bucket = json["bucket"].as_str().unwrap_or_default().to_string();
-        let desc = json["description"].as_str().unwrap_or_default().to_string();
-        let history = json["history"]
-            .as_i64()
-            .map(|v| v.to_string())
-            .unwrap_or("1".to_string());
-        let max_age = json["max_age_nanos"]
-            .as_u64()
-            .filter(|&v| v > 0)
-            .map(|v| (v / 1_000_000_000).to_string())
-            .unwrap_or_default();
-        let max_vs = json["max_value_size"]
-            .as_i64()
-            .filter(|&v| v > 0)
-            .map(|v| v.to_string())
-            .unwrap_or_default();
-        let max_b = json["max_bytes"]
-            .as_i64()
-            .filter(|&v| v > 0)
-            .map(|v| v.to_string())
-            .unwrap_or_default();
-        let replicas = json["num_replicas"]
-            .as_u64()
-            .map(|v| v.to_string())
-            .unwrap_or("1".to_string());
+    pub(crate) fn from_info(connection_id: u64, info: &KvBucketInfo) -> Self {
+        let max_age = if info.max_age_secs > 0 {
+            info.max_age_secs.to_string()
+        } else {
+            String::new()
+        };
+        let max_value_size = if info.max_value_size > 0 {
+            info.max_value_size.to_string()
+        } else {
+            String::new()
+        };
+        let max_bytes = if info.max_bytes > 0 {
+            info.max_bytes.to_string()
+        } else {
+            String::new()
+        };
         Self {
             visible: true,
             connection_id,
-            bucket,
-            description: desc,
-            history,
+            bucket: info.bucket.clone(),
+            description: info.description.clone(),
+            history: info.history_depth.to_string(),
             max_age_secs: max_age,
-            max_value_size: max_vs,
-            max_bytes: max_b,
-            num_replicas: replicas,
+            max_value_size,
+            max_bytes,
+            storage: StorageKind::from_display(&info.storage),
+            num_replicas: info.num_replicas.to_string(),
         }
     }
 }
