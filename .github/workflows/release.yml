@@ -4,6 +4,12 @@ on:
   push:
     tags:
       - "v*"
+  workflow_call:
+    inputs:
+      tag:
+        description: "Release tag to build and publish (e.g. v0.2.0)."
+        required: true
+        type: string
   workflow_dispatch:
     inputs:
       tag:
@@ -31,11 +37,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
-            tag="${{ inputs.tag }}"
-          else
-            tag="${GITHUB_REF_NAME}"
-          fi
+          case "${{ github.event_name }}" in
+            workflow_call|workflow_dispatch)
+              tag="${{ inputs.tag }}"
+              ;;
+            *)
+              tag="${GITHUB_REF_NAME}"
+              ;;
+          esac
           if [[ -z "${tag}" ]]; then
             echo "No tag resolved" >&2
             exit 1
