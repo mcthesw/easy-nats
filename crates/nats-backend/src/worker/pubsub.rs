@@ -39,15 +39,7 @@ pub(crate) async fn handle_publish(
             client.publish(subject, payload).await
         };
         match result {
-            Ok(()) => {
-                send_ok(
-                    evt_tx,
-                    connection_id,
-                    BackendOperation::Publish,
-                    serde_json::Value::Null,
-                )
-                .await
-            }
+            Ok(()) => send_ok(evt_tx, connection_id, BackendOperation::Publish).await,
             Err(e) => {
                 send_err(
                     evt_tx,
@@ -138,13 +130,7 @@ pub(crate) async fn handle_subscribe(
                             }
                         });
                         vacant.insert(handle);
-                        send_ok(
-                            evt_tx,
-                            connection_id,
-                            BackendOperation::Subscribe,
-                            serde_json::json!({ "subject": subject }),
-                        )
-                        .await;
+                        send_ok(evt_tx, connection_id, BackendOperation::Subscribe).await;
                     }
                     Err(e) => {
                         send_err(
@@ -182,13 +168,7 @@ pub(crate) async fn handle_unsubscribe(
         .remove(&(connection_id, backend_id, subject.clone()))
     {
         handle.abort();
-        send_ok(
-            evt_tx,
-            connection_id,
-            BackendOperation::Unsubscribe,
-            serde_json::json!({ "subject": subject }),
-        )
-        .await;
+        send_ok(evt_tx, connection_id, BackendOperation::Unsubscribe).await;
     } else {
         send_err(
             evt_tx,
@@ -286,13 +266,11 @@ async fn send_ok(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
     operation: BackendOperation,
-    data: serde_json::Value,
 ) {
     let _ = evt_tx
-        .send(BackendEvent::OperationResult {
+        .send(BackendEvent::OperationSucceeded {
             connection_id,
             operation,
-            data,
         })
         .await;
 }
@@ -310,7 +288,7 @@ async fn send_err(
             backend_id,
             operation,
             message,
-            data: None,
+            context: None,
         })
         .await;
 }

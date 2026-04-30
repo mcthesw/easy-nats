@@ -1,10 +1,9 @@
-use base64::Engine;
 use futures_util::StreamExt;
 use tokio::sync::mpsc;
 
 use crate::event::{BackendEvent, BackendOperation};
+use crate::models::{StreamConfigInput, StreamInfo, StreamMessageInfo};
 
-use super::helpers::{raw_message_to_json, stream_info_to_json};
 use super::state::WorkerState;
 
 pub(crate) async fn handle_list_streams(
@@ -21,26 +20,25 @@ pub(crate) async fn handle_list_streams(
     let mut list = Vec::new();
     while let Some(result) = stream_iter.next().await {
         match result {
-            Ok(info) => list.push(stream_info_to_json(&info)),
+            Ok(info) => list.push(StreamInfo::from_info(&info)),
             Err(e) => {
                 tracing::warn!(%e, "Error iterating streams");
                 break;
             }
         }
     }
-    send_ok(
-        evt_tx,
-        connection_id,
-        BackendOperation::ListStreams,
-        serde_json::Value::Array(list),
-    )
-    .await;
+    let _ = evt_tx
+        .send(BackendEvent::StreamsListed {
+            connection_id,
+            streams: list,
+        })
+        .await;
 }
 
 pub(crate) async fn handle_create_stream(
     state: &WorkerState,
     connection_id: u64,
-    config: serde_json::Value,
+    config: StreamConfigInput,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(js) = jetstream(state, connection_id, evt_tx, BackendOperation::CreateStream).await
@@ -48,33 +46,21 @@ pub(crate) async fn handle_create_stream(
         return;
     };
 
-    match serde_json::from_value::<async_nats::jetstream::stream::Config>(config) {
-        Ok(stream_config) => match js.create_stream(stream_config).await {
-            Ok(stream) => {
-                send_ok(
-                    evt_tx,
+    match js.create_stream(config.into_async_nats()).await {
+        Ok(stream) => {
+            let _ = evt_tx
+                .send(BackendEvent::StreamCreated {
                     connection_id,
-                    BackendOperation::CreateStream,
-                    stream_info_to_json(stream.cached_info()),
-                )
-                .await
-            }
-            Err(e) => {
-                send_err(
-                    evt_tx,
-                    connection_id,
-                    BackendOperation::CreateStream,
-                    e.to_string(),
-                )
-                .await
-            }
-        },
+                    stream: StreamInfo::from_info(stream.cached_info()),
+                })
+                .await;
+        }
         Err(e) => {
             send_err(
                 evt_tx,
                 connection_id,
                 BackendOperation::CreateStream,
-                format!("Invalid stream config: {e}"),
+                e.to_string(),
             )
             .await
         }
@@ -84,7 +70,7 @@ pub(crate) async fn handle_create_stream(
 pub(crate) async fn handle_update_stream(
     state: &WorkerState,
     connection_id: u64,
-    config: serde_json::Value,
+    config: StreamConfigInput,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(js) = jetstream(state, connection_id, evt_tx, BackendOperation::UpdateStream).await
@@ -92,33 +78,21 @@ pub(crate) async fn handle_update_stream(
         return;
     };
 
-    match serde_json::from_value::<async_nats::jetstream::stream::Config>(config) {
-        Ok(stream_config) => match js.update_stream(stream_config).await {
-            Ok(info) => {
-                send_ok(
-                    evt_tx,
+    match js.update_stream(config.into_async_nats()).await {
+        Ok(info) => {
+            let _ = evt_tx
+                .send(BackendEvent::StreamUpdated {
                     connection_id,
-                    BackendOperation::UpdateStream,
-                    stream_info_to_json(&info),
-                )
-                .await
-            }
-            Err(e) => {
-                send_err(
-                    evt_tx,
-                    connection_id,
-                    BackendOperation::UpdateStream,
-                    e.to_string(),
-                )
-                .await
-            }
-        },
+                    stream: StreamInfo::from_info(&info),
+                })
+                .await;
+        }
         Err(e) => {
             send_err(
                 evt_tx,
                 connection_id,
                 BackendOperation::UpdateStream,
-                format!("Invalid stream config: {e}"),
+                e.to_string(),
             )
             .await
         }
@@ -138,13 +112,12 @@ pub(crate) async fn handle_delete_stream(
 
     match js.delete_stream(&name).await {
         Ok(_) => {
-            send_ok(
-                evt_tx,
-                connection_id,
-                BackendOperation::DeleteStream,
-                serde_json::json!({ "name": name }),
-            )
-            .await
+            let _ = evt_tx
+                .send(BackendEvent::StreamDeleted {
+                    connection_id,
+                    name,
+                })
+                .await;
         }
         Err(e) => {
             send_err(
@@ -185,13 +158,13 @@ pub(crate) async fn handle_purge_stream(
 
     match result {
         Ok(resp) => {
-            send_ok(
-                evt_tx,
-                connection_id,
-                BackendOperation::PurgeStream,
-                serde_json::json!({ "name": name, "purged": resp.purged }),
-            )
-            .await
+            let _ = evt_tx
+                .send(BackendEvent::StreamPurged {
+                    connection_id,
+                    name,
+                    purged: resp.purged,
+                })
+                .await;
         }
         Err(e) => {
             send_err(
@@ -266,7 +239,7 @@ pub(crate) async fn handle_get_messages(
             match stream.get_first_raw_message_by_subject(&filter, seq).await {
                 Ok(raw) => {
                     seq = raw.sequence + 1;
-                    messages.push(raw_message_to_json(&raw));
+                    messages.push(StreamMessageInfo::from_stream_message(&raw));
                 }
                 Err(_) => break,
             }
@@ -275,7 +248,7 @@ pub(crate) async fn handle_get_messages(
         let mut seq = first;
         while seq <= last && (messages.len() as u64) < params.batch_size {
             if let Ok(raw) = stream.get_raw_message(seq).await {
-                messages.push(raw_message_to_json(&raw));
+                messages.push(StreamMessageInfo::from_stream_message(&raw));
             }
             seq += 1;
         }
@@ -283,13 +256,13 @@ pub(crate) async fn handle_get_messages(
 
     let message_count = messages.len();
     tracing::info!(connection_id, stream = %params.stream_name, message_count, "Fetched stream messages");
-    send_ok(
-        evt_tx,
-        connection_id,
-        BackendOperation::GetStreamMessages,
-        serde_json::json!({ "stream": params.stream_name, "messages": messages }),
-    )
-    .await;
+    let _ = evt_tx
+        .send(BackendEvent::StreamMessagesFetched {
+            connection_id,
+            stream: params.stream_name,
+            messages,
+        })
+        .await;
 }
 
 async fn handle_get_messages_by_time(
@@ -374,32 +347,26 @@ async fn handle_get_messages_by_time(
                     .unwrap_or_else(|_| i.published.to_string())
             })
             .unwrap_or_default();
-        let payload_b64 =
-            base64::engine::general_purpose::STANDARD.encode(msg.message.payload.as_ref());
         let headers = super::helpers::extract_headers(&msg.message.headers);
-        let header_json: Vec<_> = headers
-            .iter()
-            .map(|(k, v)| serde_json::json!([k, v]))
-            .collect();
-        messages.push(serde_json::json!({
-            "sequence": seq,
-            "subject": msg.message.subject.to_string(),
-            "payload_base64": payload_b64,
-            "headers": header_json,
-            "time": time_val,
-        }));
+        messages.push(StreamMessageInfo {
+            sequence: seq,
+            subject: msg.message.subject.to_string(),
+            payload: msg.message.payload.to_vec(),
+            headers,
+            time: time_val,
+        });
     }
 
     // Ephemeral consumer auto-deletes on timeout; no explicit cleanup needed.
     let message_count = messages.len();
     tracing::info!(connection_id, stream = %stream_name, message_count, "Fetched stream messages by time");
-    send_ok(
-        evt_tx,
-        connection_id,
-        BackendOperation::GetStreamMessages,
-        serde_json::json!({ "stream": stream_name, "messages": messages }),
-    )
-    .await;
+    let _ = evt_tx
+        .send(BackendEvent::StreamMessagesFetched {
+            connection_id,
+            stream: stream_name.to_string(),
+            messages,
+        })
+        .await;
 }
 
 pub(crate) async fn handle_delete_message(
@@ -423,13 +390,13 @@ pub(crate) async fn handle_delete_message(
 
     match stream.delete_message(sequence).await {
         Ok(_) => {
-            send_ok(
-                evt_tx,
-                connection_id,
-                BackendOperation::DeleteStreamMessage,
-                serde_json::json!({ "stream": stream_name, "sequence": sequence }),
-            )
-            .await
+            let _ = evt_tx
+                .send(BackendEvent::StreamMessageDeleted {
+                    connection_id,
+                    stream: stream_name,
+                    sequence,
+                })
+                .await;
         }
         Err(e) => {
             send_err(
@@ -475,21 +442,6 @@ async fn open_stream(
     }
 }
 
-async fn send_ok(
-    evt_tx: &mpsc::Sender<BackendEvent>,
-    connection_id: u64,
-    operation: BackendOperation,
-    data: serde_json::Value,
-) {
-    let _ = evt_tx
-        .send(BackendEvent::OperationResult {
-            connection_id,
-            operation,
-            data,
-        })
-        .await;
-}
-
 async fn send_err(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
@@ -502,7 +454,7 @@ async fn send_err(
             backend_id: None,
             operation,
             message,
-            data: None,
+            context: None,
         })
         .await;
 }

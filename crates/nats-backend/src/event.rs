@@ -1,3 +1,8 @@
+use crate::models::{
+    BackendErrorContext, ConsumerInfo, JetStreamAccountInfoSnapshot, KvBucketInfo, KvEntryInfo,
+    KvHistoryItem, KvKeyBatch, ObjectStoreBucketInfo, ObjectStoreDownloadResult,
+    ObjectStoreObjectInfo, ServerInfoSnapshot, StreamInfo, StreamMessageInfo,
+};
 use crate::monitoring::MetricsSnapshot;
 
 #[derive(Debug, Clone)]
@@ -121,11 +126,141 @@ pub enum BackendEvent {
         connection_id: u64,
         snapshot: Box<MetricsSnapshot>,
     },
-    // Operations
-    OperationResult {
+    KvBucketsListed {
+        connection_id: u64,
+        buckets: Vec<KvBucketInfo>,
+    },
+    KvBucketCreated {
+        connection_id: u64,
+        bucket: KvBucketInfo,
+    },
+    KvBucketUpdated {
+        connection_id: u64,
+        bucket: KvBucketInfo,
+    },
+    KvBucketDeleted {
+        connection_id: u64,
+        bucket: String,
+    },
+    KvKeysListed {
+        connection_id: u64,
+        batch: KvKeyBatch,
+    },
+    KvEntryFetched {
+        connection_id: u64,
+        entry: KvEntryInfo,
+    },
+    KvHistoryFetched {
+        connection_id: u64,
+        bucket: String,
+        key: String,
+        history: Vec<KvHistoryItem>,
+    },
+    KvEntryMutated {
         connection_id: u64,
         operation: BackendOperation,
-        data: serde_json::Value,
+        bucket: String,
+        key: String,
+    },
+    ObjectStoreBucketsListed {
+        connection_id: u64,
+        buckets: Vec<ObjectStoreBucketInfo>,
+    },
+    ObjectStoreBucketCreated {
+        connection_id: u64,
+        bucket: ObjectStoreBucketInfo,
+    },
+    ObjectStoreBucketDeleted {
+        connection_id: u64,
+        bucket: String,
+    },
+    ObjectStoreObjectsListed {
+        connection_id: u64,
+        bucket: String,
+        objects: Vec<ObjectStoreObjectInfo>,
+    },
+    ObjectStoreObjectUploaded {
+        connection_id: u64,
+        object: ObjectStoreObjectInfo,
+    },
+    ObjectStoreObjectDownloaded {
+        connection_id: u64,
+        result: ObjectStoreDownloadResult,
+    },
+    ObjectStoreObjectDeleted {
+        connection_id: u64,
+        bucket: String,
+        name: String,
+    },
+    ServerInfoLoaded {
+        connection_id: u64,
+        info: ServerInfoSnapshot,
+    },
+    JetStreamAccountInfoLoaded {
+        connection_id: u64,
+        info: JetStreamAccountInfoSnapshot,
+    },
+    StreamsListed {
+        connection_id: u64,
+        streams: Vec<StreamInfo>,
+    },
+    StreamCreated {
+        connection_id: u64,
+        stream: StreamInfo,
+    },
+    StreamUpdated {
+        connection_id: u64,
+        stream: StreamInfo,
+    },
+    StreamDeleted {
+        connection_id: u64,
+        name: String,
+    },
+    StreamPurged {
+        connection_id: u64,
+        name: String,
+        purged: u64,
+    },
+    StreamMessagesFetched {
+        connection_id: u64,
+        stream: String,
+        messages: Vec<StreamMessageInfo>,
+    },
+    StreamMessageDeleted {
+        connection_id: u64,
+        stream: String,
+        sequence: u64,
+    },
+    ConsumersListed {
+        connection_id: u64,
+        stream: String,
+        consumers: Vec<ConsumerInfo>,
+    },
+    ConsumerCreated {
+        connection_id: u64,
+        stream: String,
+        consumer: ConsumerInfo,
+    },
+    ConsumerUpdated {
+        connection_id: u64,
+        stream: String,
+        consumer: ConsumerInfo,
+    },
+    ConsumerDeleted {
+        connection_id: u64,
+        stream: String,
+        name: String,
+    },
+    ConsumerMessagesFetched {
+        connection_id: u64,
+        stream: String,
+        consumer: String,
+        messages: Vec<StreamMessageInfo>,
+    },
+    // Operations
+    OperationSucceeded {
+        connection_id: u64,
+        operation: BackendOperation,
     },
     // Errors
     Error {
@@ -133,7 +268,7 @@ pub enum BackendEvent {
         backend_id: Option<u64>,
         operation: BackendOperation,
         message: String,
-        data: Option<serde_json::Value>,
+        context: Option<BackendErrorContext>,
     },
 }
 

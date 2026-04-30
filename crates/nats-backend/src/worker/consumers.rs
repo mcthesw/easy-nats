@@ -4,8 +4,8 @@ use futures_util::StreamExt;
 use tokio::sync::mpsc;
 
 use crate::event::{BackendEvent, BackendOperation};
+use crate::models::{ConsumerConfigInput, ConsumerInfo, StreamMessageInfo};
 
-use super::helpers::{consumer_info_to_json, raw_message_to_json};
 use super::state::WorkerState;
 
 static INSPECTOR_COUNTER: AtomicU64 = AtomicU64::new(0);
@@ -28,23 +28,20 @@ pub(crate) async fn handle_list_consumers(
             let mut list = Vec::new();
             while let Some(result) = consumers_iter.next().await {
                 match result {
-                    Ok(info) => list.push(consumer_info_to_json(&info)),
+                    Ok(info) => list.push(ConsumerInfo::from_info(&info)),
                     Err(e) => {
                         tracing::warn!(%e, "Error iterating consumers");
                         break;
                     }
                 }
             }
-            send_ok(
-                evt_tx,
-                connection_id,
-                BackendOperation::ListConsumers,
-                serde_json::json!({
-                    "stream": stream_name,
-                    "consumers": list,
-                }),
-            )
-            .await;
+            let _ = evt_tx
+                .send(BackendEvent::ConsumersListed {
+                    connection_id,
+                    stream: stream_name,
+                    consumers: list,
+                })
+                .await;
         },
     )
     .await;
@@ -54,9 +51,10 @@ pub(crate) async fn handle_create_consumer(
     state: &WorkerState,
     connection_id: u64,
     stream_name: String,
-    config: serde_json::Value,
+    config: ConsumerConfigInput,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
+    let event_stream_name = stream_name.clone();
     with_stream(
         state,
         connection_id,
@@ -64,33 +62,22 @@ pub(crate) async fn handle_create_consumer(
         evt_tx,
         BackendOperation::CreateConsumer,
         |stream| async move {
-            match serde_json::from_value::<async_nats::jetstream::consumer::pull::Config>(config) {
-                Ok(consumer_config) => match stream.create_consumer(consumer_config).await {
-                    Ok(consumer) => {
-                        send_ok(
-                            evt_tx,
+            match stream.create_consumer(config.into_async_nats_pull()).await {
+                Ok(consumer) => {
+                    let _ = evt_tx
+                        .send(BackendEvent::ConsumerCreated {
                             connection_id,
-                            BackendOperation::CreateConsumer,
-                            consumer_info_to_json(consumer.cached_info()),
-                        )
-                        .await
-                    }
-                    Err(e) => {
-                        send_err(
-                            evt_tx,
-                            connection_id,
-                            BackendOperation::CreateConsumer,
-                            e.to_string(),
-                        )
-                        .await
-                    }
-                },
+                            stream: event_stream_name,
+                            consumer: ConsumerInfo::from_info(consumer.cached_info()),
+                        })
+                        .await;
+                }
                 Err(e) => {
                     send_err(
                         evt_tx,
                         connection_id,
                         BackendOperation::CreateConsumer,
-                        format!("Invalid consumer config: {e}"),
+                        e.to_string(),
                     )
                     .await
                 }
@@ -117,16 +104,13 @@ pub(crate) async fn handle_delete_consumer(
         |stream| async move {
             match stream.delete_consumer(&name).await {
                 Ok(_) => {
-                    send_ok(
-                        evt_tx,
-                        connection_id,
-                        BackendOperation::DeleteConsumer,
-                        serde_json::json!({
-                            "stream": stream_name,
-                            "name": name,
-                        }),
-                    )
-                    .await
+                    let _ = evt_tx
+                        .send(BackendEvent::ConsumerDeleted {
+                            connection_id,
+                            stream: stream_name,
+                            name,
+                        })
+                        .await;
                 }
                 Err(e) => {
                     send_err(
@@ -147,9 +131,10 @@ pub(crate) async fn handle_update_consumer(
     state: &WorkerState,
     connection_id: u64,
     stream_name: String,
-    config: serde_json::Value,
+    config: ConsumerConfigInput,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
+    let event_stream_name = stream_name.clone();
     with_stream(
         state,
         connection_id,
@@ -157,33 +142,22 @@ pub(crate) async fn handle_update_consumer(
         evt_tx,
         BackendOperation::UpdateConsumer,
         |stream| async move {
-            match serde_json::from_value::<async_nats::jetstream::consumer::pull::Config>(config) {
-                Ok(consumer_config) => match stream.update_consumer(consumer_config).await {
-                    Ok(consumer) => {
-                        send_ok(
-                            evt_tx,
+            match stream.update_consumer(config.into_async_nats_pull()).await {
+                Ok(consumer) => {
+                    let _ = evt_tx
+                        .send(BackendEvent::ConsumerUpdated {
                             connection_id,
-                            BackendOperation::UpdateConsumer,
-                            consumer_info_to_json(consumer.cached_info()),
-                        )
-                        .await
-                    }
-                    Err(e) => {
-                        send_err(
-                            evt_tx,
-                            connection_id,
-                            BackendOperation::UpdateConsumer,
-                            e.to_string(),
-                        )
-                        .await
-                    }
-                },
+                            stream: event_stream_name,
+                            consumer: ConsumerInfo::from_info(consumer.cached_info()),
+                        })
+                        .await;
+                }
                 Err(e) => {
                     send_err(
                         evt_tx,
                         connection_id,
                         BackendOperation::UpdateConsumer,
-                        format!("Invalid consumer config: {e}"),
+                        e.to_string(),
                     )
                     .await
                 }
@@ -275,7 +249,9 @@ pub(crate) async fn handle_fetch_consumer_messages(
                     }
                 };
                 match async_nats::jetstream::message::StreamMessage::try_from(msg.message.clone()) {
-                    Ok(stream_msg) => messages.push(raw_message_to_json(&stream_msg)),
+                    Ok(stream_msg) => {
+                        messages.push(StreamMessageInfo::from_stream_message(&stream_msg))
+                    }
                     Err(e) => tracing::debug!(%e, "Failed to convert inspector message"),
                 }
                 if messages.len() >= batch {
@@ -285,17 +261,14 @@ pub(crate) async fn handle_fetch_consumer_messages(
             drop(fetch_stream);
             cleanup_inspector_consumer(&stream, &inspector_name).await;
 
-            send_ok(
-                evt_tx,
-                connection_id,
-                operation,
-                serde_json::json!({
-                    "stream": stream_name,
-                    "consumer": consumer_name,
-                    "messages": messages,
-                }),
-            )
-            .await;
+            let _ = evt_tx
+                .send(BackendEvent::ConsumerMessagesFetched {
+                    connection_id,
+                    stream: stream_name,
+                    consumer: consumer_name,
+                    messages,
+                })
+                .await;
         },
     )
     .await;
@@ -342,21 +315,6 @@ async fn with_stream<F, Fut>(
     }
 }
 
-async fn send_ok(
-    evt_tx: &mpsc::Sender<BackendEvent>,
-    connection_id: u64,
-    operation: BackendOperation,
-    data: serde_json::Value,
-) {
-    let _ = evt_tx
-        .send(BackendEvent::OperationResult {
-            connection_id,
-            operation,
-            data,
-        })
-        .await;
-}
-
 async fn send_err(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
@@ -369,7 +327,7 @@ async fn send_err(
             backend_id: None,
             operation,
             message,
-            data: None,
+            context: None,
         })
         .await;
 }
