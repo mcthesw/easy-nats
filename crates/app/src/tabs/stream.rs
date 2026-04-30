@@ -1,6 +1,5 @@
-use base64::Engine;
 use eframe::egui;
-use nats_backend::{BackendCommand, BackendHandle};
+use nats_backend::{BackendCommand, BackendHandle, StreamInfo, StreamMessageInfo};
 use std::time::{Duration, SystemTime};
 
 use crate::format::{self, PayloadFormat};
@@ -9,7 +8,7 @@ use crate::schema::MessageSchemaManager;
 
 use super::common::{
     SEARCH_RESULT_LIMIT, SearchStatus, auto_refresh_ui, format_bytes, matches_query,
-    render_search_row, searchable_json_payload,
+    render_search_row, searchable_payload_text,
 };
 use super::stream_consumers::render_consumers;
 use super::types::{SearchCacheKey, StreamState, TabAction};
@@ -115,17 +114,13 @@ fn render_message_controls(
     actions: &mut Vec<TabAction>,
 ) {
     // WorkQueue retention warning
-    if let Some(info) = &state.info {
-        let retention = info["config"]["retention"]
-            .as_str()
-            .unwrap_or("")
-            .to_lowercase();
-        if retention.contains("work") {
-            ui.horizontal(|ui| {
-                ui.colored_label(egui::Color32::YELLOW, "⚠");
-                ui.label(t("stream.workqueue_hint"));
-            });
-        }
+    if let Some(info) = &state.info
+        && info.retention.to_lowercase().contains("work")
+    {
+        ui.horizontal(|ui| {
+            ui.colored_label(egui::Color32::YELLOW, "⚠");
+            ui.label(t("stream.workqueue_hint"));
+        });
     }
 
     ui.horizontal(|ui| {
@@ -278,28 +273,23 @@ fn filtered_stream_rows(state: &mut StreamState) -> &[(usize, String)] {
 }
 
 fn stream_message_matches(
-    msg: &serde_json::Value,
+    msg: &StreamMessageInfo,
     search: &super::types::ScopedSearchState,
     query: &str,
 ) -> bool {
     if !search.is_active() {
         return true;
     }
-    let subject_matches = search.primary
-        && msg["subject"]
-            .as_str()
-            .is_some_and(|subject| matches_query(subject, query));
-    let payload_matches = search.secondary && matches_query(&searchable_json_payload(msg), query);
+    let subject_matches = search.primary && matches_query(&msg.subject, query);
+    let payload_matches =
+        search.secondary && matches_query(&searchable_payload_text(&msg.payload), query);
     subject_matches || payload_matches
 }
 
-fn stream_message_label(msg: &serde_json::Value) -> String {
-    let seq = msg["sequence"].as_u64().unwrap_or(0);
-    let subject = msg["subject"].as_str().unwrap_or("");
-    let time_str = msg["time"]
-        .as_str()
-        .and_then(format_rfc3339_short)
-        .unwrap_or_default();
+fn stream_message_label(msg: &StreamMessageInfo) -> String {
+    let seq = msg.sequence;
+    let subject = msg.subject.as_str();
+    let time_str = format_rfc3339_short(&msg.time).unwrap_or_default();
     if time_str.is_empty() {
         format!("#{seq} {subject}")
     } else {
@@ -318,10 +308,7 @@ fn format_rfc3339_short(rfc: &str) -> Option<String> {
 
 fn default_publish_subject(state: &StreamState) -> String {
     if let Some(idx) = state.selected_msg
-        && let Some(subject) = state
-            .messages
-            .get(idx)
-            .and_then(|msg| msg["subject"].as_str())
+        && let Some(subject) = state.messages.get(idx).map(|msg| msg.subject.as_str())
         && is_publishable_subject(subject)
     {
         return subject.to_string();
@@ -333,10 +320,9 @@ fn default_publish_subject(state: &StreamState) -> String {
     }
 
     if let Some(info) = &state.info
-        && let Some(subjects) = info["config"]["subjects"].as_array()
-        && let Some(subject) = subjects
+        && let Some(subject) = info
+            .subjects
             .iter()
-            .filter_map(|item| item.as_str())
             .find(|subject| is_publishable_subject(subject))
     {
         return subject.to_string();
@@ -428,81 +414,36 @@ fn render_purge_controls(
             });
             if let Some(idx) = state.selected_msg
                 && let Some(msg) = state.messages.get(idx)
-                && let Some(seq) = msg["sequence"].as_u64()
                 && ui
-                    .button(format!("{} #{seq}", t("stream.delete_msg")))
+                    .button(format!("{} #{}", t("stream.delete_msg"), msg.sequence))
                     .clicked()
             {
                 backend.send(BackendCommand::DeleteStreamMessage {
                     connection_id,
                     stream: stream_name.to_string(),
-                    sequence: seq,
+                    sequence: msg.sequence,
                 });
             }
         });
 }
 
-fn stream_info_panel(ui: &mut egui::Ui, info: &serde_json::Value) {
+fn stream_info_panel(ui: &mut egui::Ui, info: &StreamInfo) {
     egui::Grid::new("stream_info_grid")
         .num_columns(2)
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
-            if let Some(config) = info.get("config") {
-                if let Some(name) = config.get("name").and_then(|v| v.as_str()) {
-                    ui.label(t("stream.name"));
-                    ui.label(name);
-                    ui.end_row();
-                }
-                if let Some(subjects) = config.get("subjects").and_then(|v| v.as_array()) {
-                    ui.label(t("stream.subjects"));
-                    ui.label(
-                        subjects
-                            .iter()
-                            .filter_map(|s| s.as_str())
-                            .collect::<Vec<_>>()
-                            .join(", "),
-                    );
-                    ui.end_row();
-                }
-                if let Some(storage) = config.get("storage").and_then(|v| v.as_str()) {
-                    ui.label(t("stream.storage"));
-                    ui.label(storage);
-                    ui.end_row();
-                }
-                if let Some(retention) = config.get("retention").and_then(|v| v.as_str()) {
-                    ui.label(t("stream.retention"));
-                    ui.label(retention);
-                    ui.end_row();
-                }
-            }
-            if let Some(st) = info.get("state") {
-                for (label, value, is_bytes) in [
-                    (
-                        t("stream.msg_count"),
-                        st.get("messages").and_then(|v| v.as_u64()),
-                        false,
-                    ),
-                    (
-                        t("stream.bytes"),
-                        st.get("bytes").and_then(|v| v.as_u64()),
-                        true,
-                    ),
-                    (
-                        t("stream.consumers"),
-                        st.get("consumer_count").and_then(|v| v.as_u64()),
-                        false,
-                    ),
-                ] {
-                    if let Some(value) = value {
-                        ui.label(label);
-                        if is_bytes {
-                            ui.label(format_bytes(value));
-                        } else {
-                            ui.label(value.to_string());
-                        }
-                        ui.end_row();
-                    }
-                }
+            for (label, value) in [
+                (t("stream.name"), info.name.clone()),
+                (t("stream.subjects"), info.subjects.join(", ")),
+                (t("stream.storage"), info.storage.clone()),
+                (t("stream.retention"), info.retention.clone()),
+                (t("stream.msg_count"), info.messages.to_string()),
+                (t("stream.bytes"), format_bytes(info.bytes)),
+                (t("stream.consumers"), info.consumer_count.to_string()),
+            ] {
+                ui.label(label);
+                ui.label(value);
+                ui.end_row();
             }
         });
 }
@@ -510,7 +451,7 @@ fn stream_info_panel(ui: &mut egui::Ui, info: &serde_json::Value) {
 fn stream_message_detail(
     ui: &mut egui::Ui,
     connection_id: u64,
-    msg: &serde_json::Value,
+    msg: &StreamMessageInfo,
     payload_format: &mut PayloadFormat,
     proto_view: &mut crate::proto::ProtoViewState,
     schema_manager: &MessageSchemaManager,
@@ -524,80 +465,59 @@ fn stream_message_detail(
         .num_columns(2)
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
-            if let Some(seq) = msg["sequence"].as_u64() {
-                ui.label(t("stream.msg_sequence"));
-                ui.label(seq.to_string());
-                ui.end_row();
-            }
-            if let Some(subject) = msg["subject"].as_str() {
-                ui.label(t("stream.msg_subject"));
-                ui.label(subject);
-                ui.end_row();
-            }
-            if let Some(time) = msg["time"].as_str()
-                && !time.is_empty()
-            {
+            ui.label(t("stream.msg_sequence"));
+            ui.label(msg.sequence.to_string());
+            ui.end_row();
+
+            ui.label(t("stream.msg_subject"));
+            ui.label(&msg.subject);
+            ui.end_row();
+
+            if !msg.time.is_empty() {
                 ui.label(t("stream.msg_time"));
-                ui.label(time);
+                ui.label(&msg.time);
                 ui.end_row();
             }
         });
 
-    if let Some(headers) = msg["headers"].as_array()
-        && !headers.is_empty()
-    {
+    if !msg.headers.is_empty() {
         ui.add_space(4.0);
         ui.label(t("stream.msg_headers"));
         egui::Grid::new("stream_msg_headers")
             .num_columns(2)
             .striped(true)
             .show(ui, |ui| {
-                for h in headers {
-                    if let Some(arr) = h.as_array()
-                        && arr.len() == 2
-                    {
-                        ui.label(arr[0].as_str().unwrap_or(""));
-                        ui.label(arr[1].as_str().unwrap_or(""));
-                        ui.end_row();
-                    }
+                for (name, value) in &msg.headers {
+                    ui.label(name);
+                    ui.label(value);
+                    ui.end_row();
                 }
             });
     }
 
     ui.add_space(4.0);
     ui.label(t("stream.msg_payload"));
-    if let Some(payload_b64) = msg["payload_base64"].as_str() {
-        match base64::engine::general_purpose::STANDARD.decode(payload_b64) {
-            Ok(data) => {
-                if let Some(subject) = msg["subject"].as_str() {
-                    format::render_payload_with_schema(
-                        ui,
-                        &data,
-                        *payload_format,
-                        "stream_proto",
-                        proto_view,
-                        format::SchemaRenderContext {
-                            manager: schema_manager,
-                            connection_id,
-                            subject,
-                        },
-                    );
-                } else {
-                    format::render_payload_with_proto(
-                        ui,
-                        &data,
-                        *payload_format,
-                        "stream_proto",
-                        proto_view,
-                        schema_manager,
-                    );
-                }
-            }
-            Err(_) => {
-                ui.label(t("stream.invalid_base64"));
-            }
-        }
+    if !msg.subject.is_empty() {
+        format::render_payload_with_schema(
+            ui,
+            &msg.payload,
+            *payload_format,
+            "stream_proto",
+            proto_view,
+            format::SchemaRenderContext {
+                manager: schema_manager,
+                connection_id,
+                subject: &msg.subject,
+            },
+        );
     } else {
-        ui.label(t("stream.no_payload"));
+        format::render_payload_with_proto(
+            ui,
+            &msg.payload,
+            *payload_format,
+            "stream_proto",
+            proto_view,
+            schema_manager,
+        );
     }
 }
