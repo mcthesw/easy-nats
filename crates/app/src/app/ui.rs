@@ -100,17 +100,17 @@ impl eframe::App for EasyNatsApp {
                 TabAction::OpenConsumerEdit {
                     connection_id,
                     stream_name,
-                    consumer_json,
+                    consumer_info,
                 } => {
                     self.consumer_edit_editor =
-                        ConsumerEditEditor::from_json(connection_id, stream_name, &consumer_json);
+                        ConsumerEditEditor::from_info(connection_id, stream_name, &consumer_info);
                 }
                 TabAction::OpenKvBucketEdit {
                     connection_id,
-                    bucket_json,
+                    bucket_info,
                 } => {
                     self.kv_bucket_edit_editor =
-                        KvBucketEditEditor::from_json(connection_id, &bucket_json);
+                        KvBucketEditEditor::from_info(connection_id, &bucket_info);
                 }
                 TabAction::OpenKvEntryCreate {
                     connection_id,

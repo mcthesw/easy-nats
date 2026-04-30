@@ -1,7 +1,9 @@
 use std::collections::{BTreeSet, HashMap, HashSet};
 
 use egui_dock::DockState;
-use nats_backend::{AppConfig, ConnectionStatusKind};
+use nats_backend::{
+    AppConfig, ConnectionStatusKind, KvBucketInfo, ObjectStoreBucketInfo, StreamInfo,
+};
 
 use crate::log_layer::SharedLogBuffer;
 use crate::schema::MessageSchemaManager;
@@ -73,9 +75,9 @@ pub struct EasyNatsApp {
     pub(crate) kv_bucket_edit_editor: KvBucketEditEditor,
     pub(crate) kv_entry_create_editor: KvEntryCreateEditor,
     pub(crate) obj_store_bucket_editor: ObjStoreBucketCreateEditor,
-    pub(crate) stream_lists: HashMap<u64, Vec<serde_json::Value>>,
-    pub(crate) kv_lists: HashMap<u64, Vec<serde_json::Value>>,
-    pub(crate) obj_store_lists: HashMap<u64, Vec<serde_json::Value>>,
+    pub(crate) stream_lists: HashMap<u64, Vec<StreamInfo>>,
+    pub(crate) kv_lists: HashMap<u64, Vec<KvBucketInfo>>,
+    pub(crate) obj_store_lists: HashMap<u64, Vec<ObjectStoreBucketInfo>>,
     pub(crate) dock_state: DockState<TabKind>,
     pub(crate) toasts: Toasts,
     pub(crate) theme_id: ThemeId,
