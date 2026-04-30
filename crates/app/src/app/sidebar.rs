@@ -260,9 +260,8 @@ fn render_streams_section(
             });
             if let Some(infos) = app.stream_lists.get(&id) {
                 for info in infos {
-                    if let Some(stream_name) = info["config"]["name"].as_str()
-                        && ui.selectable_label(false, stream_name).clicked()
-                    {
+                    let stream_name = info.name.as_str();
+                    if ui.selectable_label(false, stream_name).clicked() {
                         let cancel = CancellationToken::new();
                         let guard = TabGuard::new_without_id(cancel);
                         *action = Some(SidebarAction::OpenTab(Box::new(TabKind::Stream {
@@ -311,9 +310,8 @@ fn render_kv_section(
 
             if let Some(infos) = app.kv_lists.get(&id) {
                 for info in infos {
-                    if let Some(bucket_name) = info["bucket"].as_str()
-                        && ui.selectable_label(false, bucket_name).clicked()
-                    {
+                    let bucket_name = info.bucket.as_str();
+                    if ui.selectable_label(false, bucket_name).clicked() {
                         let cancel = CancellationToken::new();
                         let guard = TabGuard::new_without_id(cancel);
                         *action = Some(SidebarAction::OpenTab(Box::new(TabKind::KvBucket {
@@ -363,9 +361,8 @@ fn render_obj_store_section(
 
             if let Some(infos) = app.obj_store_lists.get(&id) {
                 for info in infos {
-                    if let Some(bucket_name) = info["bucket"].as_str()
-                        && ui.selectable_label(false, bucket_name).clicked()
-                    {
+                    let bucket_name = info.bucket.as_str();
+                    if ui.selectable_label(false, bucket_name).clicked() {
                         let cancel = CancellationToken::new();
                         let guard = TabGuard::new_without_id(cancel);
                         *action = Some(SidebarAction::OpenTab(Box::new(
