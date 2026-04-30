@@ -1,6 +1,5 @@
 use std::time::SystemTime;
 
-use base64::Engine;
 use eframe::egui;
 use eframe::egui::{Popup, PopupCloseBehavior, TextEdit};
 
@@ -90,28 +89,6 @@ pub(crate) fn matches_query(value: &str, query: &str) -> bool {
 
 pub(crate) fn searchable_payload_text(payload: &[u8]) -> String {
     String::from_utf8_lossy(payload).into_owned()
-}
-
-pub(crate) fn searchable_json_payload(value: &serde_json::Value) -> String {
-    if let Some(payload) = value["payload"].as_str() {
-        return payload.to_string();
-    }
-    if let Some(value_base64) = value["payload_base64"]
-        .as_str()
-        .or_else(|| value["value_base64"].as_str())
-    {
-        return searchable_payload_text(&decode_base64_payload(Some(value_base64)));
-    }
-    if let Some(payload) = value.get("payload") {
-        return payload.to_string();
-    }
-    String::new()
-}
-
-pub(crate) fn decode_base64_payload(value_base64: Option<&str>) -> Vec<u8> {
-    value_base64
-        .and_then(|value| base64::engine::general_purpose::STANDARD.decode(value).ok())
-        .unwrap_or_default()
 }
 
 /// Render auto-refresh toggle + interval selector inline.

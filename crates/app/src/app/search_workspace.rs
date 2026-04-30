@@ -193,7 +193,7 @@ impl EasyNatsApp {
                 if let Some(idx) = state
                     .messages
                     .iter()
-                    .position(|msg| msg["sequence"].as_u64() == Some(sequence))
+                    .position(|msg| msg.sequence == sequence)
                 {
                     state.selected_msg = Some(idx);
                     return true;

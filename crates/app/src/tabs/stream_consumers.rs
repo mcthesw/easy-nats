@@ -1,5 +1,5 @@
 use eframe::egui;
-use nats_backend::{BackendCommand, BackendHandle};
+use nats_backend::{BackendCommand, BackendHandle, ConsumerInfo, StreamMessageInfo};
 
 use crate::i18n::t;
 
@@ -68,14 +68,13 @@ fn consumer_card(
     ui: &mut egui::Ui,
     connection_id: u64,
     stream_name: &str,
-    consumer: &serde_json::Value,
+    consumer: &ConsumerInfo,
     state: &mut StreamState,
     backend: &BackendHandle,
     actions: &mut Vec<TabAction>,
 ) {
-    let name = consumer["name"].as_str().unwrap_or(t("consumer.unnamed"));
-    let config = &consumer["config"];
-    let consumer_type = if config["deliver_subject"].as_str().is_some() {
+    let name = consumer.name.as_str();
+    let consumer_type = if consumer.deliver_subject.is_some() {
         t("consumer.type_push")
     } else {
         t("consumer.type_pull")
@@ -98,54 +97,34 @@ fn consumer_card(
                             info_row(
                                 ui,
                                 t("consumer.durable"),
-                                config["durable_name"].as_str().filter(|s| !s.is_empty()),
+                                consumer.durable_name.as_deref().filter(|s| !s.is_empty()),
                             );
                             info_row(
                                 ui,
                                 t("consumer.filter_subject"),
-                                config["filter_subject"].as_str().filter(|s| !s.is_empty()),
+                                consumer.filter_subject.as_deref().filter(|s| !s.is_empty()),
                             );
                             info_row(
                                 ui,
                                 t("consumer.deliver_policy"),
-                                config["deliver_policy"].as_str(),
+                                Some(consumer.deliver_policy.as_str()),
                             );
-                            info_row(ui, t("consumer.ack_policy"), config["ack_policy"].as_str());
-                            info_num_row(
-                                ui,
-                                t("consumer.max_deliver"),
-                                config["max_deliver"].as_i64(),
-                            );
+                            info_row(ui, t("consumer.ack_policy"), Some(&consumer.ack_policy));
+                            info_num_row(ui, t("consumer.max_deliver"), consumer.max_deliver);
                             info_num_row(
                                 ui,
                                 t("consumer.max_ack_pending"),
-                                config["max_ack_pending"].as_i64(),
+                                consumer.max_ack_pending,
                             );
                             info_row(
                                 ui,
                                 t("consumer.description"),
-                                config["description"].as_str().filter(|s| !s.is_empty()),
+                                consumer.description.as_deref().filter(|s| !s.is_empty()),
                             );
-                            info_u64_row(
-                                ui,
-                                t("consumer.pending"),
-                                consumer["num_pending"].as_u64(),
-                            );
-                            info_u64_row(
-                                ui,
-                                t("consumer.ack_pending"),
-                                consumer["num_ack_pending"].as_u64(),
-                            );
-                            info_u64_row(
-                                ui,
-                                t("consumer.waiting"),
-                                consumer["num_waiting"].as_u64(),
-                            );
-                            info_u64_row(
-                                ui,
-                                t("consumer.redelivered"),
-                                consumer["num_redelivered"].as_u64(),
-                            );
+                            info_u64_row(ui, t("consumer.pending"), consumer.num_pending);
+                            info_u64_row(ui, t("consumer.ack_pending"), consumer.num_ack_pending);
+                            info_u64_row(ui, t("consumer.waiting"), consumer.num_waiting);
+                            info_u64_row(ui, t("consumer.redelivered"), consumer.num_redelivered);
                         });
 
                     ui.add_space(4.0);
@@ -154,7 +133,7 @@ fn consumer_card(
                             actions.push(TabAction::OpenConsumerEdit {
                                 connection_id,
                                 stream_name: stream_name.to_string(),
-                                consumer_json: consumer.clone(),
+                                consumer_info: consumer.clone(),
                             });
                         }
                         let is_fetching = state.consumer_fetching.contains(name);
@@ -195,22 +174,20 @@ fn consumer_card(
                                 .max_height(200.0)
                                 .show(ui, |ui| {
                                     for (i, msg) in msgs.iter().enumerate() {
-                                        let subj = msg["subject"].as_str().unwrap_or("?");
-                                        let seq = msg["seq"].as_u64().unwrap_or(0);
-                                        let time = msg["time"].as_str().unwrap_or("");
+                                        let subj = msg.subject.as_str();
+                                        let seq = msg.sequence;
+                                        let time = msg.time.as_str();
                                         let header = format!("#{seq} {subj}  {time}");
                                         egui::CollapsingHeader::new(header)
                                             .id_salt(("fetched_msg", i))
                                             .default_open(false)
                                             .show(ui, |ui| {
-                                                let payload = msg["payload"].as_str().unwrap_or("");
+                                                let mut payload = consumer_message_payload(msg);
                                                 ui.add(
-                                                    egui::TextEdit::multiline(
-                                                        &mut payload.to_string(),
-                                                    )
-                                                    .desired_rows(3)
-                                                    .interactive(false)
-                                                    .desired_width(ui.available_width()),
+                                                    egui::TextEdit::multiline(&mut payload)
+                                                        .desired_rows(3)
+                                                        .interactive(false)
+                                                        .desired_width(ui.available_width()),
                                                 );
                                             });
                                     }
@@ -235,16 +212,18 @@ fn info_row(ui: &mut egui::Ui, label: &str, value: Option<&str>) {
     }
 }
 
-fn info_num_row(ui: &mut egui::Ui, label: &str, value: Option<i64>) {
-    if let Some(value) = value {
-        ui.label(label);
-        ui.label(value.to_string());
-        ui.end_row();
-    }
+fn info_num_row(ui: &mut egui::Ui, label: &str, value: i64) {
+    ui.label(label);
+    ui.label(value.to_string());
+    ui.end_row();
 }
 
-fn info_u64_row(ui: &mut egui::Ui, label: &str, value: Option<u64>) {
+fn info_u64_row(ui: &mut egui::Ui, label: &str, value: u64) {
     ui.label(label);
-    ui.label(value.unwrap_or(0).to_string());
+    ui.label(value.to_string());
     ui.end_row();
+}
+
+fn consumer_message_payload(msg: &StreamMessageInfo) -> String {
+    String::from_utf8_lossy(&msg.payload).to_string()
 }
