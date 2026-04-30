@@ -2,6 +2,7 @@ use futures_util::TryStreamExt;
 use tokio::sync::mpsc;
 
 use crate::event::{BackendEvent, BackendOperation};
+use crate::models::{ObjectStoreBucketConfigInput, ObjectStoreBucketInfo};
 
 use super::super::state::WorkerState;
 
@@ -32,14 +33,10 @@ pub(crate) async fn handle_list_buckets(
                 match js.get_stream(&stream_name).await {
                     Ok(mut stream) => match stream.info().await {
                         Ok(info) => {
-                            buckets.push(serde_json::json!({
-                                "bucket": bucket_name,
-                                "description": info.config.description.as_deref().unwrap_or(""),
-                                "storage": format!("{:?}", info.config.storage),
-                                "bytes": info.state.bytes,
-                                "max_bytes": info.config.max_bytes,
-                                "messages": info.state.messages,
-                            }));
+                            buckets.push(ObjectStoreBucketInfo::from_stream_info(
+                                bucket_name.to_string(),
+                                info,
+                            ));
                         }
                         Err(e) => {
                             tracing::warn!(bucket = bucket_name, %e, "Error loading object store info")
@@ -64,20 +61,19 @@ pub(crate) async fn handle_list_buckets(
         }
     }
 
-    buckets.sort_by(|a, b| a["bucket"].as_str().cmp(&b["bucket"].as_str()));
-    super::send_ok(
-        evt_tx,
-        connection_id,
-        BackendOperation::ListObjectStoreBuckets,
-        serde_json::Value::Array(buckets),
-    )
-    .await;
+    buckets.sort_by(|a, b| a.bucket.cmp(&b.bucket));
+    let _ = evt_tx
+        .send(BackendEvent::ObjectStoreBucketsListed {
+            connection_id,
+            buckets,
+        })
+        .await;
 }
 
 pub(crate) async fn handle_create_bucket(
     state: &WorkerState,
     connection_id: u64,
-    config: serde_json::Value,
+    config: ObjectStoreBucketConfigInput,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     let Some(js) = super::jetstream(
@@ -91,7 +87,7 @@ pub(crate) async fn handle_create_bucket(
         return;
     };
 
-    let bucket = config["bucket"].as_str().unwrap_or("").trim().to_string();
+    let bucket = config.bucket.trim().to_string();
     if bucket.is_empty() {
         super::send_err(
             evt_tx,
@@ -103,30 +99,26 @@ pub(crate) async fn handle_create_bucket(
         return;
     }
 
-    let storage = match config["storage"].as_str() {
-        Some("memory") | Some("Memory") => async_nats::jetstream::stream::StorageType::Memory,
-        _ => async_nats::jetstream::stream::StorageType::File,
-    };
-
-    let bucket_config = async_nats::jetstream::object_store::Config {
-        bucket: bucket.clone(),
-        description: config["description"].as_str().map(|s| s.to_string()),
-        max_bytes: config["max_bytes"].as_i64().unwrap_or_default(),
-        storage,
-        num_replicas: config["num_replicas"].as_u64().unwrap_or(1) as usize,
-        ..Default::default()
-    };
-
-    match js.create_object_store(bucket_config).await {
-        Ok(_store) => {
-            super::send_ok(
-                evt_tx,
-                connection_id,
-                BackendOperation::CreateObjectStoreBucket,
-                serde_json::json!({ "bucket": bucket }),
-            )
-            .await
-        }
+    match js.create_object_store(config.into_async_nats()).await {
+        Ok(_store) => match load_bucket_info(&js, &bucket).await {
+            Ok(info) => {
+                let _ = evt_tx
+                    .send(BackendEvent::ObjectStoreBucketCreated {
+                        connection_id,
+                        bucket: info,
+                    })
+                    .await;
+            }
+            Err(e) => {
+                super::send_err(
+                    evt_tx,
+                    connection_id,
+                    BackendOperation::CreateObjectStoreBucket,
+                    e,
+                )
+                .await
+            }
+        },
         Err(e) => {
             super::send_err(
                 evt_tx,
@@ -158,13 +150,12 @@ pub(crate) async fn handle_delete_bucket(
 
     match js.delete_object_store(&bucket).await {
         Ok(_) => {
-            super::send_ok(
-                evt_tx,
-                connection_id,
-                BackendOperation::DeleteObjectStoreBucket,
-                serde_json::json!({ "bucket": bucket }),
-            )
-            .await
+            let _ = evt_tx
+                .send(BackendEvent::ObjectStoreBucketDeleted {
+                    connection_id,
+                    bucket,
+                })
+                .await;
         }
         Err(e) => {
             super::send_err(
@@ -176,4 +167,20 @@ pub(crate) async fn handle_delete_bucket(
             .await
         }
     }
+}
+
+async fn load_bucket_info(
+    js: &async_nats::jetstream::Context,
+    bucket: &str,
+) -> Result<ObjectStoreBucketInfo, String> {
+    let stream_name = format!("OBJ_{bucket}");
+    let mut stream = js
+        .get_stream(&stream_name)
+        .await
+        .map_err(|e| e.to_string())?;
+    let info = stream.info().await.map_err(|e| e.to_string())?;
+    Ok(ObjectStoreBucketInfo::from_stream_info(
+        bucket.to_string(),
+        info,
+    ))
 }

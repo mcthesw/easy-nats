@@ -4,6 +4,7 @@ pub mod command;
 pub mod config;
 pub mod connection;
 pub mod event;
+pub mod models;
 pub mod monitoring;
 pub mod paths;
 pub mod worker;
@@ -14,6 +15,16 @@ pub use command::BackendCommand;
 pub use config::AppConfig;
 pub use connection::{AuthMethod, ConnectionConfig, ConnectionStatus, MonitoringConfig};
 pub use event::{BackendEvent, BackendOperation, ConnectionStatusKind, MessageData};
+pub use models::{
+    BackendErrorContext, ConsumerAckPolicyKind, ConsumerConfigInput, ConsumerDeliverPolicyKind,
+    KvBucketConfigInput, KvBucketInfo, KvEntryInfo, KvHistoryItem, KvKeyBatch,
+    ObjectStoreBucketConfigInput, StorageKind, StreamConfigInput, StreamRetentionKind,
+};
+pub use models::{ConsumerInfo, StreamInfo, StreamMessageInfo};
+pub use models::{
+    JetStreamAccountInfoSnapshot, JetStreamAccountLimitsSnapshot, ServerInfoSnapshot,
+};
+pub use models::{ObjectStoreBucketInfo, ObjectStoreDownloadResult, ObjectStoreObjectInfo};
 pub use monitoring::{
     ConnzMetrics, JetStreamMetrics, MetricsHealth, MetricsSection, MetricsSectionError,
     MetricsSnapshot, VarzMetrics,

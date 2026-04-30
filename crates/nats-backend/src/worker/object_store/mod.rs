@@ -44,21 +44,6 @@ async fn open_store(
     }
 }
 
-async fn send_ok(
-    evt_tx: &mpsc::Sender<BackendEvent>,
-    connection_id: u64,
-    operation: BackendOperation,
-    data: serde_json::Value,
-) {
-    let _ = evt_tx
-        .send(BackendEvent::OperationResult {
-            connection_id,
-            operation,
-            data,
-        })
-        .await;
-}
-
 async fn send_err(
     evt_tx: &mpsc::Sender<BackendEvent>,
     connection_id: u64,
@@ -71,7 +56,7 @@ async fn send_err(
             backend_id: None,
             operation,
             message,
-            data: None,
+            context: None,
         })
         .await;
 }

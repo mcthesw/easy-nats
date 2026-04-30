@@ -3,11 +3,10 @@ use futures_util::TryStreamExt;
 use tokio::sync::mpsc;
 use tokio::task::JoinHandle;
 
+use super::super::state::WorkerState;
 use crate::cancellation::TaskCancellation;
 use crate::event::{BackendEvent, BackendOperation};
-
-use super::super::helpers::kv_entry_to_json;
-use super::super::state::WorkerState;
+use crate::models::{BackendErrorContext, KvEntryInfo, KvHistoryItem, KvKeyBatch};
 
 /// Spawn a task that streams key names in batches.
 /// Returns the JoinHandle so the caller can track/cancel it.
@@ -74,18 +73,20 @@ pub(crate) async fn handle_list_keys(
                 Ok(Some(key)) => {
                     batch.push(key);
                     if batch.len() >= BATCH_SIZE {
-                        let entries: Vec<serde_json::Value> = batch
-                            .drain(..)
-                            .map(|k| serde_json::json!({ "key": k }))
-                            .collect();
-                        total_keys += entries.len();
-                        tracing::debug!(connection_id, bucket = %bucket, generation, batch_size = entries.len(), total_keys, "Sending KV key batch");
-                        super::send_ok(
-                            &evt_tx,
-                            connection_id,
-                            BackendOperation::ListKvKeys,
-                            serde_json::json!({ "bucket": &bucket, "entries": entries, "done": false, "generation": generation }),
-                        ).await;
+                        let keys = std::mem::take(&mut batch);
+                        total_keys += keys.len();
+                        tracing::debug!(connection_id, bucket = %bucket, generation, batch_size = keys.len(), total_keys, "Sending KV key batch");
+                        let _ = evt_tx
+                            .send(BackendEvent::KvKeysListed {
+                                connection_id,
+                                batch: KvKeyBatch {
+                                    bucket: bucket.clone(),
+                                    keys,
+                                    done: false,
+                                    generation,
+                                },
+                            })
+                            .await;
                     }
                 }
                 Ok(None) => break,
@@ -104,29 +105,36 @@ pub(crate) async fn handle_list_keys(
 
         // Send remaining keys
         if !batch.is_empty() {
-            let entries: Vec<serde_json::Value> = batch
-                .drain(..)
-                .map(|k| serde_json::json!({ "key": k }))
-                .collect();
-            total_keys += entries.len();
-            tracing::debug!(connection_id, bucket = %bucket, generation, batch_size = entries.len(), total_keys, "Sending final KV key batch");
-            super::send_ok(
-                &evt_tx,
-                connection_id,
-                BackendOperation::ListKvKeys,
-                serde_json::json!({ "bucket": &bucket, "entries": entries, "done": false, "generation": generation }),
-            ).await;
+            let keys = std::mem::take(&mut batch);
+            total_keys += keys.len();
+            tracing::debug!(connection_id, bucket = %bucket, generation, batch_size = keys.len(), total_keys, "Sending final KV key batch");
+            let _ = evt_tx
+                .send(BackendEvent::KvKeysListed {
+                    connection_id,
+                    batch: KvKeyBatch {
+                        bucket: bucket.clone(),
+                        keys,
+                        done: false,
+                        generation,
+                    },
+                })
+                .await;
         }
 
         tracing::info!(connection_id, bucket = %bucket, generation, total_keys, "Completed KV key list task");
 
         // Signal completion
-        super::send_ok(
-            &evt_tx,
-            connection_id,
-            BackendOperation::ListKvKeys,
-            serde_json::json!({ "bucket": &bucket, "entries": [], "done": true, "generation": generation }),
-        ).await;
+        let _ = evt_tx
+            .send(BackendEvent::KvKeysListed {
+                connection_id,
+                batch: KvKeyBatch {
+                    bucket,
+                    keys: Vec::new(),
+                    done: true,
+                    generation,
+                },
+            })
+            .await;
     }))
 }
 
@@ -138,14 +146,17 @@ pub(crate) async fn handle_get_entry(
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
     tracing::debug!(connection_id, bucket = %bucket, key = %key, "Fetching KV entry");
-    let error_data = serde_json::json!({ "bucket": &bucket, "key": &key });
-    let Some(store) = super::open_store_with_error_data(
+    let error_context = BackendErrorContext::KvEntry {
+        bucket: bucket.clone(),
+        key: key.clone(),
+    };
+    let Some(store) = super::open_store_with_context(
         state,
         connection_id,
         &bucket,
         evt_tx,
         BackendOperation::GetKvEntry,
-        Some(error_data.clone()),
+        Some(error_context.clone()),
     )
     .await
     else {
@@ -154,25 +165,24 @@ pub(crate) async fn handle_get_entry(
     match store.entry(&key).await {
         Ok(entry) => {
             tracing::debug!(connection_id, bucket = %bucket, key = %key, found = entry.is_some(), "Fetched KV entry");
-            let entry_json = match entry.as_ref().map(kv_entry_to_json) {
-                Some(v) => v,
-                None => serde_json::json!({ "key": key }),
-            };
-            super::send_ok(
-                evt_tx,
-                connection_id,
-                BackendOperation::GetKvEntry,
-                serde_json::json!({ "bucket": bucket, "entry": entry_json }),
-            )
-            .await;
+            let entry = entry
+                .as_ref()
+                .map(KvEntryInfo::from_entry)
+                .unwrap_or_else(|| KvEntryInfo::missing(bucket, key));
+            let _ = evt_tx
+                .send(BackendEvent::KvEntryFetched {
+                    connection_id,
+                    entry,
+                })
+                .await;
         }
         Err(e) => {
-            super::send_err_with_data(
+            super::send_err_with_context(
                 evt_tx,
                 connection_id,
                 BackendOperation::GetKvEntry,
                 e.to_string(),
-                Some(error_data),
+                Some(error_context),
             )
             .await
         }
@@ -203,7 +213,7 @@ pub(crate) async fn handle_get_history(
             let mut entries = Vec::new();
             loop {
                 match history.try_next().await {
-                    Ok(Some(entry)) => entries.push(kv_entry_to_json(&entry)),
+                    Ok(Some(entry)) => entries.push(KvHistoryItem::from_entry(&entry)),
                     Ok(None) => break,
                     Err(e) => {
                         super::send_err(
@@ -217,14 +227,15 @@ pub(crate) async fn handle_get_history(
                     }
                 }
             }
-            entries.sort_by(|a, b| b["revision"].as_u64().cmp(&a["revision"].as_u64()));
-            super::send_ok(
-                evt_tx,
-                connection_id,
-                BackendOperation::GetKvHistory,
-                serde_json::json!({ "bucket": bucket, "key": key, "history": entries }),
-            )
-            .await;
+            entries.sort_by_key(|entry| std::cmp::Reverse(entry.revision));
+            let _ = evt_tx
+                .send(BackendEvent::KvHistoryFetched {
+                    connection_id,
+                    bucket,
+                    key,
+                    history: entries,
+                })
+                .await;
         }
         Err(e) => {
             super::send_err(
@@ -259,14 +270,15 @@ pub(crate) async fn handle_put_entry(
         return;
     };
     match store.put(&key, Bytes::from(value)).await {
-        Ok(revision) => {
-            super::send_ok(
-                evt_tx,
-                connection_id,
-                BackendOperation::PutKvEntry,
-                serde_json::json!({ "bucket": bucket, "key": key, "revision": revision }),
-            )
-            .await
+        Ok(_revision) => {
+            let _ = evt_tx
+                .send(BackendEvent::KvEntryMutated {
+                    connection_id,
+                    operation: BackendOperation::PutKvEntry,
+                    bucket,
+                    key,
+                })
+                .await;
         }
         Err(e) => {
             super::send_err(
@@ -301,13 +313,14 @@ pub(crate) async fn handle_delete_entry(
     };
     match store.delete(&key).await {
         Ok(()) => {
-            super::send_ok(
-                evt_tx,
-                connection_id,
-                BackendOperation::DeleteKvEntry,
-                serde_json::json!({ "bucket": bucket, "key": key }),
-            )
-            .await
+            let _ = evt_tx
+                .send(BackendEvent::KvEntryMutated {
+                    connection_id,
+                    operation: BackendOperation::DeleteKvEntry,
+                    bucket,
+                    key,
+                })
+                .await;
         }
         Err(e) => {
             super::send_err(
@@ -342,13 +355,14 @@ pub(crate) async fn handle_purge_entry(
     };
     match store.purge(&key).await {
         Ok(()) => {
-            super::send_ok(
-                evt_tx,
-                connection_id,
-                BackendOperation::PurgeKvEntry,
-                serde_json::json!({ "bucket": bucket, "key": key }),
-            )
-            .await
+            let _ = evt_tx
+                .send(BackendEvent::KvEntryMutated {
+                    connection_id,
+                    operation: BackendOperation::PurgeKvEntry,
+                    bucket,
+                    key,
+                })
+                .await;
         }
         Err(e) => {
             super::send_err(
