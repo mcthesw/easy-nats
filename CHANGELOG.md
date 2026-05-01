@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.16](https://github.com/mcthesw/easy-nats/compare/v0.1.15...v0.1.16) (2026-05-01)
+
+
+### Bug Fixes
+
+* **ci:** resolve release tag input first ([de7b289](https://github.com/mcthesw/easy-nats/commit/de7b28973a647cad4b87e3ffe085244d8dbf1981))
+
 ## [0.1.15](https://github.com/mcthesw/easy-nats/compare/v0.1.14...v0.1.15) (2026-05-01)
 
 
