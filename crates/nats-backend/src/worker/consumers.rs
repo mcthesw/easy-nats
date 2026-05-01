@@ -62,7 +62,14 @@ pub(crate) async fn handle_create_consumer(
         evt_tx,
         BackendOperation::CreateConsumer,
         |stream| async move {
-            match stream.create_consumer(config.into_async_nats_pull()).await {
+            let consumer_config = match config.into_async_nats_pull() {
+                Ok(config) => config,
+                Err(e) => {
+                    send_err(evt_tx, connection_id, BackendOperation::CreateConsumer, e).await;
+                    return;
+                }
+            };
+            match stream.create_consumer(consumer_config).await {
                 Ok(consumer) => {
                     let _ = evt_tx
                         .send(BackendEvent::ConsumerCreated {
@@ -142,7 +149,14 @@ pub(crate) async fn handle_update_consumer(
         evt_tx,
         BackendOperation::UpdateConsumer,
         |stream| async move {
-            match stream.update_consumer(config.into_async_nats_pull()).await {
+            let consumer_config = match config.into_async_nats_pull() {
+                Ok(config) => config,
+                Err(e) => {
+                    send_err(evt_tx, connection_id, BackendOperation::UpdateConsumer, e).await;
+                    return;
+                }
+            };
+            match stream.update_consumer(consumer_config).await {
                 Ok(consumer) => {
                     let _ = evt_tx
                         .send(BackendEvent::ConsumerUpdated {
