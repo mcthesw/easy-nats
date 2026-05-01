@@ -37,14 +37,15 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          case "${{ github.event_name }}" in
-            workflow_call|workflow_dispatch)
-              tag="${{ inputs.tag }}"
-              ;;
-            *)
-              tag="${GITHUB_REF_NAME}"
-              ;;
-          esac
+          input_tag="${{ inputs.tag }}"
+          if [[ -n "${input_tag}" ]]; then
+            tag="${input_tag}"
+          elif [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+            tag="${GITHUB_REF_NAME}"
+          else
+            echo "No release tag input was provided and the current ref is not a tag: ${GITHUB_REF}" >&2
+            exit 1
+          fi
           if [[ -z "${tag}" ]]; then
             echo "No tag resolved" >&2
             exit 1
