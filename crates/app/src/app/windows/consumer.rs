@@ -36,23 +36,33 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                         egui::ComboBox::from_id_salt("consumer_deliver_policy")
                             .selected_text(app.consumer_editor.deliver_policy.label())
                             .show_ui(ui, |ui| {
-                                ui.selectable_value(
-                                    &mut app.consumer_editor.deliver_policy,
-                                    DeliverPolicySelection::All,
-                                    DeliverPolicySelection::All.label(),
-                                );
-                                ui.selectable_value(
-                                    &mut app.consumer_editor.deliver_policy,
-                                    DeliverPolicySelection::Last,
-                                    DeliverPolicySelection::Last.label(),
-                                );
-                                ui.selectable_value(
-                                    &mut app.consumer_editor.deliver_policy,
-                                    DeliverPolicySelection::New,
-                                    DeliverPolicySelection::New.label(),
-                                );
+                                for policy in DeliverPolicySelection::ALL {
+                                    ui.selectable_value(
+                                        &mut app.consumer_editor.deliver_policy,
+                                        policy,
+                                        policy.label(),
+                                    );
+                                }
                             });
                         ui.end_row();
+
+                        match app.consumer_editor.deliver_policy {
+                            DeliverPolicySelection::ByStartSequence => {
+                                ui.label(t("consumer.start_sequence"));
+                                ui.text_edit_singleline(
+                                    &mut app.consumer_editor.deliver_start_sequence,
+                                );
+                                ui.end_row();
+                            }
+                            DeliverPolicySelection::ByStartTime => {
+                                ui.label(t("consumer.start_time"));
+                                ui.text_edit_singleline(
+                                    &mut app.consumer_editor.deliver_start_time,
+                                );
+                                ui.end_row();
+                            }
+                            _ => {}
+                        }
 
                         ui.label(t("consumer.ack_policy"));
                         egui::ComboBox::from_id_salt("consumer_ack_policy")
@@ -94,7 +104,8 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     });
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    let valid = !app.consumer_editor.name.trim().is_empty();
+                    let valid = !app.consumer_editor.name.trim().is_empty()
+                        && deliver_policy_input_valid(&app.consumer_editor);
                     if ui
                         .add_enabled(valid, egui::Button::new(t("common.save")))
                         .clicked()
@@ -109,6 +120,16 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     }
     if save_requested {
         app.save_consumer_editor();
+    }
+}
+
+fn deliver_policy_input_valid(editor: &super::super::editors::ConsumerCreateEditor) -> bool {
+    match editor.deliver_policy {
+        DeliverPolicySelection::ByStartSequence => {
+            editor.deliver_start_sequence.trim().parse::<u64>().is_ok()
+        }
+        DeliverPolicySelection::ByStartTime => !editor.deliver_start_time.trim().is_empty(),
+        _ => true,
     }
 }
 

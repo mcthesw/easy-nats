@@ -80,6 +80,21 @@ policy_last:
 policy_new:
   en: "New"
   zh: "新消息"
+policy_by_start_sequence:
+  en: "By start sequence"
+  zh: "按起始序列"
+policy_by_start_time:
+  en: "By start time"
+  zh: "按起始时间"
+policy_last_per_subject:
+  en: "Last per subject"
+  zh: "每个主题最新"
+start_sequence:
+  en: "Start sequence:"
+  zh: "起始序列:"
+start_time:
+  en: "Start time (RFC3339):"
+  zh: "起始时间 (RFC3339):"
 ack_explicit:
   en: "Explicit"
   zh: "显式"
