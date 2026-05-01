@@ -15,12 +15,19 @@ pub enum StreamRetentionKind {
     WorkQueue,
 }
 
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub enum ConsumerDeliverPolicyKind {
     #[default]
     All,
     Last,
     New,
+    ByStartSequence {
+        start_sequence: u64,
+    },
+    ByStartTime {
+        start_time: String,
+    },
+    LastPerSubject,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -219,7 +226,7 @@ pub struct ConsumerInfo {
     pub stream_name: String,
     pub durable_name: Option<String>,
     pub filter_subject: Option<String>,
-    pub deliver_policy: String,
+    pub deliver_policy: ConsumerDeliverPolicyKind,
     pub ack_policy: String,
     pub max_deliver: i64,
     pub max_ack_pending: i64,
@@ -269,15 +276,61 @@ impl ConsumerDeliverPolicyKind {
         match value.to_ascii_lowercase().as_str() {
             "last" => Self::Last,
             "new" => Self::New,
+            "lastpersubject" | "last_per_subject" | "last per subject" => Self::LastPerSubject,
             _ => Self::All,
         }
     }
 
-    fn into_async_nats(self) -> async_nats::jetstream::consumer::DeliverPolicy {
+    fn from_async_nats(policy: async_nats::jetstream::consumer::DeliverPolicy) -> Self {
+        match policy {
+            async_nats::jetstream::consumer::DeliverPolicy::All => Self::All,
+            async_nats::jetstream::consumer::DeliverPolicy::Last => Self::Last,
+            async_nats::jetstream::consumer::DeliverPolicy::New => Self::New,
+            async_nats::jetstream::consumer::DeliverPolicy::ByStartSequence { start_sequence } => {
+                Self::ByStartSequence { start_sequence }
+            }
+            async_nats::jetstream::consumer::DeliverPolicy::ByStartTime { start_time } => {
+                let start_time = start_time
+                    .format(&time::format_description::well_known::Rfc3339)
+                    .unwrap_or_else(|_| start_time.to_string());
+                Self::ByStartTime { start_time }
+            }
+            async_nats::jetstream::consumer::DeliverPolicy::LastPerSubject => Self::LastPerSubject,
+        }
+    }
+
+    pub fn display(&self) -> String {
         match self {
-            Self::All => async_nats::jetstream::consumer::DeliverPolicy::All,
-            Self::Last => async_nats::jetstream::consumer::DeliverPolicy::Last,
-            Self::New => async_nats::jetstream::consumer::DeliverPolicy::New,
+            Self::All => "All".to_string(),
+            Self::Last => "Last".to_string(),
+            Self::New => "New".to_string(),
+            Self::ByStartSequence { start_sequence } => {
+                format!("By start sequence ({start_sequence})")
+            }
+            Self::ByStartTime { start_time } => format!("By start time ({start_time})"),
+            Self::LastPerSubject => "Last per subject".to_string(),
+        }
+    }
+
+    fn into_async_nats(self) -> Result<async_nats::jetstream::consumer::DeliverPolicy, String> {
+        match self {
+            Self::All => Ok(async_nats::jetstream::consumer::DeliverPolicy::All),
+            Self::Last => Ok(async_nats::jetstream::consumer::DeliverPolicy::Last),
+            Self::New => Ok(async_nats::jetstream::consumer::DeliverPolicy::New),
+            Self::ByStartSequence { start_sequence } => Ok(
+                async_nats::jetstream::consumer::DeliverPolicy::ByStartSequence { start_sequence },
+            ),
+            Self::ByStartTime { start_time } => {
+                let start_time = time::OffsetDateTime::parse(
+                    &start_time,
+                    &time::format_description::well_known::Rfc3339,
+                )
+                .map_err(|e| format!("Invalid deliver policy start time (use RFC3339): {e}"))?;
+                Ok(async_nats::jetstream::consumer::DeliverPolicy::ByStartTime { start_time })
+            }
+            Self::LastPerSubject => {
+                Ok(async_nats::jetstream::consumer::DeliverPolicy::LastPerSubject)
+            }
         }
     }
 }
@@ -327,12 +380,15 @@ impl StreamConfigInput {
 }
 
 impl ConsumerConfigInput {
-    pub fn into_async_nats_pull(self) -> async_nats::jetstream::consumer::pull::Config {
+    pub fn into_async_nats_pull(
+        self,
+    ) -> Result<async_nats::jetstream::consumer::pull::Config, String> {
+        let deliver_policy = self.deliver_policy.into_async_nats()?;
         let mut config = async_nats::jetstream::consumer::pull::Config {
             name: (!self.name.trim().is_empty()).then_some(self.name),
             durable_name: self.durable_name,
             filter_subject: self.filter_subject.unwrap_or_default(),
-            deliver_policy: self.deliver_policy.into_async_nats(),
+            deliver_policy,
             ack_policy: self.ack_policy.into_async_nats(),
             description: self.description,
             ..Default::default()
@@ -343,7 +399,7 @@ impl ConsumerConfigInput {
         if let Some(max_ack_pending) = self.max_ack_pending {
             config.max_ack_pending = max_ack_pending;
         }
-        config
+        Ok(config)
     }
 }
 
@@ -569,10 +625,7 @@ impl ConsumerInfo {
             durable_name: info.config.durable_name.clone(),
             filter_subject: (!info.config.filter_subject.is_empty())
                 .then(|| info.config.filter_subject.clone()),
-            deliver_policy: serde_json::to_value(info.config.deliver_policy)
-                .ok()
-                .and_then(|value| value.as_str().map(str::to_owned))
-                .unwrap_or_else(|| format!("{:?}", info.config.deliver_policy)),
+            deliver_policy: ConsumerDeliverPolicyKind::from_async_nats(info.config.deliver_policy),
             ack_policy: serde_json::to_value(info.config.ack_policy)
                 .ok()
                 .and_then(|value| value.as_str().map(str::to_owned))
@@ -591,107 +644,4 @@ impl ConsumerInfo {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn stream_config_input_maps_to_async_nats_config() {
-        let config = StreamConfigInput {
-            name: "orders".to_string(),
-            subjects: vec!["orders.*".to_string()],
-            storage: StorageKind::Memory,
-            retention: StreamRetentionKind::WorkQueue,
-            max_messages: Some(42),
-            max_bytes: Some(1024),
-            max_age: Some(Duration::from_secs(5)),
-            num_replicas: Some(3),
-            description: Some("order events".to_string()),
-        }
-        .into_async_nats();
-
-        assert_eq!(config.name, "orders");
-        assert_eq!(config.subjects, vec!["orders.*"]);
-        assert_eq!(
-            config.storage,
-            async_nats::jetstream::stream::StorageType::Memory
-        );
-        assert_eq!(
-            config.retention,
-            async_nats::jetstream::stream::RetentionPolicy::WorkQueue
-        );
-        assert_eq!(config.max_messages, 42);
-        assert_eq!(config.max_bytes, 1024);
-        assert_eq!(config.max_age, Duration::from_secs(5));
-        assert_eq!(config.num_replicas, 3);
-        assert_eq!(config.description.as_deref(), Some("order events"));
-    }
-
-    #[test]
-    fn consumer_config_input_maps_to_async_nats_pull_config() {
-        let config = ConsumerConfigInput {
-            name: "durable".to_string(),
-            durable_name: Some("durable".to_string()),
-            filter_subject: Some("orders.created".to_string()),
-            deliver_policy: ConsumerDeliverPolicyKind::New,
-            ack_policy: ConsumerAckPolicyKind::All,
-            max_deliver: Some(5),
-            max_ack_pending: Some(128),
-            description: Some("worker".to_string()),
-        }
-        .into_async_nats_pull();
-
-        assert_eq!(config.name.as_deref(), Some("durable"));
-        assert_eq!(config.durable_name.as_deref(), Some("durable"));
-        assert_eq!(config.filter_subject, "orders.created");
-        assert_eq!(
-            config.deliver_policy,
-            async_nats::jetstream::consumer::DeliverPolicy::New
-        );
-        assert_eq!(
-            config.ack_policy,
-            async_nats::jetstream::consumer::AckPolicy::All
-        );
-        assert_eq!(config.max_deliver, 5);
-        assert_eq!(config.max_ack_pending, 128);
-        assert_eq!(config.description.as_deref(), Some("worker"));
-    }
-
-    #[test]
-    fn bucket_config_inputs_map_to_async_nats_configs() {
-        let kv = KvBucketConfigInput {
-            bucket: "settings".to_string(),
-            history: 3,
-            storage: StorageKind::File,
-            max_value_size: Some(2048),
-            max_bytes: Some(4096),
-            max_age: Some(Duration::from_secs(60)),
-            num_replicas: Some(2),
-            description: Some("app settings".to_string()),
-        }
-        .into_async_nats();
-        assert_eq!(kv.bucket, "settings");
-        assert_eq!(kv.history, 3);
-        assert_eq!(kv.max_value_size, 2048);
-        assert_eq!(kv.max_bytes, 4096);
-        assert_eq!(kv.max_age, Duration::from_secs(60));
-        assert_eq!(kv.num_replicas, 2);
-        assert_eq!(kv.description, "app settings");
-
-        let object_store = ObjectStoreBucketConfigInput {
-            bucket: "files".to_string(),
-            storage: StorageKind::Memory,
-            max_bytes: Some(8192),
-            num_replicas: Some(1),
-            description: None,
-        }
-        .into_async_nats();
-        assert_eq!(object_store.bucket, "files");
-        assert_eq!(
-            object_store.storage,
-            async_nats::jetstream::stream::StorageType::Memory
-        );
-        assert_eq!(object_store.max_bytes, 8192);
-        assert_eq!(object_store.num_replicas, 1);
-        assert_eq!(object_store.description, None);
-    }
-}
+mod tests;

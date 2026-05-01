@@ -79,6 +79,7 @@ fn consumer_card(
     } else {
         t("consumer.type_pull")
     };
+    let deliver_policy = consumer.deliver_policy.display();
 
     // Stable ID scope for the entire consumer card
     ui.push_id(
@@ -107,7 +108,7 @@ fn consumer_card(
                             info_row(
                                 ui,
                                 t("consumer.deliver_policy"),
-                                Some(consumer.deliver_policy.as_str()),
+                                Some(deliver_policy.as_str()),
                             );
                             info_row(ui, t("consumer.ack_policy"), Some(&consumer.ack_policy));
                             info_num_row(ui, t("consumer.max_deliver"), consumer.max_deliver);

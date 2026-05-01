@@ -357,7 +357,7 @@ impl EasyNatsApp {
                 name: name.clone(),
                 durable_name: self.consumer_editor.durable.then_some(name),
                 filter_subject: trimmed_optional(&self.consumer_editor.filter_subject),
-                deliver_policy: deliver_policy_kind(self.consumer_editor.deliver_policy),
+                deliver_policy: deliver_policy_kind(&self.consumer_editor),
                 ack_policy: ack_policy_kind(self.consumer_editor.ack_policy),
                 max_deliver: parse_optional(&self.consumer_editor.max_deliver),
                 max_ack_pending: parse_optional(&self.consumer_editor.max_ack_pending),
@@ -393,7 +393,7 @@ impl EasyNatsApp {
                 name: original.name.clone(),
                 durable_name: original.durable_name.clone(),
                 filter_subject: original.filter_subject.clone(),
-                deliver_policy: original.deliver_policy,
+                deliver_policy: original.deliver_policy.clone(),
                 ack_policy: original.ack_policy,
                 max_deliver: parse_optional(&self.consumer_edit_editor.max_deliver),
                 max_ack_pending: parse_optional(&self.consumer_edit_editor.max_ack_pending),
@@ -644,13 +644,24 @@ fn retention_kind(selection: super::editors::RetentionSelection) -> StreamRetent
     }
 }
 
-fn deliver_policy_kind(
-    selection: super::editors::DeliverPolicySelection,
-) -> ConsumerDeliverPolicyKind {
-    match selection {
+fn deliver_policy_kind(editor: &super::editors::ConsumerCreateEditor) -> ConsumerDeliverPolicyKind {
+    match editor.deliver_policy {
         super::editors::DeliverPolicySelection::All => ConsumerDeliverPolicyKind::All,
         super::editors::DeliverPolicySelection::Last => ConsumerDeliverPolicyKind::Last,
         super::editors::DeliverPolicySelection::New => ConsumerDeliverPolicyKind::New,
+        super::editors::DeliverPolicySelection::ByStartSequence => {
+            ConsumerDeliverPolicyKind::ByStartSequence {
+                start_sequence: editor.deliver_start_sequence.parse::<u64>().unwrap_or(1),
+            }
+        }
+        super::editors::DeliverPolicySelection::ByStartTime => {
+            ConsumerDeliverPolicyKind::ByStartTime {
+                start_time: editor.deliver_start_time.trim().to_string(),
+            }
+        }
+        super::editors::DeliverPolicySelection::LastPerSubject => {
+            ConsumerDeliverPolicyKind::LastPerSubject
+        }
     }
 }
 

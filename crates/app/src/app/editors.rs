@@ -118,6 +118,8 @@ pub(crate) struct ConsumerCreateEditor {
     pub(crate) name: String,
     pub(crate) durable: bool,
     pub(crate) deliver_policy: DeliverPolicySelection,
+    pub(crate) deliver_start_sequence: String,
+    pub(crate) deliver_start_time: String,
     pub(crate) ack_policy: AckPolicySelection,
     pub(crate) filter_subject: String,
     pub(crate) max_deliver: String,
@@ -134,6 +136,8 @@ impl Default for ConsumerCreateEditor {
             name: String::new(),
             durable: true,
             deliver_policy: DeliverPolicySelection::All,
+            deliver_start_sequence: "1".to_string(),
+            deliver_start_time: String::new(),
             ack_policy: AckPolicySelection::Explicit,
             filter_subject: String::new(),
             max_deliver: String::new(),
@@ -178,14 +182,29 @@ pub(crate) enum DeliverPolicySelection {
     All,
     Last,
     New,
+    ByStartSequence,
+    ByStartTime,
+    LastPerSubject,
 }
 
 impl DeliverPolicySelection {
+    pub(crate) const ALL: [Self; 6] = [
+        Self::All,
+        Self::Last,
+        Self::New,
+        Self::ByStartSequence,
+        Self::ByStartTime,
+        Self::LastPerSubject,
+    ];
+
     pub(crate) fn label(self) -> &'static str {
         match self {
             Self::All => t("consumer.policy_all"),
             Self::Last => t("consumer.policy_last"),
             Self::New => t("consumer.policy_new"),
+            Self::ByStartSequence => t("consumer.policy_by_start_sequence"),
+            Self::ByStartTime => t("consumer.policy_by_start_time"),
+            Self::LastPerSubject => t("consumer.policy_last_per_subject"),
         }
     }
 }
@@ -280,7 +299,7 @@ impl ConsumerEditEditor {
                 name,
                 durable_name: info.durable_name.clone(),
                 filter_subject: info.filter_subject.clone(),
-                deliver_policy: ConsumerDeliverPolicyKind::from_display(&info.deliver_policy),
+                deliver_policy: info.deliver_policy.clone(),
                 ack_policy: ConsumerAckPolicyKind::from_display(&info.ack_policy),
             },
         }
