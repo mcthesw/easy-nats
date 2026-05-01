@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.15](https://github.com/mcthesw/easy-nats/compare/v0.1.14...v0.1.15) (2026-05-01)
+
+
+### Features
+
+* **consumer:** support all deliver policies ([03a0534](https://github.com/mcthesw/easy-nats/commit/03a0534ad2c1a10aa6147ea72c1f1ef420624f6e))
+* **kv:** show stored values and current key count ([cd0b01a](https://github.com/mcthesw/easy-nats/commit/cd0b01aac179bf8118ec1b6160395f86c5dae50e))
+
+
+### Code Refactoring
+
+* **app:** wire typed backend domain state ([2628462](https://github.com/mcthesw/easy-nats/commit/2628462d5c68a98c7c1cdb6f98dca168cd202b83))
+* **backend:** type domain commands and events ([cf16cb7](https://github.com/mcthesw/easy-nats/commit/cf16cb78650615932102f8c056f1db6de22dd8c9))
+* **object-store:** use typed bucket and object models ([1f191c3](https://github.com/mcthesw/easy-nats/commit/1f191c3d61bdbe82c403f12359e5716123cbfa5b))
+* **server-info:** use typed info snapshots ([f430d92](https://github.com/mcthesw/easy-nats/commit/f430d921d13ac26195e6be3fb43b9ba0a9eb5141))
+* **stream:** use typed stream and consumer models ([9cfaf50](https://github.com/mcthesw/easy-nats/commit/9cfaf5088e04c06db19de79f8d9a209143152413))
+
+
+### Documentation
+
+* **openspec:** propose typed backend domain models ([2bb32fc](https://github.com/mcthesw/easy-nats/commit/2bb32fc4d5549aeba501d828ca26e15575647963))
+
 ## [0.1.14](https://github.com/mcthesw/easy-nats/compare/v0.1.13...v0.1.14) (2026-04-29)
 
 
