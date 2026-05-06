@@ -1,5 +1,5 @@
 use eframe::egui;
-use nats_backend::{BackendCommand, BackendHandle, KvBucketInfo, KvHistoryItem};
+use nats_backend::{BackendCommand, BackendHandle, KvBucketInfo};
 
 use crate::format;
 use crate::i18n::t;
@@ -7,10 +7,11 @@ use crate::schema::{MessageSchemaManager, kv_subject};
 use crate::tabs::guard::TabGuard;
 
 use super::common::{
-    KV_VALUE_SEARCH_BATCH, SearchStatus, auto_refresh_ui, format_bytes, matches_query,
-    render_search_row,
+    KV_VALUE_SEARCH_BATCH, SearchStatus, auto_refresh_ui, format_bytes, render_search_row,
 };
 use super::types::{KvBucketState, TabAction};
+
+mod key_filter;
 
 #[allow(clippy::too_many_arguments)]
 pub fn kv_bucket_ui(
@@ -50,8 +51,10 @@ pub fn kv_bucket_ui(
         state.load_generation = new_gen;
         state.keys.clear();
         state.fetched_values.clear();
+        key_filter::invalidate(state);
         state.value_search_cursor = 0;
         state.value_search_scanning = 0;
+        state.value_search_pending.clear();
         state.search_generation = state.search_generation.wrapping_add(1);
         backend.send(BackendCommand::ListKvKeys {
             connection_id,
@@ -137,7 +140,6 @@ fn render_key_list(
             });
         }
     });
-    let search_status = kv_search_status(state);
     let search_changed = render_search_row(
         ui,
         ("kv_search", bucket_name),
@@ -149,7 +151,9 @@ fn render_key_list(
     if search_changed {
         state.search_more_requested = false;
         state.value_search_cursor = 0;
+        key_filter::invalidate(state);
     }
+    let search_status = kv_search_status(state);
     if state.search.is_active() {
         ui.horizontal_wrapped(|ui| {
             if let Some(text) = search_status.text() {
@@ -174,43 +178,48 @@ fn render_key_list(
         });
     }
 
+    let row_count = key_filter::filtered_row_count(state);
+    if row_count == 0 {
+        ui.label(t("kv.no_keys"));
+        return;
+    }
+
     egui::ScrollArea::vertical()
         .id_salt(("kv_keys", connection_id, bucket_name))
-        .show(ui, |ui| {
-            let filtered = filtered_keys(state);
-
-            if filtered.is_empty() {
-                ui.label(t("kv.no_keys"));
-            } else {
-                for key in &filtered {
-                    if ui
-                        .selectable_label(
-                            state.selected_key.as_deref() == Some(key.as_str()),
-                            key.as_str(),
-                        )
-                        .clicked()
-                    {
-                        state.selected_key = Some(key.clone());
-                        state.show_history = false;
-                        // Clear editor state and request entry details
-                        state.entry_key.clear();
-                        state.entry_value.clear();
-                        state.entry_revision = None;
-                        state.entry_operation = None;
-                        state.entry_created = None;
-                        state.loading_entry = true;
-                        backend.send(BackendCommand::GetKvEntry {
-                            connection_id,
-                            bucket: bucket_name.to_string(),
-                            key: key.clone(),
-                        });
-                        backend.send(BackendCommand::GetKvHistory {
-                            connection_id,
-                            bucket: bucket_name.to_string(),
-                            key: key.clone(),
-                        });
-                        state.loading_history = true;
-                    }
+        .show_rows(ui, 22.0, row_count, |ui, row_range| {
+            let key_indices = key_filter::visible_key_indices(state, row_range);
+            for key_index in key_indices {
+                let Some(key) = state.keys.get(key_index).cloned() else {
+                    continue;
+                };
+                if ui
+                    .selectable_label(
+                        state.selected_key.as_deref() == Some(key.as_str()),
+                        key.as_str(),
+                    )
+                    .clicked()
+                {
+                    state.selected_key = Some(key.clone());
+                    key_filter::invalidate(state);
+                    state.show_history = false;
+                    // Clear editor state and request entry details
+                    state.entry_key.clear();
+                    state.entry_value.clear();
+                    state.entry_revision = None;
+                    state.entry_operation = None;
+                    state.entry_created = None;
+                    state.loading_entry = true;
+                    backend.send(BackendCommand::GetKvEntry {
+                        connection_id,
+                        bucket: bucket_name.to_string(),
+                        key: key.clone(),
+                    });
+                    backend.send(BackendCommand::GetKvHistory {
+                        connection_id,
+                        bucket: bucket_name.to_string(),
+                        key: key.clone(),
+                    });
+                    state.loading_history = true;
                 }
             }
         });
@@ -272,6 +281,7 @@ fn scan_next_kv_values(
     state.value_search_cursor = end;
     state.value_search_scanning += keys.len();
     for key in keys {
+        state.value_search_pending.insert(key.clone());
         backend.send(BackendCommand::GetKvEntry {
             connection_id,
             bucket: bucket_name.to_string(),
@@ -280,42 +290,15 @@ fn scan_next_kv_values(
     }
 }
 
-fn kv_search_status(state: &KvBucketState) -> SearchStatus {
+fn kv_search_status(state: &mut KvBucketState) -> SearchStatus {
     if !state.search.is_active() {
         return SearchStatus::Inactive;
     }
-    let matches = filtered_keys(state).len();
+    let matches = key_filter::filtered_row_count(state);
     SearchStatus::Showing {
         matches,
         capped: false,
     }
-}
-
-fn filtered_keys(state: &KvBucketState) -> Vec<String> {
-    let query = state.search.normalized_query();
-    state
-        .keys
-        .iter()
-        .filter(|key| {
-            if query.is_empty() || (!state.search.primary && !state.search.secondary) {
-                return true;
-            }
-            let key_matches = state.search.primary && matches_query(key, &query);
-            let fetched_value_matches = state.search.secondary
-                && state
-                    .fetched_values
-                    .get(key.as_str())
-                    .is_some_and(|value| matches_query(value, &query));
-            let history_matches = state.search.secondary
-                && state.selected_key.as_deref() == Some(key.as_str())
-                && state
-                    .history
-                    .iter()
-                    .any(|item| matches_query(&searchable_kv_history_item(item), &query));
-            key_matches || fetched_value_matches || history_matches
-        })
-        .cloned()
-        .collect()
 }
 
 fn normalized_entry_key(key: &str) -> String {
@@ -333,8 +316,10 @@ fn refresh_kv_keys(
     state.load_generation = new_gen;
     state.keys.clear();
     state.fetched_values.clear();
+    key_filter::invalidate(state);
     state.value_search_cursor = 0;
     state.value_search_scanning = 0;
+    state.value_search_pending.clear();
     state.search_generation = state.search_generation.wrapping_add(1);
     state.keys_complete = false;
     state.loading_entries = true;
@@ -601,10 +586,6 @@ fn current_kv_count_text(state: &KvBucketState) -> String {
     format!("{}{}", state.keys.len(), suffix)
 }
 
-fn searchable_kv_history_item(item: &KvHistoryItem) -> String {
-    String::from_utf8_lossy(&item.value).into_owned()
-}
-
 fn kv_bucket_info_panel(ui: &mut egui::Ui, info: &KvBucketInfo, state: &KvBucketState) {
     egui::Grid::new("kv_bucket_info_grid")
         .num_columns(2)
@@ -642,7 +623,7 @@ mod tests {
         state.search.primary = true;
         state.search.secondary = false;
 
-        assert_eq!(filtered_keys(&state), vec!["users.alice".to_string()]);
+        assert_eq!(key_filter::visible_key_indices(&mut state, 0..1), vec![0]);
     }
 
     #[test]
@@ -681,7 +662,7 @@ mod tests {
         state.search.primary = false;
         state.search.secondary = true;
 
-        assert_eq!(filtered_keys(&state), vec!["users.bob".to_string()]);
+        assert_eq!(key_filter::visible_key_indices(&mut state, 0..1), vec![1]);
     }
 
     #[test]

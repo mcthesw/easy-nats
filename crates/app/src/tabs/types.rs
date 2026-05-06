@@ -187,6 +187,14 @@ pub type CachedSubscriberRows = (u64, Option<String>, SearchCacheKey, Vec<Subscr
 pub type StreamListRow = (usize, String);
 pub type CachedStreamRows = (u64, SearchCacheKey, Vec<StreamListRow>);
 
+#[derive(Debug, Clone)]
+pub struct CachedKvKeyRows {
+    pub generation: u64,
+    pub cache_key: SearchCacheKey,
+    pub selected_key: Option<String>,
+    pub rows: Vec<usize>,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct SearchCacheKey {
     pub query: String,
@@ -559,6 +567,7 @@ pub struct KvBucketState {
     pub loading_history: bool,
     pub load_generation: u64,
     pub search_generation: u64,
+    pub cached_filtered_keys: Option<CachedKvKeyRows>,
     pub entry_key: String,
     pub entry_value: String,
     pub fetched_values: HashMap<String, String>,
@@ -591,6 +600,7 @@ impl Default for KvBucketState {
             loading_history: false,
             load_generation: 0,
             search_generation: 0,
+            cached_filtered_keys: None,
             entry_key: String::new(),
             entry_value: String::new(),
             fetched_values: HashMap::new(),
@@ -605,6 +615,12 @@ impl Default for KvBucketState {
             editor_proto_view: ProtoViewState::default(),
             history_proto_view: ProtoViewState::default(),
         }
+    }
+}
+
+impl KvBucketState {
+    pub(crate) fn invalidate_filtered_key_cache(&mut self) {
+        self.cached_filtered_keys = None;
     }
 }
 
