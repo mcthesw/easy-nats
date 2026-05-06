@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.17](https://github.com/mcthesw/easy-nats/compare/v0.1.16...v0.1.17) (2026-05-06)
+
+
+### Bug Fixes
+
+* **consumer:** guard workqueue preview limitation ([87b2a1b](https://github.com/mcthesw/easy-nats/commit/87b2a1b3bc10806fd4363db4127abe608cd8147e))
+
+
+### Performance Improvements
+
+* **kv:** virtualize large key lists ([2f90056](https://github.com/mcthesw/easy-nats/commit/2f90056c4934d83897cfbc7b04143a1b3c065f93))
+
 ## [0.1.16](https://github.com/mcthesw/easy-nats/compare/v0.1.15...v0.1.16) (2026-05-01)
 
 
