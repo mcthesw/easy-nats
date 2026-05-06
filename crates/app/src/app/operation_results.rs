@@ -1,5 +1,6 @@
 use nats_backend::{BackendErrorContext, BackendOperation};
 
+use crate::i18n::t;
 use crate::tabs::TabKind;
 use crate::toast::ToastLevel;
 
@@ -87,7 +88,56 @@ impl EasyNatsApp {
             self.clear_server_info_loading_on_error(cid, operation);
         }
 
-        self.toasts
-            .push(ToastLevel::Error, format!("{operation}: {message}"));
+        self.toasts.push(
+            ToastLevel::Error,
+            operation_error_message(operation, message, context),
+        );
+    }
+}
+
+fn operation_error_message(
+    operation: BackendOperation,
+    message: &str,
+    context: Option<&BackendErrorContext>,
+) -> String {
+    if operation == BackendOperation::FetchConsumerMessages
+        && matches!(
+            context,
+            Some(BackendErrorContext::WorkQueueConsumerPreview { reason, .. })
+                if reason == "workqueue_inspector_not_supported"
+        )
+    {
+        return format!(
+            "{operation}: {}",
+            t("consumer.workqueue_preview_unsupported")
+        );
+    }
+
+    format!("{operation}: {message}")
+}
+
+#[cfg(test)]
+mod tests {
+    use nats_backend::{BackendErrorContext, BackendOperation};
+
+    use super::*;
+
+    #[test]
+    fn workqueue_fetch_limitation_hides_raw_server_error() {
+        let context = BackendErrorContext::WorkQueueConsumerPreview {
+            stream: "ORDERS".to_string(),
+            consumer: "worker-a".to_string(),
+            reason: "workqueue_inspector_not_supported".to_string(),
+        };
+
+        let message = operation_error_message(
+            BackendOperation::FetchConsumerMessages,
+            "Failed to create inspector consumer: JetStream error: filtered consumer not unique on workqueue stream",
+            Some(&context),
+        );
+
+        assert!(!message.contains("filtered consumer not unique"));
+        assert!(!message.contains("Failed to create inspector consumer"));
+        assert!(message.contains("fetch_consumer_messages"));
     }
 }

@@ -125,3 +125,6 @@ fetched_messages:
 fetching:
   en: "Fetching..."
   zh: "获取中..."
+workqueue_preview_unsupported:
+  en: "Safe non-destructive preview is unavailable for WorkQueue streams because NATS does not allow another filtered inspector consumer with overlapping subjects."
+  zh: "WorkQueue 流无法使用安全的非破坏性预览，因为 NATS 不允许创建另一个主题过滤范围重叠的检查器消费者。"

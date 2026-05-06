@@ -241,7 +241,15 @@ pub struct ConsumerInfo {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum BackendErrorContext {
-    KvEntry { bucket: String, key: String },
+    KvEntry {
+        bucket: String,
+        key: String,
+    },
+    WorkQueueConsumerPreview {
+        stream: String,
+        consumer: String,
+        reason: String,
+    },
 }
 
 impl StorageKind {
