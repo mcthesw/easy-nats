@@ -87,10 +87,12 @@ impl EasyNatsApp {
             {
                 state.keys.extend(batch.keys.clone());
                 if !batch.keys.is_empty() {
+                    state.invalidate_filtered_key_cache();
                     state.search_generation = state.search_generation.wrapping_add(1);
                 }
                 if batch.done {
                     state.keys.sort();
+                    state.invalidate_filtered_key_cache();
                     state.keys_complete = true;
                     state.loading_entries = false;
                     state.search_generation = state.search_generation.wrapping_add(1);
@@ -115,6 +117,7 @@ impl EasyNatsApp {
                 state
                     .fetched_values
                     .insert(entry_key.to_string(), entry_value.clone());
+                state.invalidate_filtered_key_cache();
                 state.search_generation = state.search_generation.wrapping_add(1);
                 if state.value_search_pending.remove(entry_key) {
                     state.value_search_scanning = state.value_search_pending.len();
@@ -150,6 +153,8 @@ impl EasyNatsApp {
                 && state.selected_key.as_deref() == Some(key.as_str())
             {
                 state.history = history.clone();
+                state.invalidate_filtered_key_cache();
+                state.search_generation = state.search_generation.wrapping_add(1);
                 state.loading_history = false;
             }
         }
@@ -183,6 +188,7 @@ impl EasyNatsApp {
                 state.load_generation = new_gen;
                 state.keys.clear();
                 state.fetched_values.clear();
+                state.invalidate_filtered_key_cache();
                 state.value_search_cursor = 0;
                 state.value_search_scanning = 0;
                 state.value_search_pending.clear();
@@ -258,7 +264,7 @@ impl EasyNatsApp {
                     Some(BackendErrorContext::KvEntry { bucket, key }) => {
                         (Some(bucket.as_str()), Some(key.as_str()))
                     }
-                    None => (None, None),
+                    _ => (None, None),
                 };
                 for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
                     if let TabKind::KvBucket {

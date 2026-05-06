@@ -224,8 +224,10 @@ impl EasyNatsApp {
             state.load_generation = new_gen;
             state.keys.clear();
             state.fetched_values.clear();
+            state.invalidate_filtered_key_cache();
             state.value_search_cursor = 0;
             state.value_search_scanning = 0;
+            state.value_search_pending.clear();
             state.search_generation = state.search_generation.wrapping_add(1);
             state.keys_complete = false;
             self.backend.send(BackendCommand::ListKvKeys {
