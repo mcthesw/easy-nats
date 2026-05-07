@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.18](https://github.com/mcthesw/easy-nats/compare/v0.1.17...v0.1.18) (2026-05-07)
+
+
+### Features
+
+* **monitoring:** add client status tab ([7990bf0](https://github.com/mcthesw/easy-nats/commit/7990bf0b5510b629294089444d268a5e665fb0e3))
+
 ## [0.1.17](https://github.com/mcthesw/easy-nats/compare/v0.1.16...v0.1.17) (2026-05-06)
 
 
