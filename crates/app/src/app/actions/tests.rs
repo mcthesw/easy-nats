@@ -78,6 +78,21 @@ fn count_metrics_tabs(app: &EasyNatsApp, connection_id: u64) -> usize {
         .count()
 }
 
+fn count_clients_tabs(app: &EasyNatsApp, connection_id: u64) -> usize {
+    app.dock_state
+        .iter_all_tabs()
+        .filter(|(_, tab)| {
+            matches!(
+                tab,
+                TabKind::Clients {
+                    connection_id: existing_id,
+                    ..
+                } if *existing_id == connection_id
+            )
+        })
+        .count()
+}
+
 #[test]
 fn publisher_reuses_existing_tab_when_configured() {
     let mut app = test_app(PubSubTabMode::ReuseExisting);
@@ -107,4 +122,15 @@ fn metrics_tab_focuses_existing_tab_for_same_connection() {
     app.open_or_focus_metrics_tab(7);
 
     assert_eq!(count_metrics_tabs(&app, 7), 1);
+}
+
+#[test]
+fn clients_tab_focuses_existing_tab_for_same_connection() {
+    let mut app = test_app(PubSubTabMode::NewTab);
+    push_metrics_connection(&mut app, 7);
+
+    app.open_or_focus_clients_tab(7);
+    app.open_or_focus_clients_tab(7);
+
+    assert_eq!(count_clients_tabs(&app, 7), 1);
 }

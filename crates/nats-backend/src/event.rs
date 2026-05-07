@@ -3,7 +3,9 @@ use crate::models::{
     KvHistoryItem, KvKeyBatch, ObjectStoreBucketInfo, ObjectStoreDownloadResult,
     ObjectStoreObjectInfo, ServerInfoSnapshot, StreamInfo, StreamMessageInfo,
 };
-use crate::monitoring::MetricsSnapshot;
+use crate::monitoring::{
+    ClientStatusDetail, ClientStatusPage, ClientStatusRequestError, MetricsSnapshot,
+};
 
 #[derive(Debug, Clone)]
 pub struct MessageData {
@@ -51,6 +53,8 @@ pub enum BackendOperation {
     DeleteObject,
     ServerInfo,
     JetStreamAccountInfo,
+    FetchClientStatusPage,
+    FetchClientStatusDetail,
 }
 
 impl BackendOperation {
@@ -91,6 +95,8 @@ impl BackendOperation {
             Self::DeleteObject => "delete_object",
             Self::ServerInfo => "server_info",
             Self::JetStreamAccountInfo => "jetstream_account_info",
+            Self::FetchClientStatusPage => "fetch_client_status_page",
+            Self::FetchClientStatusDetail => "fetch_client_status_detail",
         }
     }
 }
@@ -125,6 +131,18 @@ pub enum BackendEvent {
     MetricsSnapshot {
         connection_id: u64,
         snapshot: Box<MetricsSnapshot>,
+    },
+    ClientStatusPageLoaded {
+        connection_id: u64,
+        page: Box<ClientStatusPage>,
+    },
+    ClientStatusDetailLoaded {
+        connection_id: u64,
+        detail: Box<ClientStatusDetail>,
+    },
+    ClientStatusError {
+        connection_id: u64,
+        error: Box<ClientStatusRequestError>,
     },
     KvBucketsListed {
         connection_id: u64,

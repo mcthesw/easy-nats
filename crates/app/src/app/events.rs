@@ -127,6 +127,24 @@ impl EasyNatsApp {
                 } => {
                     self.apply_metrics_snapshot(connection_id, *snapshot);
                 }
+                BackendEvent::ClientStatusPageLoaded {
+                    connection_id,
+                    page,
+                } => {
+                    self.apply_client_status_page(connection_id, *page);
+                }
+                BackendEvent::ClientStatusDetailLoaded {
+                    connection_id,
+                    detail,
+                } => {
+                    self.apply_client_status_detail(connection_id, *detail);
+                }
+                BackendEvent::ClientStatusError {
+                    connection_id,
+                    error,
+                } => {
+                    self.apply_client_status_error(connection_id, *error);
+                }
                 BackendEvent::KvBucketsListed {
                     connection_id,
                     buckets,

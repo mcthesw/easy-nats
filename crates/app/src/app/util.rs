@@ -58,6 +58,14 @@ pub(crate) fn same_tab(a: &TabKind, b: &TabKind) -> bool {
                 connection_id: a2, ..
             },
         ) => a1 == a2,
+        (
+            TabKind::Clients {
+                connection_id: a1, ..
+            },
+            TabKind::Clients {
+                connection_id: a2, ..
+            },
+        ) => a1 == a2,
         (TabKind::SearchWorkspace { .. }, TabKind::SearchWorkspace { .. }) => true,
         (TabKind::MessageSchemas { .. }, TabKind::MessageSchemas { .. }) => true,
         (TabKind::Settings, TabKind::Settings) => true,

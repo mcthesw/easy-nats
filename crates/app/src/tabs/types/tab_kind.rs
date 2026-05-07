@@ -7,9 +7,9 @@ use crate::schema::MessageSchemaManager;
 use crate::theme::ThemeId;
 
 use super::{
-    KvBucketState, MessageSchemasState, MetricsState, ObjectStoreBucketState, PublisherState,
-    SearchSourceSnapshot, SearchWorkspaceState, ServerInfoState, StreamState, SubscriberState,
-    TabAction,
+    ClientStatusState, KvBucketState, MessageSchemasState, MetricsState, ObjectStoreBucketState,
+    PublisherState, SearchSourceSnapshot, SearchWorkspaceState, ServerInfoState, StreamState,
+    SubscriberState, TabAction,
 };
 use crate::tabs::guard::TabGuard;
 
@@ -62,6 +62,11 @@ pub enum TabKind {
         connection_id: u64,
         connection_name: String,
         state: MetricsState,
+    },
+    Clients {
+        connection_id: u64,
+        connection_name: String,
+        state: ClientStatusState,
     },
     SearchWorkspace {
         state: SearchWorkspaceState,
@@ -130,6 +135,9 @@ impl TabKind {
             TabKind::Metrics {
                 connection_name, ..
             } => format!("{} ({})", t("common.tab_metrics"), connection_name),
+            TabKind::Clients {
+                connection_name, ..
+            } => format!("{} ({})", t("common.tab_clients"), connection_name),
             TabKind::SearchWorkspace { .. } => t("common.tab_search_workspace").to_string(),
             TabKind::MessageSchemas { .. } => t("common.tab_message_schemas").to_string(),
             TabKind::Settings => t("settings.title").to_string(),
@@ -171,6 +179,9 @@ impl TabKind {
             }
             TabKind::Metrics { connection_id, .. } => {
                 egui::Id::new(("tab:metrics", *connection_id))
+            }
+            TabKind::Clients { connection_id, .. } => {
+                egui::Id::new(("tab:clients", *connection_id))
             }
             TabKind::SearchWorkspace { .. } => egui::Id::new("tab:search-workspace"),
             TabKind::MessageSchemas { .. } => egui::Id::new("tab:message-schemas"),

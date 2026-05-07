@@ -22,6 +22,7 @@ pub(crate) enum SidebarAction {
     OpenObjStoreBucketCreate(u64),
     OpenServerInfo(u64),
     OpenMetrics(u64),
+    OpenClients(u64),
 }
 
 pub(crate) fn render_sidebar(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
@@ -179,6 +180,7 @@ fn render_resource_tree(
         render_kv_section(app, ui, id, name, action);
         render_obj_store_section(app, ui, id, name, action);
         render_metrics_entry(app, ui, id, action);
+        render_clients_entry(app, ui, id, action);
         if render_sidebar_leaf(ui, "ℹ", t("server_info.title")).clicked() {
             *action = Some(SidebarAction::OpenServerInfo(id));
         }
@@ -197,6 +199,21 @@ fn render_metrics_entry(
 
     if render_sidebar_leaf(ui, "◔", t("sidebar.section_metrics")).clicked() {
         *action = Some(SidebarAction::OpenMetrics(id));
+    }
+}
+
+fn render_clients_entry(
+    app: &mut EasyNatsApp,
+    ui: &mut egui::Ui,
+    id: u64,
+    action: &mut Option<SidebarAction>,
+) {
+    if app.connection_metrics_endpoint(id).is_none() {
+        return;
+    }
+
+    if render_sidebar_leaf(ui, "@", t("sidebar.section_clients")).clicked() {
+        *action = Some(SidebarAction::OpenClients(id));
     }
 }
 
@@ -438,6 +455,9 @@ fn apply_sidebar_action(app: &mut EasyNatsApp, action: Option<SidebarAction>) {
         }
         Some(SidebarAction::OpenMetrics(id)) => {
             app.open_or_focus_metrics_tab(id);
+        }
+        Some(SidebarAction::OpenClients(id)) => {
+            app.open_or_focus_clients_tab(id);
         }
         None => {}
     }

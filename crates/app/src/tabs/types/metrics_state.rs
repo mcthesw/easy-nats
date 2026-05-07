@@ -8,7 +8,7 @@ use super::AutoRefresh;
 #[derive(Debug, Default)]
 pub struct MetricsState {
     endpoint: String,
-    latest_attempt: Option<MetricsSnapshot>,
+    latest_attempt: Option<Box<MetricsSnapshot>>,
     history: VecDeque<MetricsSnapshot>,
     pub loading: bool,
     pub auto_refresh: AutoRefresh,
@@ -60,7 +60,7 @@ impl MetricsState {
             }
             self.history.push_back(snapshot.clone());
         }
-        self.latest_attempt = Some(snapshot);
+        self.latest_attempt = Some(Box::new(snapshot));
     }
 
     pub fn has_never_loaded(&self) -> bool {
@@ -68,12 +68,12 @@ impl MetricsState {
     }
 
     pub fn latest_attempt(&self) -> Option<&MetricsSnapshot> {
-        self.latest_attempt.as_ref()
+        self.latest_attempt.as_deref()
     }
 
     pub fn latest_data(&self) -> Option<&MetricsSnapshot> {
         self.latest_attempt
-            .as_ref()
+            .as_deref()
             .filter(|snapshot| snapshot.has_any_data())
             .or_else(|| self.history.back())
     }
@@ -84,7 +84,7 @@ impl MetricsState {
 
     pub fn is_stale(&self) -> bool {
         self.latest_attempt
-            .as_ref()
+            .as_deref()
             .is_some_and(|snapshot| !snapshot.has_any_data())
             && !self.history.is_empty()
     }

@@ -3,6 +3,7 @@ use crate::connection::ConnectionConfig;
 use crate::models::{
     ConsumerConfigInput, KvBucketConfigInput, ObjectStoreBucketConfigInput, StreamConfigInput,
 };
+use crate::monitoring::ClientStatusQuery;
 
 /// Commands sent from the UI thread to the async backend worker.
 #[derive(Debug)]
@@ -191,5 +192,15 @@ pub enum BackendCommand {
     FetchMetrics {
         connection_id: u64,
         endpoint: String,
+    },
+    FetchClientStatusPage {
+        connection_id: u64,
+        endpoint: String,
+        query: ClientStatusQuery,
+    },
+    FetchClientStatusDetail {
+        connection_id: u64,
+        endpoint: String,
+        query: ClientStatusQuery,
     },
 }
