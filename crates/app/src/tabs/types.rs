@@ -1,6 +1,8 @@
+mod client_status_state;
 mod metrics_state;
 mod tab_kind;
 
+pub use client_status_state::ClientStatusState;
 pub use metrics_state::MetricsState;
 pub use tab_kind::{AppTabViewer, TabKind};
 

@@ -26,6 +26,8 @@ pub use models::{
 };
 pub use models::{ObjectStoreBucketInfo, ObjectStoreDownloadResult, ObjectStoreObjectInfo};
 pub use monitoring::{
+    ClientConnectionState, ClientStatusDetail, ClientStatusPage, ClientStatusQuery,
+    ClientStatusRequestError, ClientStatusRow, ClientStatusSort, ClientStatusSubscription,
     ConnzMetrics, JetStreamMetrics, MetricsHealth, MetricsSection, MetricsSectionError,
     MetricsSnapshot, VarzMetrics,
 };

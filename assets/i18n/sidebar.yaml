@@ -22,6 +22,9 @@ section_object_store:
 section_metrics:
   en: "Metrics"
   zh: "监控指标"
+section_clients:
+  en: "Clients"
+  zh: "客户端"
 
 # Resource openers
 open_publisher:

@@ -128,3 +128,139 @@ series_js_memory:
 series_js_storage:
   en: "JetStream Storage"
   zh: "JetStream 存储"
+
+client_refresh:
+  en: "Refresh clients"
+  zh: "刷新客户端"
+client_previous:
+  en: "Previous page"
+  zh: "上一页"
+client_next:
+  en: "Next page"
+  zh: "下一页"
+client_loading:
+  en: "Loading clients..."
+  zh: "正在加载客户端..."
+client_not_loaded:
+  en: "No client status page loaded yet."
+  zh: "尚未加载客户端状态页。"
+client_empty:
+  en: "No clients match the current query."
+  zh: "当前查询没有匹配的客户端。"
+client_error_stale:
+  en: "Showing last successful client page"
+  zh: "当前展示的是最近一次成功客户端页"
+client_error_unavailable:
+  en: "Client status is currently unavailable"
+  zh: "当前无法获取客户端状态"
+client_page_summary:
+  en: "Rows"
+  zh: "行"
+client_select_hint:
+  en: "Click a client row to inspect details"
+  zh: "点击客户端行以查看详情"
+client_detail:
+  en: "Client Detail"
+  zh: "客户端详情"
+client_detail_loading:
+  en: "Loading client detail..."
+  zh: "正在加载客户端详情..."
+client_detail_stale:
+  en: "Selected client is not present in the latest page."
+  zh: "所选客户端不在最新页面中。"
+client_subscriptions:
+  en: "Subscriptions"
+  zh: "订阅"
+client_no_subscriptions:
+  en: "No subscription details returned for this client."
+  zh: "该客户端未返回订阅详情。"
+client_missing:
+  en: "n/a"
+  zh: "无"
+
+client_state_open:
+  en: "Open"
+  zh: "打开"
+client_state_closed:
+  en: "Closed"
+  zh: "已关闭"
+client_state_any:
+  en: "Any"
+  zh: "全部"
+
+client_sort_cid:
+  en: "Client ID"
+  zh: "客户端 ID"
+client_sort_start:
+  en: "Start"
+  zh: "开始时间"
+client_sort_subs:
+  en: "Subscriptions"
+  zh: "订阅数"
+client_sort_pending:
+  en: "Pending bytes"
+  zh: "待发送字节"
+client_sort_in_msgs:
+  en: "In messages"
+  zh: "入消息"
+client_sort_out_msgs:
+  en: "Out messages"
+  zh: "出消息"
+client_sort_in_bytes:
+  en: "In bytes"
+  zh: "入字节"
+client_sort_out_bytes:
+  en: "Out bytes"
+  zh: "出字节"
+client_sort_last:
+  en: "Last activity"
+  zh: "最后活动"
+client_sort_idle:
+  en: "Idle"
+  zh: "空闲"
+client_sort_uptime:
+  en: "Uptime"
+  zh: "运行时长"
+client_sort_stop:
+  en: "Stop"
+  zh: "停止时间"
+client_sort_reason:
+  en: "Reason"
+  zh: "原因"
+
+client_col_client:
+  en: "Client"
+  zh: "客户端"
+client_col_state:
+  en: "State"
+  zh: "状态"
+client_col_identity:
+  en: "Identity"
+  zh: "身份"
+client_col_address:
+  en: "Address"
+  zh: "地址"
+client_col_uptime_idle:
+  en: "Uptime / Idle"
+  zh: "运行 / 空闲"
+client_col_subs:
+  en: "Subs"
+  zh: "订阅"
+client_col_pending:
+  en: "Pending"
+  zh: "待发送"
+client_col_msgs:
+  en: "In / Out Msgs"
+  zh: "入 / 出消息"
+client_col_bytes:
+  en: "In / Out Bytes"
+  zh: "入 / 出字节"
+client_col_activity:
+  en: "Last Activity"
+  zh: "最后活动"
+client_col_rtt:
+  en: "RTT"
+  zh: "RTT"
+client_col_reason:
+  en: "Close Reason"
+  zh: "关闭原因"

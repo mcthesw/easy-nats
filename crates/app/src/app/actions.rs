@@ -11,7 +11,8 @@ use tokio_util::sync::CancellationToken;
 use crate::schema::kv_subject;
 use crate::settings::PubSubTabMode;
 use crate::tabs::{
-    MetricsState, PublisherState, SubscriberState, TabGuard, TabKind, next_backend_id,
+    ClientStatusState, MetricsState, PublisherState, SubscriberState, TabGuard, TabKind,
+    next_backend_id,
 };
 
 use super::{model::EasyNatsApp, util::same_tab};
@@ -298,6 +299,33 @@ impl EasyNatsApp {
             connection_id,
             connection_name,
             state: MetricsState::with_endpoint(endpoint),
+        };
+        self.open_or_focus_tab_kind(tab);
+    }
+
+    pub(crate) fn open_or_focus_clients_tab(&mut self, connection_id: u64) {
+        let connection_name = self.conn_name(connection_id);
+        let endpoint = self
+            .connection_metrics_endpoint(connection_id)
+            .unwrap_or_default();
+
+        for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+            if let TabKind::Clients {
+                connection_id: existing_id,
+                connection_name: existing_name,
+                state,
+            } = tab
+                && *existing_id == connection_id
+            {
+                *existing_name = connection_name.clone();
+                state.set_endpoint(endpoint.clone());
+            }
+        }
+
+        let tab = TabKind::Clients {
+            connection_id,
+            connection_name,
+            state: ClientStatusState::with_endpoint(endpoint),
         };
         self.open_or_focus_tab_kind(tab);
     }

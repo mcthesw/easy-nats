@@ -33,7 +33,6 @@ pub fn metrics_ui(
         }
     });
     ui.add_space(6.0);
-
     ui.horizontal_wrapped(|ui| {
         auto_refresh_ui(ui, "metrics_auto_refresh", &mut state.auto_refresh);
         if let Some((label, fill)) = status_badge(state, ui.visuals()) {
