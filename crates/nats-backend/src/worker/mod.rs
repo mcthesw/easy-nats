@@ -355,6 +355,34 @@ pub async fn run_worker(
             } => {
                 metrics::handle_fetch_metrics(&state, connection_id, endpoint, &evt_tx).await;
             }
+            BackendCommand::FetchClientStatusPage {
+                connection_id,
+                endpoint,
+                query,
+            } => {
+                metrics::handle_fetch_client_status_page(
+                    &state,
+                    connection_id,
+                    endpoint,
+                    query,
+                    &evt_tx,
+                )
+                .await;
+            }
+            BackendCommand::FetchClientStatusDetail {
+                connection_id,
+                endpoint,
+                query,
+            } => {
+                metrics::handle_fetch_client_status_detail(
+                    &state,
+                    connection_id,
+                    endpoint,
+                    query,
+                    &evt_tx,
+                )
+                .await;
+            }
         }
     }
 
