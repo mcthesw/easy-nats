@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.19](https://github.com/mcthesw/easy-nats/compare/v0.1.18...v0.1.19) (2026-05-08)
+
+
+### Bug Fixes
+
+* **search:** prevent source chips from deforming ([075ff2d](https://github.com/mcthesw/easy-nats/commit/075ff2dcf520432fa178fe57a3bdab24d867c2dc))
+
 ## [0.1.18](https://github.com/mcthesw/easy-nats/compare/v0.1.17...v0.1.18) (2026-05-07)
 
 
