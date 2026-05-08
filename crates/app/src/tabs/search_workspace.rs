@@ -11,6 +11,10 @@ use super::types::{
     SearchWorkspaceResult, SearchWorkspaceState, TabAction, TabKind,
 };
 
+const SOURCE_CHIP_LABEL_WIDTH: f32 = 190.0;
+const SOURCE_CHIP_COVERAGE_WIDTH: f32 = 105.0;
+const SOURCE_CHIP_FALLBACK_WIDTH: f32 = 125.0;
+
 pub(crate) fn source_snapshot_from_tab(tab: &TabKind) -> Option<SearchSourceSnapshot> {
     match tab {
         TabKind::KvBucket {
@@ -292,50 +296,17 @@ fn render_selected_sources(
     }
 
     let mut remove = Vec::new();
-    ui.horizontal_wrapped(|ui| {
-        for source_id in state.selected_sources.clone() {
-            let snapshot = sources.iter().find(|source| source.id == source_id);
-            ui.group(|ui| {
-                ui.horizontal_wrapped(|ui| {
-                    let label = snapshot
-                        .map(|source| source.label.as_str())
-                        .unwrap_or_else(|| t("search_workspace.source_unavailable"));
-                    ui.label(label);
-                    if let Some(snapshot) = snapshot {
-                        ui.weak(coverage_text(snapshot));
-                    } else {
-                        ui.weak(source_id.fallback_label());
-                    }
-                    if let Some(snapshot) = snapshot
-                        && let SearchSourceCoverage::Kv {
-                            scanning,
-                            can_scan_more,
-                            ..
-                        } = snapshot.coverage
-                    {
-                        if scanning > 0 {
-                            ui.spinner();
-                            ui.weak(t("search_workspace.scanning_values"));
-                        } else if can_scan_more {
-                            let label = if has_fetched_values(snapshot) {
-                                t("search_workspace.scan_more_values")
-                            } else {
-                                t("search_workspace.scan_values")
-                            };
-                            if ui.small_button(label).clicked() {
-                                actions.push(TabAction::ScanSearchWorkspaceKvValues {
-                                    source_id: source_id.clone(),
-                                });
-                            }
-                        }
-                    }
-                    if ui.small_button("x").clicked() {
-                        remove.push(source_id.clone());
-                    }
-                });
+    egui::ScrollArea::horizontal()
+        .id_salt("search_workspace_selected_sources")
+        .auto_shrink([false, true])
+        .show(ui, |ui| {
+            ui.horizontal(|ui| {
+                for source_id in state.selected_sources.clone() {
+                    let snapshot = sources.iter().find(|source| source.id == source_id);
+                    render_selected_source_chip(ui, &source_id, snapshot, actions, &mut remove);
+                }
             });
-        }
-    });
+        });
 
     if !remove.is_empty() {
         state
@@ -351,6 +322,70 @@ fn render_selected_sources(
             state.selected_preview = None;
         }
     }
+}
+
+fn render_selected_source_chip(
+    ui: &mut egui::Ui,
+    source_id: &SearchSourceId,
+    snapshot: Option<&SearchSourceSnapshot>,
+    actions: &mut Vec<TabAction>,
+    remove: &mut Vec<SearchSourceId>,
+) {
+    ui.group(|ui| {
+        ui.horizontal(|ui| {
+            let label = snapshot
+                .map(|source| source.label.as_str())
+                .unwrap_or_else(|| t("search_workspace.source_unavailable"));
+            clipped_label(ui, label, SOURCE_CHIP_LABEL_WIDTH);
+            if let Some(snapshot) = snapshot {
+                clipped_weak_label(ui, &coverage_text(snapshot), SOURCE_CHIP_COVERAGE_WIDTH);
+            } else {
+                clipped_weak_label(ui, &source_id.fallback_label(), SOURCE_CHIP_FALLBACK_WIDTH);
+            }
+            if let Some(snapshot) = snapshot
+                && let SearchSourceCoverage::Kv {
+                    scanning,
+                    can_scan_more,
+                    ..
+                } = snapshot.coverage
+            {
+                if scanning > 0 {
+                    ui.spinner();
+                    ui.weak(t("search_workspace.scanning_values"));
+                } else if can_scan_more {
+                    let label = if has_fetched_values(snapshot) {
+                        t("search_workspace.scan_more_values")
+                    } else {
+                        t("search_workspace.scan_values")
+                    };
+                    if ui.small_button(label).clicked() {
+                        actions.push(TabAction::ScanSearchWorkspaceKvValues {
+                            source_id: source_id.clone(),
+                        });
+                    }
+                }
+            }
+            if ui.small_button("x").clicked() {
+                remove.push(source_id.clone());
+            }
+        });
+    });
+}
+
+fn clipped_label(ui: &mut egui::Ui, text: &str, width: f32) {
+    ui.add_sized(
+        [width, ui.spacing().interact_size.y],
+        egui::Label::new(text).truncate(),
+    )
+    .on_hover_text(text);
+}
+
+fn clipped_weak_label(ui: &mut egui::Ui, text: &str, width: f32) {
+    ui.add_sized(
+        [width, ui.spacing().interact_size.y],
+        egui::Label::new(egui::RichText::new(text).weak()).truncate(),
+    )
+    .on_hover_text(text);
 }
 
 fn render_results(
