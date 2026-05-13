@@ -23,7 +23,46 @@
     </screenshot>
   </screenshots>
   <releases>
-    <release version="0.1.12" timestamp="1777092054"/>
+    <release version="0.1.19" date="2026-05-08">
+      <description>
+        <p>Fixes search source chip layout.</p>
+      </description>
+    </release>
+    <release version="0.1.18" date="2026-05-07">
+      <description>
+        <p>Adds the client status tab.</p>
+      </description>
+    </release>
+    <release version="0.1.17" date="2026-05-06">
+      <description>
+        <p>Improves large KV lists and work queue previews.</p>
+      </description>
+    </release>
+    <release version="0.1.16" date="2026-05-01">
+      <description>
+        <p>Fixes release tag handling in CI.</p>
+      </description>
+    </release>
+    <release version="0.1.15" date="2026-05-01">
+      <description>
+        <p>Adds deliver policies, KV values, and typed backend models.</p>
+      </description>
+    </release>
+    <release version="0.1.14" date="2026-04-29">
+      <description>
+        <p>Adds message schema management and payload templates.</p>
+      </description>
+    </release>
+    <release version="0.1.13" date="2026-04-26">
+      <description>
+        <p>Adds the in-memory search workspace.</p>
+      </description>
+    </release>
+    <release version="0.1.12" date="2026-04-25">
+      <description>
+        <p>Adds scoped tab search.</p>
+      </description>
+    </release>
     <release version="0.1.11" timestamp="1776964326"/>
     <release version="0.1.10" timestamp="1776962414"/>
     <release version="0.1.9" timestamp="1776697737"/>
