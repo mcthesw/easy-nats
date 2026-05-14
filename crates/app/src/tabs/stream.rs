@@ -7,7 +7,7 @@ use crate::i18n::t;
 use crate::schema::MessageSchemaManager;
 
 use super::common::{
-    SEARCH_RESULT_LIMIT, SearchStatus, auto_refresh_ui, format_bytes, matches_query,
+    NormalizedSearchQuery, SEARCH_RESULT_LIMIT, SearchStatus, auto_refresh_ui, format_bytes,
     render_search_row, searchable_payload_text,
 };
 use super::stream_consumers::render_consumers;
@@ -253,12 +253,20 @@ fn filtered_stream_rows(state: &mut StreamState) -> &[(usize, String)] {
     };
 
     if needs_refresh {
-        let query = state.search.normalized_query();
+        let search_active = state.search.is_active();
+        let query = search_active.then(|| {
+            NormalizedSearchQuery::new(&cache_key.query)
+                .expect("active search has a normalized query")
+        });
         let rows = state
             .messages
             .iter()
             .enumerate()
-            .filter(|(_, msg)| stream_message_matches(msg, &state.search, &query))
+            .filter(|(_, msg)| {
+                query
+                    .as_ref()
+                    .is_none_or(|query| stream_message_matches(msg, &state.search, query))
+            })
             .take(SEARCH_RESULT_LIMIT)
             .map(|(idx, msg)| (idx, stream_message_label(msg)))
             .collect();
@@ -275,15 +283,11 @@ fn filtered_stream_rows(state: &mut StreamState) -> &[(usize, String)] {
 fn stream_message_matches(
     msg: &StreamMessageInfo,
     search: &super::types::ScopedSearchState,
-    query: &str,
+    query: &NormalizedSearchQuery,
 ) -> bool {
-    if !search.is_active() {
-        return true;
-    }
-    let subject_matches = search.primary && matches_query(&msg.subject, query);
-    let payload_matches =
-        search.secondary && matches_query(&searchable_payload_text(&msg.payload), query);
-    subject_matches || payload_matches
+    query.matches_scoped(search.primary, &msg.subject, search.secondary, |query| {
+        query.matches(&searchable_payload_text(&msg.payload))
+    })
 }
 
 fn stream_message_label(msg: &StreamMessageInfo) -> String {
@@ -519,5 +523,32 @@ fn stream_message_detail(
             proto_view,
             schema_manager,
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn stream_msg(subject: &str, payload: &[u8]) -> StreamMessageInfo {
+        StreamMessageInfo {
+            sequence: 1,
+            subject: subject.to_string(),
+            payload: payload.to_vec(),
+            headers: Vec::new(),
+            time: String::new(),
+        }
+    }
+
+    #[test]
+    fn inactive_stream_search_lists_loaded_messages_without_query() {
+        let mut state = StreamState {
+            messages: vec![stream_msg("orders.created", b"balance: 42")],
+            ..Default::default()
+        };
+
+        let rows = filtered_stream_rows(&mut state).to_vec();
+
+        assert_eq!(rows, vec![(0, "#1 orders.created".to_string())]);
     }
 }

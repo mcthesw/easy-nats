@@ -6,7 +6,7 @@ use crate::i18n::t;
 use crate::schema::MessageSchemaManager;
 
 use super::common::{
-    SEARCH_RESULT_LIMIT, SearchStatus, format_timestamp, matches_query, render_search_row,
+    NormalizedSearchQuery, SEARCH_RESULT_LIMIT, SearchStatus, format_timestamp, render_search_row,
     searchable_payload_text, topic_history_text_edit,
 };
 use super::guard::TabGuard;
@@ -50,7 +50,7 @@ pub fn subscriber_ui(
 
     egui::CentralPanel::default().show_inside(ui, |ui| {
         let selected_msg = state.selected_idx.and_then(|idx| state.messages.get(idx));
-        if let Some(msg) = &selected_msg {
+        if let Some(msg) = selected_msg {
             message_detail_ui(
                 ui,
                 connection_id,
@@ -299,7 +299,11 @@ fn filtered_rows(state: &mut SubscriberState) -> &[(usize, String, String)] {
 
     if needs_refresh {
         let subject_filter = state.subject_filter.clone();
-        let query = state.search.normalized_query();
+        let search_active = state.search.is_active();
+        let query = search_active.then(|| {
+            NormalizedSearchQuery::new(&search_key.query)
+                .expect("active search has a normalized query")
+        });
         let rows = state
             .messages
             .iter()
@@ -308,7 +312,9 @@ fn filtered_rows(state: &mut SubscriberState) -> &[(usize, String, String)] {
                 subject_filter
                     .as_ref()
                     .is_none_or(|filter| message.subject == *filter)
-                    && subscriber_message_matches(message, &state.search, &query)
+                    && query.as_ref().is_none_or(|query| {
+                        subscriber_message_matches(message, &state.search, query)
+                    })
             })
             .take(SEARCH_RESULT_LIMIT)
             .map(|(idx, message)| {
@@ -332,15 +338,14 @@ fn filtered_rows(state: &mut SubscriberState) -> &[(usize, String, String)] {
 fn subscriber_message_matches(
     message: &ReceivedMessage,
     search: &super::types::ScopedSearchState,
-    query: &str,
+    query: &NormalizedSearchQuery,
 ) -> bool {
-    if !search.is_active() {
-        return true;
-    }
-    let subject_matches = search.primary && matches_query(&message.subject, query);
-    let payload_matches =
-        search.secondary && matches_query(&searchable_payload_text(&message.payload), query);
-    subject_matches || payload_matches
+    query.matches_scoped(
+        search.primary,
+        &message.subject,
+        search.secondary,
+        |query| query.matches(&searchable_payload_text(&message.payload)),
+    )
 }
 
 fn message_detail_ui(
@@ -441,9 +446,7 @@ mod tests {
             max_messages: 2,
             ..Default::default()
         };
-        state.push_message(make_msg("a"));
-        state.push_message(make_msg("b"));
-        state.push_message(make_msg("c"));
+        state.push_messages([make_msg("a"), make_msg("b"), make_msg("c")]);
         assert_eq!(state.messages.len(), 2);
         assert_eq!(state.messages[0].subject, "b");
         assert_eq!(state.messages[1].subject, "c");
@@ -452,20 +455,19 @@ mod tests {
     #[test]
     fn cache_is_reused_until_state_changes() {
         let mut state = SubscriberState::default();
-        state.push_message(make_msg("alpha"));
-        state.push_message(make_msg("beta"));
+        state.push_messages([make_msg("alpha"), make_msg("beta")]);
 
         let first = filtered_rows(&mut state).to_vec();
         assert_eq!(
             state.cached_filtered.as_ref().map(|cached| cached.0),
-            Some(2)
+            Some(1)
         );
 
         let second = filtered_rows(&mut state).to_vec();
         assert_eq!(first, second);
         assert_eq!(
             state.cached_filtered.as_ref().map(|cached| cached.0),
-            Some(2)
+            Some(1)
         );
 
         state.subject_filter = Some("beta".to_string());
@@ -479,8 +481,10 @@ mod tests {
     #[test]
     fn search_filters_by_subject_or_payload() {
         let mut state = SubscriberState::default();
-        state.push_message(make_msg_with_payload("orders.created", b"balance: 10"));
-        state.push_message(make_msg_with_payload("payments.updated", b"balance: 42"));
+        state.push_messages([
+            make_msg_with_payload("orders.created", b"balance: 10"),
+            make_msg_with_payload("payments.updated", b"balance: 42"),
+        ]);
 
         state.search.query = "payments".to_string();
         state.search.primary = true;
@@ -501,7 +505,7 @@ mod tests {
     #[test]
     fn clear_messages_resets_selection_and_cache() {
         let mut state = SubscriberState::default();
-        state.push_message(make_msg("alpha"));
+        state.push_messages([make_msg("alpha")]);
         state.selected_idx = Some(0);
         let _ = filtered_rows(&mut state);
 
@@ -519,14 +523,47 @@ mod tests {
             max_messages: 2,
             ..Default::default()
         };
-        state.push_message(make_msg("alpha"));
-        state.push_message(make_msg("beta"));
+        state.push_messages([make_msg("alpha"), make_msg("beta")]);
         state.selected_idx = Some(1);
 
-        state.push_message(make_msg("gamma"));
+        state.push_messages([make_msg("gamma")]);
 
         assert_eq!(state.selected_idx, Some(0));
         assert_eq!(state.messages[0].subject, "beta");
         assert_eq!(state.messages[1].subject, "gamma");
+    }
+
+    #[test]
+    fn batch_push_invalidates_cache_once() {
+        let mut state = SubscriberState::default();
+
+        state.push_messages([make_msg("alpha"), make_msg("beta")]);
+
+        assert_eq!(state.messages.len(), 2);
+        assert_eq!(state.messages[0].id, 1);
+        assert_eq!(state.messages[1].id, 2);
+        assert_eq!(state.cache_generation, 1);
+        assert!(state.cached_filtered.is_none());
+    }
+
+    #[test]
+    fn batch_push_preserves_eviction_and_selected_index_behavior() {
+        let mut state = SubscriberState {
+            max_messages: 3,
+            ..Default::default()
+        };
+        state.push_messages([make_msg("alpha"), make_msg("beta"), make_msg("gamma")]);
+        state.selected_idx = Some(2);
+
+        state.push_messages([make_msg("delta"), make_msg("epsilon")]);
+
+        let subjects = state
+            .messages
+            .iter()
+            .map(|message| message.subject.as_str())
+            .collect::<Vec<_>>();
+        assert_eq!(subjects, vec!["gamma", "delta", "epsilon"]);
+        assert_eq!(state.selected_idx, Some(0));
+        assert_eq!(state.cache_generation, 2);
     }
 }

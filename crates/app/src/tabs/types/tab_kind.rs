@@ -8,7 +8,7 @@ use crate::theme::ThemeId;
 
 use super::{
     ClientStatusState, KvBucketState, MessageSchemasState, MetricsState, ObjectStoreBucketState,
-    PublisherState, SearchSourceSnapshot, SearchWorkspaceState, ServerInfoState, StreamState,
+    PublisherState, SearchSourceSummary, SearchWorkspaceState, ServerInfoState, StreamState,
     SubscriberState, TabAction,
 };
 use crate::tabs::guard::TabGuard;
@@ -194,7 +194,7 @@ impl TabKind {
 pub struct AppTabViewer<'a> {
     pub backend: &'a nats_backend::BackendHandle,
     pub actions: &'a mut Vec<TabAction>,
-    pub search_sources: &'a [SearchSourceSnapshot],
+    pub search_sources: &'a [SearchSourceSummary],
     pub settings: &'a mut crate::settings::AppSettings,
     pub theme_id: &'a mut ThemeId,
     pub log_buffer: &'a crate::log_layer::SharedLogBuffer,

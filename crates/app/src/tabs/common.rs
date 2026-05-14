@@ -80,11 +80,70 @@ pub(crate) fn render_search_row(
                 ui.checkbox(&mut search.secondary, secondary_label);
             });
     });
-    before != (search.query.clone(), search.primary, search.secondary)
+    search.query != before.0 || search.primary != before.1 || search.secondary != before.2
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct NormalizedSearchQuery {
+    query: String,
+    is_ascii: bool,
+}
+
+impl NormalizedSearchQuery {
+    pub(crate) fn new(query: &str) -> Option<Self> {
+        let query = query.trim();
+        if query.is_empty() {
+            return None;
+        }
+        Some(Self::from_normalized(query.to_lowercase()))
+    }
+
+    pub(crate) fn from_normalized(query: String) -> Self {
+        let is_ascii = query.is_ascii();
+        Self { query, is_ascii }
+    }
+
+    pub(crate) fn matches(&self, value: &str) -> bool {
+        if self.is_ascii && value.is_ascii() {
+            contains_ascii_case_insensitive(value.as_bytes(), self.query.as_bytes())
+        } else {
+            value.to_lowercase().contains(&self.query)
+        }
+    }
+
+    pub(crate) fn matches_scoped(
+        &self,
+        primary_enabled: bool,
+        primary: &str,
+        secondary_enabled: bool,
+        secondary_matches: impl FnOnce(&Self) -> bool,
+    ) -> bool {
+        if primary_enabled && self.matches(primary) {
+            return true;
+        }
+        secondary_enabled && secondary_matches(self)
+    }
+}
+
+#[cfg(test)]
 pub(crate) fn matches_query(value: &str, query: &str) -> bool {
-    value.to_lowercase().contains(query)
+    NormalizedSearchQuery::new(query).is_some_and(|query| query.matches(value))
+}
+
+fn contains_ascii_case_insensitive(value: &[u8], query: &[u8]) -> bool {
+    if query.is_empty() {
+        return true;
+    }
+    if query.len() > value.len() {
+        return false;
+    }
+
+    value.windows(query.len()).any(|window| {
+        window
+            .iter()
+            .zip(query.iter())
+            .all(|(value, query)| value.to_ascii_lowercase() == *query)
+    })
 }
 
 pub(crate) fn searchable_payload_text(payload: &[u8]) -> String {
@@ -228,8 +287,11 @@ fn cycle_suggestion_index(current: Option<usize>, len: usize, forward: bool) -> 
 
 #[cfg(test)]
 mod tests {
+    use std::cell::Cell;
+
     use super::{
-        cycle_suggestion_index, matches_query, searchable_payload_text, visible_topic_suggestions,
+        NormalizedSearchQuery, cycle_suggestion_index, matches_query, searchable_payload_text,
+        visible_topic_suggestions,
     };
 
     #[test]
@@ -248,6 +310,42 @@ mod tests {
         assert!(matches_query("Balance: 42", "balance"));
         assert!(matches_query("Balance: 42", "42"));
         assert_eq!(searchable_payload_text(b"hello"), "hello");
+    }
+
+    #[test]
+    fn normalized_search_query_trims_and_matches_ascii_case_insensitively() {
+        let query = NormalizedSearchQuery::new("  BALANCE  ").expect("query is active");
+
+        assert_eq!(
+            query,
+            NormalizedSearchQuery::from_normalized("balance".to_string())
+        );
+        assert!(query.matches("Account Balance: 42"));
+        assert!(!query.matches("Account total: 42"));
+    }
+
+    #[test]
+    fn normalized_search_query_preserves_unicode_case_matching() {
+        let query = NormalizedSearchQuery::new("éclair").expect("query is active");
+
+        assert!(query.matches("ÉCLAIR"));
+    }
+
+    #[test]
+    fn normalized_search_query_reports_inactive_empty_queries() {
+        assert!(NormalizedSearchQuery::new("   ").is_none());
+    }
+
+    #[test]
+    fn scoped_match_short_circuits_secondary_field_when_primary_matches() {
+        let query = NormalizedSearchQuery::new("orders").expect("query is active");
+        let secondary_called = Cell::new(false);
+
+        assert!(query.matches_scoped(true, "orders.created", true, |_| {
+            secondary_called.set(true);
+            false
+        }));
+        assert!(!secondary_called.get());
     }
 
     #[test]

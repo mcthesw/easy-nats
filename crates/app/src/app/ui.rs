@@ -21,7 +21,8 @@ impl eframe::App for EasyNatsApp {
         windows::render_windows(self, ui);
         sidebar::render_sidebar(self, ui);
 
-        let search_sources = self.search_source_snapshots();
+        let search_sources = self.search_source_summaries();
+        self.prepare_search_workspace_results(&search_sources);
         let connections: Vec<(u64, String)> = self
             .config
             .connections

@@ -2,20 +2,21 @@ use eframe::egui;
 
 use crate::i18n::t;
 
-use super::common::{
-    SEARCH_RESULT_LIMIT, format_timestamp, matches_query, searchable_payload_text,
-};
+use super::common::SEARCH_RESULT_LIMIT;
 use super::types::{
-    SearchField, SearchRecordSnapshot, SearchResultIdentity, SearchResultLocator,
-    SearchSourceCoverage, SearchSourceId, SearchSourceSnapshot, SearchWorkspaceCacheKey,
+    SearchField, SearchSourceCoverage, SearchSourceId, SearchSourceKind, SearchSourceSummary,
     SearchWorkspaceResult, SearchWorkspaceState, TabAction, TabKind,
 };
+
+mod results;
+
+pub(crate) use results::{SearchWorkspaceBuildStats, append_search_workspace_results};
 
 const SOURCE_CHIP_LABEL_WIDTH: f32 = 190.0;
 const SOURCE_CHIP_COVERAGE_WIDTH: f32 = 105.0;
 const SOURCE_CHIP_FALLBACK_WIDTH: f32 = 125.0;
 
-pub(crate) fn source_snapshot_from_tab(tab: &TabKind) -> Option<SearchSourceSnapshot> {
+pub(crate) fn source_summary_from_tab(tab: &TabKind) -> Option<SearchSourceSummary> {
     match tab {
         TabKind::KvBucket {
             connection_id,
@@ -28,41 +29,7 @@ pub(crate) fn source_snapshot_from_tab(tab: &TabKind) -> Option<SearchSourceSnap
                 connection_id: *connection_id,
                 bucket_name: bucket_name.clone(),
             };
-            let mut records = Vec::new();
-            for key in &state.keys {
-                records.push(SearchRecordSnapshot {
-                    field: SearchField::Key,
-                    item_id: key.clone(),
-                    item_label: key.clone(),
-                    text: key.clone(),
-                    snippet: compact_text(key, 160),
-                    locator: SearchResultLocator::KvKey {
-                        connection_id: *connection_id,
-                        bucket_name: bucket_name.clone(),
-                        key: key.clone(),
-                    },
-                });
-            }
-            let mut fetched_keys = state.fetched_values.keys().cloned().collect::<Vec<_>>();
-            fetched_keys.sort();
-            for key in fetched_keys {
-                if let Some(value) = state.fetched_values.get(&key) {
-                    records.push(SearchRecordSnapshot {
-                        field: SearchField::Value,
-                        item_id: key.clone(),
-                        item_label: key.clone(),
-                        text: value.clone(),
-                        snippet: compact_text(value, 160),
-                        locator: SearchResultLocator::KvKey {
-                            connection_id: *connection_id,
-                            bucket_name: bucket_name.clone(),
-                            key,
-                        },
-                    });
-                }
-            }
-
-            Some(SearchSourceSnapshot {
+            Some(SearchSourceSummary {
                 id,
                 label: format!("{bucket_name} ({connection_name})"),
                 generation: state.search_generation,
@@ -73,7 +40,7 @@ pub(crate) fn source_snapshot_from_tab(tab: &TabKind) -> Option<SearchSourceSnap
                     can_scan_more: state.value_search_scanning == 0
                         && state.value_search_cursor < state.keys.len(),
                 },
-                records,
+                kind: SearchSourceKind::Kv,
             })
         }
         TabKind::Stream {
@@ -87,54 +54,14 @@ pub(crate) fn source_snapshot_from_tab(tab: &TabKind) -> Option<SearchSourceSnap
                 connection_id: *connection_id,
                 stream_name: stream_name.clone(),
             };
-            let mut records = Vec::new();
-            for msg in &state.messages {
-                let sequence = msg.sequence;
-                let subject = msg.subject.as_str();
-                let item_label = if subject.is_empty() {
-                    format!("#{sequence}")
-                } else {
-                    format!("#{sequence} {subject}")
-                };
-                if !subject.is_empty() {
-                    records.push(SearchRecordSnapshot {
-                        field: SearchField::Subject,
-                        item_id: sequence.to_string(),
-                        item_label: item_label.clone(),
-                        text: subject.to_string(),
-                        snippet: compact_text(subject, 160),
-                        locator: SearchResultLocator::StreamMessage {
-                            connection_id: *connection_id,
-                            stream_name: stream_name.clone(),
-                            sequence,
-                        },
-                    });
-                }
-                let payload = searchable_payload_text(&msg.payload);
-                if !payload.is_empty() {
-                    records.push(SearchRecordSnapshot {
-                        field: SearchField::Payload,
-                        item_id: sequence.to_string(),
-                        item_label: item_label.clone(),
-                        text: payload.clone(),
-                        snippet: compact_text(&payload, 160),
-                        locator: SearchResultLocator::StreamMessage {
-                            connection_id: *connection_id,
-                            stream_name: stream_name.clone(),
-                            sequence,
-                        },
-                    });
-                }
-            }
-
-            Some(SearchSourceSnapshot {
+            Some(SearchSourceSummary {
                 id,
                 label: format!("{stream_name} ({connection_name})"),
                 generation: state.search_generation,
                 coverage: SearchSourceCoverage::Stream {
                     messages: state.messages.len(),
                 },
-                records,
+                kind: SearchSourceKind::Stream,
             })
         }
         TabKind::Subscriber {
@@ -153,39 +80,7 @@ pub(crate) fn source_snapshot_from_tab(tab: &TabKind) -> Option<SearchSourceSnap
                 .display_id()
                 .map(|id| format!("#{id} "))
                 .unwrap_or_default();
-            let mut records = Vec::new();
-            for msg in &state.messages {
-                let item_label = format!("{} {}", format_timestamp(msg.timestamp), msg.subject);
-                records.push(SearchRecordSnapshot {
-                    field: SearchField::Subject,
-                    item_id: msg.id.to_string(),
-                    item_label: item_label.clone(),
-                    text: msg.subject.clone(),
-                    snippet: compact_text(&msg.subject, 160),
-                    locator: SearchResultLocator::SubscriberMessage {
-                        connection_id: *connection_id,
-                        backend_id: *backend_id,
-                        message_id: msg.id,
-                    },
-                });
-                let payload = searchable_payload_text(&msg.payload);
-                if !payload.is_empty() {
-                    records.push(SearchRecordSnapshot {
-                        field: SearchField::Payload,
-                        item_id: msg.id.to_string(),
-                        item_label: item_label.clone(),
-                        text: payload.clone(),
-                        snippet: compact_text(&payload, 160),
-                        locator: SearchResultLocator::SubscriberMessage {
-                            connection_id: *connection_id,
-                            backend_id: *backend_id,
-                            message_id: msg.id,
-                        },
-                    });
-                }
-            }
-
-            Some(SearchSourceSnapshot {
+            Some(SearchSourceSummary {
                 id,
                 label: format!(
                     "{} {display_id}({connection_name})",
@@ -196,7 +91,7 @@ pub(crate) fn source_snapshot_from_tab(tab: &TabKind) -> Option<SearchSourceSnap
                     messages: state.messages.len(),
                     max_messages: state.max_messages,
                 },
-                records,
+                kind: SearchSourceKind::Subscriber,
             })
         }
         _ => None,
@@ -206,7 +101,7 @@ pub(crate) fn source_snapshot_from_tab(tab: &TabKind) -> Option<SearchSourceSnap
 pub fn search_workspace_ui(
     ui: &mut egui::Ui,
     state: &mut SearchWorkspaceState,
-    sources: &[SearchSourceSnapshot],
+    sources: &[SearchSourceSummary],
     actions: &mut Vec<TabAction>,
 ) {
     render_toolbar(ui, state, sources);
@@ -214,7 +109,11 @@ pub fn search_workspace_ui(
     render_selected_sources(ui, state, sources, actions);
     ui.separator();
 
-    let results = workspace_results(state, sources).to_vec();
+    let cached_results = state.cached_results.take();
+    let results = cached_results
+        .as_ref()
+        .map(|(_, results)| results.as_slice())
+        .unwrap_or(&[]);
     if let Some(selected) = &state.selected_result
         && !results.iter().any(|result| &result.identity == selected)
         && state.selected_preview.is_none()
@@ -227,18 +126,20 @@ pub fn search_workspace_ui(
         .default_size(360.0)
         .size_range(260.0..=f32::INFINITY)
         .show_inside(ui, |ui| {
-            render_results(ui, state, sources, &results);
+            render_results(ui, state, sources, results);
         });
 
     egui::CentralPanel::default().show_inside(ui, |ui| {
-        render_preview(ui, state, &results, actions);
+        render_preview(ui, state, results, actions);
     });
+
+    state.cached_results = cached_results;
 }
 
 fn render_toolbar(
     ui: &mut egui::Ui,
     state: &mut SearchWorkspaceState,
-    sources: &[SearchSourceSnapshot],
+    sources: &[SearchSourceSummary],
 ) {
     let before = (state.query.clone(), state.primary, state.secondary);
     ui.horizontal_wrapped(|ui| {
@@ -287,7 +188,7 @@ fn render_toolbar(
 fn render_selected_sources(
     ui: &mut egui::Ui,
     state: &mut SearchWorkspaceState,
-    sources: &[SearchSourceSnapshot],
+    sources: &[SearchSourceSummary],
     actions: &mut Vec<TabAction>,
 ) {
     if state.selected_sources.is_empty() {
@@ -302,8 +203,8 @@ fn render_selected_sources(
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 for source_id in state.selected_sources.clone() {
-                    let snapshot = sources.iter().find(|source| source.id == source_id);
-                    render_selected_source_chip(ui, &source_id, snapshot, actions, &mut remove);
+                    let source = sources.iter().find(|source| source.id == source_id);
+                    render_selected_source_chip(ui, &source_id, source, actions, &mut remove);
                 }
             });
         });
@@ -327,33 +228,33 @@ fn render_selected_sources(
 fn render_selected_source_chip(
     ui: &mut egui::Ui,
     source_id: &SearchSourceId,
-    snapshot: Option<&SearchSourceSnapshot>,
+    source: Option<&SearchSourceSummary>,
     actions: &mut Vec<TabAction>,
     remove: &mut Vec<SearchSourceId>,
 ) {
     ui.group(|ui| {
         ui.horizontal(|ui| {
-            let label = snapshot
+            let label = source
                 .map(|source| source.label.as_str())
                 .unwrap_or_else(|| t("search_workspace.source_unavailable"));
             clipped_label(ui, label, SOURCE_CHIP_LABEL_WIDTH);
-            if let Some(snapshot) = snapshot {
-                clipped_weak_label(ui, &coverage_text(snapshot), SOURCE_CHIP_COVERAGE_WIDTH);
+            if let Some(source) = source {
+                clipped_weak_label(ui, &coverage_text(source), SOURCE_CHIP_COVERAGE_WIDTH);
             } else {
                 clipped_weak_label(ui, &source_id.fallback_label(), SOURCE_CHIP_FALLBACK_WIDTH);
             }
-            if let Some(snapshot) = snapshot
+            if let Some(source) = source
                 && let SearchSourceCoverage::Kv {
                     scanning,
                     can_scan_more,
                     ..
-                } = snapshot.coverage
+                } = source.coverage
             {
                 if scanning > 0 {
                     ui.spinner();
                     ui.weak(t("search_workspace.scanning_values"));
                 } else if can_scan_more {
-                    let label = if has_fetched_values(snapshot) {
+                    let label = if has_fetched_values(source) {
                         t("search_workspace.scan_more_values")
                     } else {
                         t("search_workspace.scan_values")
@@ -391,7 +292,7 @@ fn clipped_weak_label(ui: &mut egui::Ui, text: &str, width: f32) {
 fn render_results(
     ui: &mut egui::Ui,
     state: &mut SearchWorkspaceState,
-    sources: &[SearchSourceSnapshot],
+    sources: &[SearchSourceSummary],
     results: &[SearchWorkspaceResult],
 ) {
     ui.horizontal(|ui| {
@@ -431,15 +332,15 @@ fn render_results(
         .auto_shrink(false)
         .show(ui, |ui| {
             for source_id in state.selected_sources.clone() {
-                let group_results = results
+                let mut group_results = results
                     .iter()
-                    .filter(|result| result.identity.source_id == source_id)
-                    .collect::<Vec<_>>();
-                if group_results.is_empty() {
+                    .filter(|result| result.identity.source_id == source_id);
+                let Some(first_result) = group_results.next() else {
                     continue;
-                }
-                render_result_group_header(ui, sources, group_results[0]);
+                };
+                render_result_group_header(ui, sources, first_result);
                 ui.add_space(2.0);
+                render_result_row(ui, state, first_result);
                 for result in group_results {
                     render_result_row(ui, state, result);
                 }
@@ -450,7 +351,7 @@ fn render_results(
 
 fn render_result_group_header(
     ui: &mut egui::Ui,
-    sources: &[SearchSourceSnapshot],
+    sources: &[SearchSourceSummary],
     first_result: &SearchWorkspaceResult,
 ) {
     let source = sources
@@ -538,83 +439,6 @@ fn render_preview(
     );
 }
 
-fn workspace_results<'a>(
-    state: &'a mut SearchWorkspaceState,
-    sources: &[SearchSourceSnapshot],
-) -> &'a [SearchWorkspaceResult] {
-    let key = SearchWorkspaceCacheKey {
-        query: state.query.trim().to_lowercase(),
-        primary: state.primary,
-        secondary: state.secondary,
-        sources: state
-            .selected_sources
-            .iter()
-            .map(|source_id| {
-                let generation = sources
-                    .iter()
-                    .find(|source| &source.id == source_id)
-                    .map(|source| source.generation);
-                (source_id.clone(), generation)
-            })
-            .collect(),
-    };
-
-    let needs_refresh = state
-        .cached_results
-        .as_ref()
-        .is_none_or(|(cached_key, _)| *cached_key != key);
-
-    if needs_refresh {
-        let mut results = Vec::new();
-        if !key.query.is_empty() && (key.primary || key.secondary) {
-            for source_id in &state.selected_sources {
-                let Some(source) = sources.iter().find(|source| &source.id == source_id) else {
-                    continue;
-                };
-                for record in &source.records {
-                    if results.len() >= SEARCH_RESULT_LIMIT {
-                        break;
-                    }
-                    if !field_enabled(record.field, key.primary, key.secondary) {
-                        continue;
-                    }
-                    if matches_query(&record.text, &key.query) {
-                        results.push(SearchWorkspaceResult {
-                            identity: SearchResultIdentity {
-                                source_id: source.id.clone(),
-                                generation: source.generation,
-                                field: record.field,
-                                item_id: record.item_id.clone(),
-                            },
-                            source_label: source.label.clone(),
-                            field: record.field,
-                            item_label: record.item_label.clone(),
-                            snippet: record.snippet.clone(),
-                            preview: record.text.clone(),
-                            locator: record.locator.clone(),
-                        });
-                    }
-                }
-            }
-        }
-        state.cached_results = Some((key, results));
-    }
-
-    state
-        .cached_results
-        .as_ref()
-        .map(|(_, results)| results.as_slice())
-        .unwrap_or(&[])
-}
-
-fn field_enabled(field: SearchField, primary: bool, secondary: bool) -> bool {
-    if field.is_primary() {
-        primary
-    } else {
-        secondary
-    }
-}
-
 fn field_label(field: SearchField) -> &'static str {
     match field {
         SearchField::Key => t("search_workspace.field_key"),
@@ -624,7 +448,7 @@ fn field_label(field: SearchField) -> &'static str {
     }
 }
 
-fn coverage_text(source: &SearchSourceSnapshot) -> String {
+fn coverage_text(source: &SearchSourceSummary) -> String {
     match source.coverage {
         SearchSourceCoverage::Kv {
             loaded_keys,
@@ -648,7 +472,7 @@ fn coverage_text(source: &SearchSourceSnapshot) -> String {
     }
 }
 
-fn has_fetched_values(source: &SearchSourceSnapshot) -> bool {
+fn has_fetched_values(source: &SearchSourceSummary) -> bool {
     matches!(
         source.coverage,
         SearchSourceCoverage::Kv {
@@ -663,14 +487,36 @@ fn compact_label(label: &str) -> String {
 }
 
 pub(crate) fn compact_text(text: &str, max_chars: usize) -> String {
-    let collapsed = text.split_whitespace().collect::<Vec<_>>().join(" ");
-    let mut chars = collapsed.chars();
-    let snippet: String = chars.by_ref().take(max_chars).collect();
-    if chars.next().is_some() {
-        format!("{snippet}...")
-    } else {
-        snippet
+    let mut snippet = String::new();
+    let mut written = 0usize;
+    let mut truncated = false;
+
+    'words: for word in text.split_whitespace() {
+        if !snippet.is_empty() && push_limited_char(&mut snippet, ' ', max_chars, &mut written) {
+            truncated = true;
+            break;
+        }
+        for ch in word.chars() {
+            if push_limited_char(&mut snippet, ch, max_chars, &mut written) {
+                truncated = true;
+                break 'words;
+            }
+        }
     }
+
+    if truncated {
+        snippet.push_str("...");
+    }
+    snippet
+}
+
+fn push_limited_char(output: &mut String, ch: char, max_chars: usize, written: &mut usize) -> bool {
+    if *written >= max_chars {
+        return true;
+    }
+    output.push(ch);
+    *written += 1;
+    false
 }
 
 #[cfg(test)]

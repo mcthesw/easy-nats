@@ -1,6 +1,6 @@
 use std::ops::Range;
 
-use crate::tabs::common::matches_query;
+use crate::tabs::common::NormalizedSearchQuery;
 use crate::tabs::types::{CachedKvKeyRows, KvBucketState, SearchCacheKey};
 
 pub(crate) fn invalidate(state: &mut KvBucketState) {
@@ -43,25 +43,32 @@ fn filtered_key_indices(state: &mut KvBucketState) -> &[usize] {
     };
 
     if needs_refresh {
-        let query = cache_key.query.as_str();
+        let query = NormalizedSearchQuery::new(&cache_key.query)
+            .expect("active search has a normalized query");
         let rows = state
             .keys
             .iter()
             .enumerate()
             .filter_map(|(idx, key)| {
-                let key_matches = cache_key.primary && matches_query(key, query);
-                let fetched_value_matches = cache_key.secondary
-                    && state
-                        .fetched_values
-                        .get(key.as_str())
-                        .is_some_and(|value| matches_query(value, query));
-                let history_matches = cache_key.secondary
-                    && selected_key.as_deref() == Some(key.as_str())
+                if cache_key.primary && query.matches(key) {
+                    return Some(idx);
+                }
+                if !cache_key.secondary {
+                    return None;
+                }
+                if state
+                    .fetched_values
+                    .get(key.as_str())
+                    .is_some_and(|value| query.matches(value))
+                {
+                    return Some(idx);
+                }
+                (selected_key.as_deref() == Some(key.as_str())
                     && state
                         .history
                         .iter()
-                        .any(|item| matches_query(&searchable_kv_history_item(item), query));
-                (key_matches || fetched_value_matches || history_matches).then_some(idx)
+                        .any(|item| query.matches(&searchable_kv_history_item(item))))
+                .then_some(idx)
             })
             .collect();
 
@@ -159,5 +166,27 @@ mod tests {
         invalidate(&mut state);
 
         assert!(state.cached_filtered_keys.is_none());
+    }
+
+    #[test]
+    fn large_key_collection_builds_and_reuses_filtered_indices() {
+        let mut keys = (0..50_000)
+            .map(|idx| format!("orders.{idx:05}"))
+            .collect::<Vec<_>>();
+        keys.push("needle.special".to_string());
+        let mut state = KvBucketState {
+            keys,
+            ..Default::default()
+        };
+        state.search.query = "needle".to_string();
+        state.search.primary = true;
+        state.search.secondary = false;
+
+        assert_eq!(visible_key_indices(&mut state, 0..1), vec![50_000]);
+        assert_eq!(filtered_row_count(&mut state), 1);
+        assert!(state.cached_filtered_keys.is_some());
+
+        assert_eq!(visible_key_indices(&mut state, 0..1), vec![50_000]);
+        assert_eq!(state.cached_filtered_keys.as_ref().unwrap().rows.len(), 1);
     }
 }
