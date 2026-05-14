@@ -65,6 +65,50 @@ cargo build --release
 
 The binary is output to `target/release/easy-nats` (or `easy-nats.exe` on Windows).
 
+## Development
+
+Run the desktop app from the workspace root:
+
+```bash
+cargo run -p easy-nats
+```
+
+### Local NATS sandbox
+
+The repository includes a Docker Compose setup with two local NATS servers:
+
+| Server | Client URL | Monitoring URL | Auth |
+|--------|------------|----------------|------|
+| `nats` | `nats://localhost:4222` | `http://localhost:8222` | token `dev-secret-token` |
+| `nats-open` | `nats://localhost:4223` | `http://localhost:8223` | none |
+
+Start the sandbox:
+
+```bash
+docker compose -f dev/docker-compose.yml up -d
+```
+
+Seed JetStream streams, consumers, KV buckets and sample messages on the open server:
+
+```bash
+bash dev/seed.sh
+```
+
+Generate continuous traffic for publisher, subscriber, stream and metrics testing:
+
+```bash
+bash dev/traffic.sh
+```
+
+The seed and traffic scripts require the `nats` CLI on the host and target
+`nats://localhost:4223`.
+
+Stop the sandbox when finished:
+
+```bash
+docker compose -f dev/docker-compose.yml down
+```
+
 ## License
 
 [MIT](LICENSE)
