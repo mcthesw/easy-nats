@@ -305,12 +305,6 @@ pub enum SearchField {
     Payload,
 }
 
-impl SearchField {
-    pub fn is_primary(self) -> bool {
-        matches!(self, Self::Key | Self::Subject)
-    }
-}
-
 #[derive(Debug, Clone)]
 pub enum SearchResultLocator {
     KvKey {
@@ -330,23 +324,20 @@ pub enum SearchResultLocator {
     },
 }
 
-#[derive(Debug, Clone)]
-pub struct SearchRecordSnapshot {
-    pub field: SearchField,
-    pub item_id: String,
-    pub item_label: String,
-    pub text: String,
-    pub snippet: String,
-    pub locator: SearchResultLocator,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum SearchSourceKind {
+    Kv,
+    Stream,
+    Subscriber,
 }
 
 #[derive(Debug, Clone)]
-pub struct SearchSourceSnapshot {
+pub struct SearchSourceSummary {
     pub id: SearchSourceId,
     pub label: String,
     pub generation: u64,
     pub coverage: SearchSourceCoverage,
-    pub records: Vec<SearchRecordSnapshot>,
+    pub kind: SearchSourceKind,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -479,17 +470,30 @@ impl Default for SubscriberState {
 }
 
 impl SubscriberState {
-    pub fn push_message(&mut self, mut msg: ReceivedMessage) {
+    pub fn push_messages<I>(&mut self, messages: I)
+    where
+        I: IntoIterator<Item = ReceivedMessage>,
+    {
+        let mut pushed = false;
+        for msg in messages {
+            self.push_message_without_invalidation(msg);
+            pushed = true;
+        }
+        if pushed {
+            self.invalidate_filtered_cache();
+        }
+    }
+
+    fn push_message_without_invalidation(&mut self, mut msg: ReceivedMessage) {
         if self.messages.len() >= self.max_messages {
             self.messages.pop_front();
             if let Some(idx) = self.selected_idx {
-                self.selected_idx = if idx == 0 { None } else { Some(idx - 1) };
+                self.selected_idx = idx.checked_sub(1);
             }
         }
         msg.id = self.next_message_id;
         self.next_message_id = self.next_message_id.wrapping_add(1).max(1);
         self.messages.push_back(msg);
-        self.invalidate_filtered_cache();
     }
 
     pub fn clear_messages(&mut self) {

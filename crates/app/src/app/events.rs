@@ -107,16 +107,16 @@ impl EasyNatsApp {
                             && *cid == connection_id
                             && *backend_id == msg_backend_id
                         {
-                            for message in messages {
-                                state.push_message(ReceivedMessage {
+                            state.push_messages(messages.into_iter().map(|message| {
+                                ReceivedMessage {
                                     id: 0,
                                     subject: message.subject,
                                     reply: message.reply,
                                     headers: message.headers,
                                     payload: message.payload,
                                     timestamp: message.timestamp,
-                                });
-                            }
+                                }
+                            }));
                             break;
                         }
                     }

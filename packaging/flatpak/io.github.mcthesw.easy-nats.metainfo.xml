@@ -23,6 +23,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.1.20" date="2026-05-15">
+      <description>
+        <p>Improves search performance for large in-memory data sets.</p>
+      </description>
+    </release>
     <release version="0.1.19" date="2026-05-08">
       <description>
         <p>Fixes search source chip layout.</p>

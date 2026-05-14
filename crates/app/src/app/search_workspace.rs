@@ -2,19 +2,130 @@ use nats_backend::BackendCommand;
 
 use crate::i18n::t;
 use crate::tabs::{
-    KV_VALUE_SEARCH_BATCH, MessageSchemasState, SearchResultLocator, SearchSourceId,
-    SearchSourceSnapshot, SearchWorkspaceState, TabKind, source_snapshot_from_tab,
+    KV_VALUE_SEARCH_BATCH, MessageSchemasState, NormalizedSearchQuery, SearchResultLocator,
+    SearchSourceId, SearchSourceSummary, SearchWorkspaceBuildStats, SearchWorkspaceCacheKey,
+    SearchWorkspaceResult, SearchWorkspaceState, TabKind, append_search_workspace_results,
+    source_summary_from_tab,
 };
 use crate::toast::ToastLevel;
 
 use super::model::EasyNatsApp;
 
 impl EasyNatsApp {
-    pub(crate) fn search_source_snapshots(&self) -> Vec<SearchSourceSnapshot> {
+    pub(crate) fn search_source_summaries(&self) -> Vec<SearchSourceSummary> {
         self.dock_state
             .iter_all_tabs()
-            .filter_map(|(_, tab)| source_snapshot_from_tab(tab))
+            .filter_map(|(_, tab)| source_summary_from_tab(tab))
             .collect()
+    }
+
+    pub(crate) fn prepare_search_workspace_results(&mut self, sources: &[SearchSourceSummary]) {
+        let requests = self.search_workspace_refresh_requests(sources);
+        if requests.is_empty() {
+            return;
+        }
+
+        let updates = requests
+            .into_iter()
+            .map(|request| {
+                let started = std::time::Instant::now();
+                let (results, stats) = self.build_search_workspace_results(
+                    &request.key,
+                    &request.selected_sources,
+                    sources,
+                );
+                tracing::debug!(
+                    workspace_index = request.workspace_index,
+                    refresh_reason = request.refresh_reason,
+                    source_count = stats.source_count,
+                    records_scanned = stats.records_scanned,
+                    payload_value_bytes = stats.payload_value_bytes,
+                    result_count = results.len(),
+                    capped = stats.capped,
+                    elapsed_ms = started.elapsed().as_secs_f64() * 1000.0,
+                    "Refreshed Search Workspace results"
+                );
+                (request.workspace_index, request.key, results)
+            })
+            .collect::<Vec<_>>();
+
+        let mut updates = updates.into_iter().peekable();
+        let mut workspace_index = 0usize;
+        for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+            if let TabKind::SearchWorkspace { state } = tab {
+                if let Some((_, key, results)) =
+                    updates.next_if(|(idx, _, _)| *idx == workspace_index)
+                {
+                    state.cached_results = Some((key, results));
+                }
+                workspace_index += 1;
+            }
+        }
+    }
+
+    fn search_workspace_refresh_requests(
+        &self,
+        sources: &[SearchSourceSummary],
+    ) -> Vec<SearchWorkspaceRefreshRequest> {
+        let mut requests = Vec::new();
+        let mut workspace_index = 0usize;
+        for (_surface, tab) in self.dock_state.iter_all_tabs() {
+            if let TabKind::SearchWorkspace { state } = tab {
+                let (key, refresh_reason) = search_workspace_refresh_decision(state, sources);
+                if let Some(refresh_reason) = refresh_reason {
+                    requests.push(SearchWorkspaceRefreshRequest {
+                        workspace_index,
+                        selected_sources: state.selected_sources.clone(),
+                        refresh_reason,
+                        key,
+                    });
+                }
+                workspace_index += 1;
+            }
+        }
+        requests
+    }
+
+    fn build_search_workspace_results(
+        &self,
+        key: &SearchWorkspaceCacheKey,
+        selected_sources: &[SearchSourceId],
+        sources: &[SearchSourceSummary],
+    ) -> (Vec<SearchWorkspaceResult>, SearchWorkspaceBuildStats) {
+        let mut results = Vec::new();
+        let mut stats = SearchWorkspaceBuildStats::default();
+        if key.query.is_empty() || (!key.primary && !key.secondary) {
+            return (results, stats);
+        }
+
+        let query =
+            NormalizedSearchQuery::new(&key.query).expect("active search has a normalized query");
+        for source_id in selected_sources {
+            let Some(source) = sources.iter().find(|source| &source.id == source_id) else {
+                continue;
+            };
+            let Some((_surface, tab)) = self
+                .dock_state
+                .iter_all_tabs()
+                .find(|(_, tab)| tab_matches_search_source(tab, source_id))
+            else {
+                continue;
+            };
+            stats.source_count += 1;
+            append_search_workspace_results(
+                source,
+                tab,
+                &query,
+                key.primary,
+                key.secondary,
+                &mut results,
+                &mut stats,
+            );
+            if stats.capped {
+                break;
+            }
+        }
+        (results, stats)
     }
 
     pub(crate) fn open_or_focus_search_workspace(&mut self) {
@@ -246,5 +357,213 @@ impl EasyNatsApp {
             }
         }
         false
+    }
+}
+
+#[derive(Debug)]
+struct SearchWorkspaceRefreshRequest {
+    workspace_index: usize,
+    selected_sources: Vec<SearchSourceId>,
+    refresh_reason: &'static str,
+    key: SearchWorkspaceCacheKey,
+}
+
+fn search_workspace_refresh_decision(
+    state: &SearchWorkspaceState,
+    sources: &[SearchSourceSummary],
+) -> (SearchWorkspaceCacheKey, Option<&'static str>) {
+    let key = search_workspace_cache_key(state, sources);
+    let cached_key = state.cached_results.as_ref().map(|(key, _)| key);
+    let refresh_reason = search_workspace_refresh_reason(cached_key, &key);
+    (key, refresh_reason)
+}
+
+fn search_workspace_refresh_reason(
+    cached_key: Option<&SearchWorkspaceCacheKey>,
+    next_key: &SearchWorkspaceCacheKey,
+) -> Option<&'static str> {
+    match cached_key {
+        None => Some("uncached"),
+        Some(cached_key) if cached_key.query != next_key.query => Some("query"),
+        Some(cached_key)
+            if cached_key.primary != next_key.primary
+                || cached_key.secondary != next_key.secondary =>
+        {
+            Some("field_scope")
+        }
+        Some(cached_key) if cached_key.sources != next_key.sources => Some("sources_or_generation"),
+        Some(_) => None,
+    }
+}
+
+fn search_workspace_cache_key(
+    state: &SearchWorkspaceState,
+    sources: &[SearchSourceSummary],
+) -> SearchWorkspaceCacheKey {
+    SearchWorkspaceCacheKey {
+        query: state.query.trim().to_lowercase(),
+        primary: state.primary,
+        secondary: state.secondary,
+        sources: state
+            .selected_sources
+            .iter()
+            .map(|source_id| {
+                let generation = sources
+                    .iter()
+                    .find(|source| &source.id == source_id)
+                    .map(|source| source.generation);
+                (source_id.clone(), generation)
+            })
+            .collect(),
+    }
+}
+
+fn tab_matches_search_source(tab: &TabKind, source_id: &SearchSourceId) -> bool {
+    match (tab, source_id) {
+        (
+            TabKind::KvBucket {
+                connection_id,
+                bucket_name,
+                ..
+            },
+            SearchSourceId::Kv {
+                connection_id: source_connection_id,
+                bucket_name: source_bucket,
+            },
+        ) => connection_id == source_connection_id && bucket_name == source_bucket,
+        (
+            TabKind::Stream {
+                connection_id,
+                stream_name,
+                ..
+            },
+            SearchSourceId::Stream {
+                connection_id: source_connection_id,
+                stream_name: source_stream,
+            },
+        ) => connection_id == source_connection_id && stream_name == source_stream,
+        (
+            TabKind::Subscriber {
+                connection_id,
+                backend_id,
+                ..
+            },
+            SearchSourceId::Subscriber {
+                connection_id: source_connection_id,
+                backend_id: source_backend_id,
+            },
+        ) => connection_id == source_connection_id && backend_id == source_backend_id,
+        _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use nats_backend::StreamMessageInfo;
+    use tokio_util::sync::CancellationToken;
+
+    use super::*;
+    use crate::tabs::{StreamState, TabGuard};
+
+    fn stream_source(stream_name: &str, generation: u64) -> SearchSourceSummary {
+        let tab = TabKind::Stream {
+            connection_id: 1,
+            connection_name: "local".to_string(),
+            stream_name: stream_name.to_string(),
+            guard: TabGuard::new_without_id(CancellationToken::new()),
+            state: StreamState {
+                messages: vec![StreamMessageInfo {
+                    sequence: 1,
+                    subject: "orders.created".to_string(),
+                    payload: b"balance: 42".to_vec(),
+                    headers: Vec::new(),
+                    time: String::new(),
+                }],
+                search_generation: generation,
+                ..Default::default()
+            },
+        };
+        source_summary_from_tab(&tab).expect("stream tab is searchable")
+    }
+
+    #[test]
+    fn workspace_cache_key_normalizes_query_and_tracks_scope() {
+        let source = stream_source("orders", 1);
+        let mut state = SearchWorkspaceState {
+            query: "  Balance  ".to_string(),
+            selected_sources: vec![source.id.clone()],
+            ..Default::default()
+        };
+
+        let initial = search_workspace_cache_key(&state, std::slice::from_ref(&source));
+        assert_eq!(initial.query, "balance");
+        assert!(initial.primary);
+        assert!(initial.secondary);
+
+        state.primary = false;
+        let primary_changed = search_workspace_cache_key(&state, std::slice::from_ref(&source));
+        assert_ne!(initial, primary_changed);
+
+        state.secondary = false;
+        let secondary_changed = search_workspace_cache_key(&state, std::slice::from_ref(&source));
+        assert_ne!(primary_changed, secondary_changed);
+    }
+
+    #[test]
+    fn workspace_cache_key_tracks_selection_order_and_source_generation() {
+        let orders_v1 = stream_source("orders", 1);
+        let payments = stream_source("payments", 1);
+        let mut state = SearchWorkspaceState {
+            query: "balance".to_string(),
+            selected_sources: vec![orders_v1.id.clone(), payments.id.clone()],
+            ..Default::default()
+        };
+        let ordered = search_workspace_cache_key(&state, &[orders_v1.clone(), payments.clone()]);
+
+        state.selected_sources.reverse();
+        let reversed = search_workspace_cache_key(&state, &[orders_v1.clone(), payments]);
+        assert_ne!(ordered, reversed);
+
+        state.selected_sources.reverse();
+        let orders_v2 = stream_source("orders", 2);
+        let generation_changed = search_workspace_cache_key(&state, &[orders_v2]);
+        assert_ne!(ordered, generation_changed);
+    }
+
+    #[test]
+    fn workspace_cache_key_tracks_disappeared_sources() {
+        let source = stream_source("orders", 1);
+        let state = SearchWorkspaceState {
+            query: "balance".to_string(),
+            selected_sources: vec![source.id.clone()],
+            ..Default::default()
+        };
+
+        let present = search_workspace_cache_key(&state, std::slice::from_ref(&source));
+        let missing = search_workspace_cache_key(&state, &[]);
+
+        assert_eq!(missing.sources, vec![(source.id, None)]);
+        assert_ne!(present, missing);
+    }
+
+    #[test]
+    fn workspace_refresh_reuses_cache_until_key_changes() {
+        let source = stream_source("orders", 1);
+        let mut state = SearchWorkspaceState {
+            query: "balance".to_string(),
+            selected_sources: vec![source.id.clone()],
+            ..Default::default()
+        };
+        let key = search_workspace_cache_key(&state, std::slice::from_ref(&source));
+        state.cached_results = Some((key, Vec::new()));
+
+        let (_, unchanged) =
+            search_workspace_refresh_decision(&state, std::slice::from_ref(&source));
+        assert!(unchanged.is_none());
+
+        state.query = "other".to_string();
+        let (_, query_changed) =
+            search_workspace_refresh_decision(&state, std::slice::from_ref(&source));
+        assert_eq!(query_changed, Some("query"));
     }
 }
