@@ -19,6 +19,8 @@ pub fn publisher_ui(
     actions: &mut Vec<TabAction>,
     topic_suggestions: &[&str],
 ) {
+    let shortcuts = publisher_shortcuts(ui);
+
     ui.horizontal(|ui| {
         ui.label(t("publisher.subject"));
         topic_history_text_edit(
@@ -97,10 +99,10 @@ pub fn publisher_ui(
         }
     };
     ui.horizontal(|ui| {
-        if ui
+        let publish_clicked = ui
             .add_enabled(can_send, egui::Button::new(t("publisher.publish")))
-            .clicked()
-        {
+            .clicked();
+        if publish_clicked || (shortcuts.publish && can_send) {
             let outgoing = schema_manager.prepare_outgoing(connection_id, &subject, &state.payload);
             if outgoing.can_send {
                 actions.push(TabAction::RecordTopic {
@@ -119,13 +121,13 @@ pub fn publisher_ui(
         ui.label(t("publisher.timeout"));
         ui.add(egui::TextEdit::singleline(&mut state.timeout_ms).desired_width(60.0));
 
-        if ui
+        let request_clicked = ui
             .add_enabled(
                 can_send && !state.waiting,
                 egui::Button::new(t("publisher.request")),
             )
-            .clicked()
-        {
+            .clicked();
+        if request_clicked || (shortcuts.request && can_send && !state.waiting) {
             let outgoing = schema_manager.prepare_outgoing(connection_id, &subject, &state.payload);
             if outgoing.can_send {
                 actions.push(TabAction::RecordTopic {
@@ -158,6 +160,30 @@ pub fn publisher_ui(
     render_response(ui, connection_id, state, schema_manager);
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct PublisherShortcuts {
+    publish: bool,
+    request: bool,
+}
+
+fn publisher_shortcuts(ui: &egui::Ui) -> PublisherShortcuts {
+    let (modifiers, enter_pressed) =
+        ui.input(|input| (input.modifiers, input.key_pressed(egui::Key::Enter)));
+
+    PublisherShortcuts {
+        publish: is_publish_shortcut(modifiers, enter_pressed),
+        request: is_request_shortcut(modifiers, enter_pressed),
+    }
+}
+
+fn is_publish_shortcut(modifiers: egui::Modifiers, enter_pressed: bool) -> bool {
+    enter_pressed && modifiers.command && !modifiers.shift
+}
+
+fn is_request_shortcut(modifiers: egui::Modifiers, enter_pressed: bool) -> bool {
+    enter_pressed && modifiers.command && modifiers.shift
+}
+
 fn render_generate_json_button(
     ui: &mut egui::Ui,
     payload_template: &Result<Option<String>, String>,
@@ -184,6 +210,37 @@ fn render_generate_json_button(
         Err(error) => {
             response.on_hover_text(error);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use eframe::egui;
+
+    use super::{is_publish_shortcut, is_request_shortcut};
+
+    fn modifiers(command: bool, shift: bool) -> egui::Modifiers {
+        egui::Modifiers {
+            command,
+            shift,
+            ..Default::default()
+        }
+    }
+
+    #[test]
+    fn publish_shortcut_requires_command_enter_without_shift() {
+        assert!(is_publish_shortcut(modifiers(true, false), true));
+        assert!(!is_publish_shortcut(modifiers(true, true), true));
+        assert!(!is_publish_shortcut(modifiers(false, false), true));
+        assert!(!is_publish_shortcut(modifiers(true, false), false));
+    }
+
+    #[test]
+    fn request_shortcut_requires_command_shift_enter() {
+        assert!(is_request_shortcut(modifiers(true, true), true));
+        assert!(!is_request_shortcut(modifiers(true, false), true));
+        assert!(!is_request_shortcut(modifiers(false, true), true));
+        assert!(!is_request_shortcut(modifiers(true, true), false));
     }
 }
 
