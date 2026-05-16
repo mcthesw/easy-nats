@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.20](https://github.com/mcthesw/easy-nats/compare/v0.1.19...v0.1.20) (2026-05-16)
+
+
+### Performance Improvements
+
+* **search:** optimize in-memory search refresh ([f15d3c5](https://github.com/mcthesw/easy-nats/commit/f15d3c5bebd4657e2bb2526f729523fc0719541f))
+
+
+### Documentation
+
+* add local sandbox quick start ([4922542](https://github.com/mcthesw/easy-nats/commit/492254208d25b415303c72ee101565e6ee114de5))
+
 ## [0.1.19](https://github.com/mcthesw/easy-nats/compare/v0.1.18...v0.1.19) (2026-05-08)
 
 
