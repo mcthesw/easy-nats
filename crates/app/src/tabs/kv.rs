@@ -186,19 +186,22 @@ fn render_key_list(
 
     egui::ScrollArea::vertical()
         .id_salt(("kv_keys", connection_id, bucket_name))
+        .auto_shrink([false; 2])
         .show_rows(ui, 22.0, row_count, |ui, row_range| {
             let key_indices = key_filter::visible_key_indices(state, row_range);
             for key_index in key_indices {
                 let Some(key) = state.keys.get(key_index).cloned() else {
                     continue;
                 };
-                if ui
-                    .selectable_label(
-                        state.selected_key.as_deref() == Some(key.as_str()),
-                        key.as_str(),
+                let selected = state.selected_key.as_deref() == Some(key.as_str());
+                let response = ui
+                    .add(
+                        egui::Button::selectable(selected, key.as_str())
+                            .truncate()
+                            .min_size(egui::vec2(ui.available_width(), 22.0)),
                     )
-                    .clicked()
-                {
+                    .on_hover_text(key.as_str());
+                if response.clicked() {
                     state.selected_key = Some(key.clone());
                     key_filter::invalidate(state);
                     state.show_history = false;
