@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.21](https://github.com/mcthesw/easy-nats/compare/v0.1.20...v0.1.21) (2026-05-19)
+
+
+### Bug Fixes
+
+* **kv:** keep key list scrollbar aligned ([c4954b9](https://github.com/mcthesw/easy-nats/commit/c4954b90d601eb845d511e4cd9e33aabeb409365))
+
 ## [0.1.20](https://github.com/mcthesw/easy-nats/compare/v0.1.19...v0.1.20) (2026-05-16)
 
 
