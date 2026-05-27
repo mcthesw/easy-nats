@@ -23,6 +23,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.1.22" date="2026-05-27">
+      <description>
+        <p>Fixes KV value and history panel sizing.</p>
+      </description>
+    </release>
     <release version="0.1.21" date="2026-05-19">
       <description>
         <p>Fixes KV key list scrolling in narrow panes.</p>
