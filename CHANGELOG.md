@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.22](https://github.com/mcthesw/easy-nats/compare/v0.1.21...v0.1.22) (2026-05-27)
+
+
+### Bug Fixes
+
+* **kv:** expand history panel height ([e82b14b](https://github.com/mcthesw/easy-nats/commit/e82b14b6bed9c1fbbe77d13369be4f89add5225e))
+
 ## [0.1.21](https://github.com/mcthesw/easy-nats/compare/v0.1.20...v0.1.21) (2026-05-19)
 
 
