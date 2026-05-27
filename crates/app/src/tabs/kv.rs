@@ -488,6 +488,7 @@ fn render_detail_panel(
     ui.label(t("kv.value_preview"));
     egui::ScrollArea::vertical()
         .id_salt(("kv_value_preview", connection_id, bucket_name))
+        .auto_shrink([false; 2])
         .show(ui, |ui| {
             format::render_payload_with_proto(
                 ui,
@@ -526,7 +527,8 @@ fn render_history(
     } else {
         egui::ScrollArea::vertical()
             .id_salt(("kv_history", connection_id, bucket_name))
-            .max_height(220.0)
+            .max_height(history_scroll_height(ui.available_height()))
+            .auto_shrink([false; 2])
             .show(ui, |ui| {
                 for item in &state.history {
                     let revision = item.revision;
@@ -553,6 +555,10 @@ fn render_history(
                 }
             });
     }
+}
+
+fn history_scroll_height(available_height: f32) -> f32 {
+    available_height.max(80.0)
 }
 
 fn render_generate_json_button(
@@ -672,5 +678,11 @@ mod tests {
     fn normalized_entry_key_trims_schema_and_write_target() {
         assert_eq!(normalized_entry_key("  orders.1  "), "orders.1");
         assert_eq!(normalized_entry_key("\tusers.alice\n"), "users.alice");
+    }
+
+    #[test]
+    fn history_scroll_height_uses_available_panel_space() {
+        assert_eq!(history_scroll_height(640.0), 640.0);
+        assert_eq!(history_scroll_height(12.0), 80.0);
     }
 }
