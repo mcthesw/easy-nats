@@ -23,6 +23,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.1.23" date="2026-05-29">
+      <description>
+        <p>Fixes saved theme selection when opening the app.</p>
+      </description>
+    </release>
     <release version="0.1.22" date="2026-05-27">
       <description>
         <p>Fixes KV value and history panel sizing.</p>
