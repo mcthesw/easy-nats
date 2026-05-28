@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.23](https://github.com/mcthesw/easy-nats/compare/v0.1.22...v0.1.23) (2026-05-28)
+
+
+### Bug Fixes
+
+* **theme:** persist egui theme preference ([2b0c57a](https://github.com/mcthesw/easy-nats/commit/2b0c57a2a607457c73c06e766df5cc0e64e13b2a))
+
 ## [0.1.22](https://github.com/mcthesw/easy-nats/compare/v0.1.21...v0.1.22) (2026-05-27)
 
 
