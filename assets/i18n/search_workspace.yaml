@@ -66,8 +66,11 @@ stale_result:
   en: "Source changed; showing saved preview."
   zh: "来源已变化；显示保存的预览。"
 open_source:
-  en: "Open source"
-  zh: "打开来源"
+  en: "Go to source"
+  zh: "转到来源"
+preview_format:
+  en: "Display"
+  zh: "显示"
 field_key:
   en: "Key"
   zh: "键"

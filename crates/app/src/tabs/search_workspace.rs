@@ -1,5 +1,6 @@
 use eframe::egui;
 
+use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
 
 use super::common::SEARCH_RESULT_LIMIT;
@@ -405,38 +406,71 @@ fn render_preview(
         return;
     };
 
-    let current = results
-        .iter()
-        .find(|result| result.identity == preview.identity);
-    let active_preview = current.unwrap_or(preview);
+    let (active_preview, is_stale) = active_preview_result(preview, results);
 
     ui.heading(&active_preview.item_label);
     ui.horizontal_wrapped(|ui| {
         ui.label(&active_preview.source_label);
         ui.weak(field_label(active_preview.field));
-        if current.is_none() {
+        if is_stale {
             ui.weak(t("search_workspace.stale_result"));
         }
     });
     ui.add_space(4.0);
-    if let Some(current) = current {
-        if ui.button(t("search_workspace.open_source")).clicked() {
-            actions.push(TabAction::NavigateSearchResult {
-                locator: current.locator.clone(),
-            });
+    ui.horizontal_wrapped(|ui| {
+        render_preview_format_selector(ui, &mut state.preview_format);
+        if !is_stale {
+            if ui.button(t("search_workspace.open_source")).clicked() {
+                actions.push(TabAction::NavigateSearchResult {
+                    locator: active_preview.locator.clone(),
+                });
+            }
+        } else {
+            ui.add_enabled(false, egui::Button::new(t("search_workspace.open_source")));
         }
-    } else {
-        ui.add_enabled(false, egui::Button::new(t("search_workspace.open_source")));
-    }
+    });
     ui.separator();
-    let mut preview_text = active_preview.preview.clone();
-    ui.add(
-        egui::TextEdit::multiline(&mut preview_text)
-            .desired_width(f32::INFINITY)
-            .desired_rows(14)
-            .code_editor()
-            .interactive(false),
-    );
+    render_formatted_preview(ui, active_preview, state.preview_format, &state.query);
+}
+
+fn render_preview_format_selector(ui: &mut egui::Ui, format: &mut PayloadFormat) {
+    if !format::READ_ONLY_PREVIEW_FORMATS.contains(format) {
+        *format = PayloadFormat::Auto;
+    }
+    ui.label(t("search_workspace.preview_format"));
+    egui::ComboBox::from_id_salt("search_workspace_preview_format")
+        .selected_text(format.label())
+        .show_ui(ui, |ui| {
+            for &choice in format::READ_ONLY_PREVIEW_FORMATS {
+                ui.selectable_value(format, choice, choice.label());
+            }
+        });
+}
+
+fn render_formatted_preview(
+    ui: &mut egui::Ui,
+    result: &SearchWorkspaceResult,
+    selected_format: PayloadFormat,
+    query: &str,
+) {
+    let preview = format::format_read_only_preview(&result.preview_bytes, selected_format);
+    let job = format::read_only_preview_layout_job(&preview, ui.style(), query);
+    egui::ScrollArea::both()
+        .id_salt("search_workspace_preview")
+        .auto_shrink([false, false])
+        .show(ui, |ui| {
+            ui.add(egui::Label::new(job).selectable(true));
+        });
+}
+
+fn active_preview_result<'a>(
+    preview: &'a SearchWorkspaceResult,
+    results: &'a [SearchWorkspaceResult],
+) -> (&'a SearchWorkspaceResult, bool) {
+    results
+        .iter()
+        .find(|result| result.identity == preview.identity)
+        .map_or((preview, true), |current| (current, false))
 }
 
 fn field_label(field: SearchField) -> &'static str {

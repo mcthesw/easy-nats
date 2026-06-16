@@ -225,6 +225,7 @@ impl EasyNatsApp {
             state.load_generation = new_gen;
             state.keys.clear();
             state.fetched_values.clear();
+            state.fetched_value_bytes.clear();
             state.invalidate_filtered_key_cache();
             state.value_search_cursor = 0;
             state.value_search_scanning = 0;

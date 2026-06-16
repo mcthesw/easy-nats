@@ -117,6 +117,9 @@ impl EasyNatsApp {
                 state
                     .fetched_values
                     .insert(entry_key.to_string(), entry_value.clone());
+                state
+                    .fetched_value_bytes
+                    .insert(entry_key.to_string(), entry.value.clone());
                 state.invalidate_filtered_key_cache();
                 state.search_generation = state.search_generation.wrapping_add(1);
                 if state.value_search_pending.remove(entry_key) {
@@ -188,6 +191,7 @@ impl EasyNatsApp {
                 state.load_generation = new_gen;
                 state.keys.clear();
                 state.fetched_values.clear();
+                state.fetched_value_bytes.clear();
                 state.invalidate_filtered_key_cache();
                 state.value_search_cursor = 0;
                 state.value_search_scanning = 0;
@@ -317,7 +321,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use egui_dock::DockState;
-    use nats_backend::{BackendErrorContext, BackendOperation};
+    use nats_backend::{BackendErrorContext, BackendOperation, KvEntryInfo};
     use tokio_util::sync::CancellationToken;
 
     use super::EasyNatsApp;
@@ -344,6 +348,40 @@ mod tests {
             state,
         }]);
         app
+    }
+
+    #[test]
+    fn apply_kv_entry_keeps_raw_value_bytes() {
+        let mut app = test_app_with_kv_tab(7, "ORDERS", KvBucketState::default());
+        app.apply_kv_entry(
+            7,
+            KvEntryInfo {
+                bucket: "ORDERS".to_string(),
+                key: "orders/1".to_string(),
+                value: b"abc\xff".to_vec(),
+                revision: Some(1),
+                delta: None,
+                created: None,
+                operation: None,
+            },
+        );
+
+        let (_, tab) = app
+            .dock_state
+            .iter_all_tabs()
+            .next()
+            .expect("KV tab exists");
+        let TabKind::KvBucket { state, .. } = tab else {
+            panic!("expected KV bucket tab");
+        };
+        assert_eq!(
+            state.fetched_values.get("orders/1").map(String::as_str),
+            Some("abc\u{fffd}")
+        );
+        assert_eq!(
+            state.fetched_value_bytes.get("orders/1").map(Vec::as_slice),
+            Some(b"abc\xff".as_slice())
+        );
     }
 
     #[test]
