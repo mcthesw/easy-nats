@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.24](https://github.com/mcthesw/easy-nats/compare/v0.1.23...v0.1.24) (2026-06-16)
+
+
+### Features
+
+* **search:** add formatted result previews ([4f6d720](https://github.com/mcthesw/easy-nats/commit/4f6d720c0ded721b07d83b562b45e5e6eb9590d8))
+
 ## [0.1.23](https://github.com/mcthesw/easy-nats/compare/v0.1.22...v0.1.23) (2026-05-28)
 
 
