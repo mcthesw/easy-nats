@@ -1,13 +1,27 @@
 use nats_backend::StreamMessageInfo;
 use tokio_util::sync::CancellationToken;
 
+use super::super::types::{SearchResultIdentity, SearchResultLocator};
 use super::*;
-use crate::tabs::{NormalizedSearchQuery, StreamState, TabGuard};
+use crate::format::{self, PayloadFormat};
+use crate::tabs::{KvBucketState, NormalizedSearchQuery, StreamState, TabGuard};
 
 fn stream_source_and_tab(
     stream_name: &str,
     generation: u64,
     messages: Vec<(&str, &str)>,
+) -> (SearchSourceSummary, TabKind) {
+    let messages = messages
+        .into_iter()
+        .map(|(subject, payload)| (subject, payload.as_bytes().to_vec()))
+        .collect();
+    stream_source_and_tab_bytes(stream_name, generation, messages)
+}
+
+fn stream_source_and_tab_bytes(
+    stream_name: &str,
+    generation: u64,
+    messages: Vec<(&str, Vec<u8>)>,
 ) -> (SearchSourceSummary, TabKind) {
     let tab = TabKind::Stream {
         connection_id: 1,
@@ -21,7 +35,7 @@ fn stream_source_and_tab(
                 .map(|(idx, (subject, payload))| StreamMessageInfo {
                     sequence: idx as u64 + 1,
                     subject: subject.to_string(),
-                    payload: payload.as_bytes().to_vec(),
+                    payload,
                     headers: Vec::new(),
                     time: String::new(),
                 })
@@ -31,6 +45,31 @@ fn stream_source_and_tab(
         },
     };
     let source = source_summary_from_tab(&tab).expect("stream tab is searchable");
+    (source, tab)
+}
+
+fn kv_source_and_tab(
+    bucket_name: &str,
+    generation: u64,
+    values: Vec<(&str, String, Vec<u8>)>,
+) -> (SearchSourceSummary, TabKind) {
+    let mut state = KvBucketState {
+        keys: values.iter().map(|(key, _, _)| key.to_string()).collect(),
+        search_generation: generation,
+        ..Default::default()
+    };
+    for (key, decoded_value, raw_value) in values {
+        state.fetched_values.insert(key.to_string(), decoded_value);
+        state.fetched_value_bytes.insert(key.to_string(), raw_value);
+    }
+    let tab = TabKind::KvBucket {
+        connection_id: 1,
+        connection_name: "local".to_string(),
+        bucket_name: bucket_name.to_string(),
+        guard: TabGuard::new_without_id(CancellationToken::new()),
+        state,
+    };
+    let source = source_summary_from_tab(&tab).expect("KV tab is searchable");
     (source, tab)
 }
 
@@ -149,4 +188,102 @@ fn workspace_results_ignore_missing_selected_sources() {
 fn compact_text_collapses_and_truncates() {
     assert_eq!(compact_text("a\n b  c", 8), "a b c");
     assert_eq!(compact_text("abcdef", 3), "abc...");
+}
+
+#[test]
+fn workspace_payload_preview_keeps_original_bytes_for_formatting() {
+    let (source, tab) =
+        stream_source_and_tab_bytes("orders", 1, vec![("orders.created", b"abc\xff".to_vec())]);
+    let state = SearchWorkspaceState {
+        query: "abc".to_string(),
+        selected_sources: vec![source.id.clone()],
+        ..Default::default()
+    };
+
+    let results = workspace_results(&state, &[(source, tab)]);
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].snippet, "abc\u{fffd}");
+    assert_eq!(results[0].preview_bytes, b"abc\xff");
+    let hex = format::format_read_only_preview(&results[0].preview_bytes, PayloadFormat::Hex);
+    assert!(hex.text.contains("61 62 63 FF"));
+    assert!(!hex.text.contains("EF BF BD"));
+}
+
+#[test]
+fn workspace_kv_value_preview_keeps_original_bytes_for_formatting() {
+    let (source, tab) = kv_source_and_tab(
+        "orders",
+        1,
+        vec![("orders.1", "abc\u{fffd}".to_string(), b"abc\xff".to_vec())],
+    );
+    let state = SearchWorkspaceState {
+        query: "abc".to_string(),
+        selected_sources: vec![source.id.clone()],
+        primary: false,
+        secondary: true,
+        ..Default::default()
+    };
+
+    let results = workspace_results(&state, &[(source, tab)]);
+
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0].snippet, "abc\u{fffd}");
+    assert_eq!(results[0].preview_bytes, b"abc\xff");
+    let hex = format::format_read_only_preview(&results[0].preview_bytes, PayloadFormat::Hex);
+    assert!(hex.text.contains("61 62 63 FF"));
+    assert!(!hex.text.contains("EF BF BD"));
+}
+
+#[test]
+fn workspace_preview_format_defaults_to_auto_and_persists() {
+    let mut state = SearchWorkspaceState::default();
+    assert_eq!(state.preview_format, PayloadFormat::Auto);
+
+    state.preview_format = PayloadFormat::Json;
+    state.selected_preview = Some(SearchWorkspaceResult {
+        identity: SearchResultIdentity {
+            source_id: SearchSourceId::Stream {
+                connection_id: 1,
+                stream_name: "orders".to_string(),
+            },
+            generation: 1,
+            field: SearchField::Payload,
+            item_id: "1".to_string(),
+        },
+        source_label: "orders (local)".to_string(),
+        field: SearchField::Payload,
+        item_label: "#1 orders.created".to_string(),
+        snippet: "{\"balance\":42}".to_string(),
+        preview_bytes: br#"{"balance":42}"#.to_vec(),
+        locator: SearchResultLocator::StreamMessage {
+            connection_id: 1,
+            stream_name: "orders".to_string(),
+            sequence: 1,
+        },
+    });
+
+    state.selected_result = None;
+
+    assert_eq!(state.preview_format, PayloadFormat::Json);
+}
+
+#[test]
+fn active_preview_result_prefers_current_result_and_marks_stale_snapshot() {
+    let (source, tab) = stream_source_and_tab("orders", 1, vec![("orders.created", "balance: 42")]);
+    let state = SearchWorkspaceState {
+        query: "balance".to_string(),
+        selected_sources: vec![source.id.clone()],
+        ..Default::default()
+    };
+    let results = workspace_results(&state, &[(source, tab)]);
+    let snapshot = results[0].clone();
+
+    let (active, stale) = active_preview_result(&snapshot, &results);
+    assert!(!stale);
+    assert_eq!(active.snippet, "balance: 42");
+
+    let (active, stale) = active_preview_result(&snapshot, &[]);
+    assert!(stale);
+    assert_eq!(active.snippet, "balance: 42");
 }

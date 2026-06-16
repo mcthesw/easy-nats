@@ -355,7 +355,7 @@ pub struct SearchWorkspaceResult {
     pub field: SearchField,
     pub item_label: String,
     pub snippet: String,
-    pub preview: String,
+    pub preview_bytes: Vec<u8>,
     pub locator: SearchResultLocator,
 }
 
@@ -377,6 +377,7 @@ pub struct SearchWorkspaceState {
     pub selected_sources: Vec<SearchSourceId>,
     pub selected_result: Option<SearchResultIdentity>,
     pub selected_preview: Option<SearchWorkspaceResult>,
+    pub preview_format: PayloadFormat,
     pub cached_results: Option<CachedSearchWorkspaceResults>,
 }
 
@@ -420,6 +421,7 @@ impl Default for SearchWorkspaceState {
             selected_sources: Vec::new(),
             selected_result: None,
             selected_preview: None,
+            preview_format: PayloadFormat::Auto,
             cached_results: None,
         }
     }
@@ -577,6 +579,7 @@ pub struct KvBucketState {
     pub entry_key: String,
     pub entry_value: String,
     pub fetched_values: HashMap<String, String>,
+    pub fetched_value_bytes: HashMap<String, Vec<u8>>,
     pub entry_revision: Option<u64>,
     pub entry_operation: Option<String>,
     pub entry_created: Option<String>,
@@ -610,6 +613,7 @@ impl Default for KvBucketState {
             entry_key: String::new(),
             entry_value: String::new(),
             fetched_values: HashMap::new(),
+            fetched_value_bytes: HashMap::new(),
             entry_revision: None,
             entry_operation: None,
             entry_created: None,

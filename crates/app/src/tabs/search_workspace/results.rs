@@ -107,6 +107,7 @@ fn append_kv_results(
                     key,
                     key,
                     key,
+                    key.as_bytes(),
                     SearchResultLocator::KvKey {
                         connection_id,
                         bucket_name: bucket_name.to_string(),
@@ -127,12 +128,18 @@ fn append_kv_results(
             ctx.stats.records_scanned += 1;
             ctx.stats.payload_value_bytes += value.len();
             if ctx.query.matches(value) {
+                let preview_bytes = state
+                    .fetched_value_bytes
+                    .get(key.as_str())
+                    .map(Vec::as_slice)
+                    .unwrap_or_else(|| value.as_bytes());
                 push_result(
                     &mut ctx,
                     SearchField::Value,
                     key,
                     key,
                     value,
+                    preview_bytes,
                     SearchResultLocator::KvKey {
                         connection_id,
                         bucket_name: bucket_name.to_string(),
@@ -167,6 +174,7 @@ fn append_stream_results(
                     &sequence.to_string(),
                     &item_label,
                     subject,
+                    subject.as_bytes(),
                     SearchResultLocator::StreamMessage {
                         connection_id,
                         stream_name: stream_name.to_string(),
@@ -191,6 +199,7 @@ fn append_stream_results(
                     &sequence.to_string(),
                     &item_label,
                     &payload,
+                    &msg.payload,
                     SearchResultLocator::StreamMessage {
                         connection_id,
                         stream_name: stream_name.to_string(),
@@ -222,6 +231,7 @@ fn append_subscriber_results(
                     &msg.id.to_string(),
                     &item_label,
                     &msg.subject,
+                    msg.subject.as_bytes(),
                     SearchResultLocator::SubscriberMessage {
                         connection_id,
                         backend_id,
@@ -246,6 +256,7 @@ fn append_subscriber_results(
                     &msg.id.to_string(),
                     &item_label,
                     &payload,
+                    &msg.payload,
                     SearchResultLocator::SubscriberMessage {
                         connection_id,
                         backend_id,
@@ -275,6 +286,7 @@ fn push_result(
     item_id: &str,
     item_label: &str,
     text: &str,
+    preview_bytes: &[u8],
     locator: SearchResultLocator,
 ) {
     ctx.results.push(SearchWorkspaceResult {
@@ -288,7 +300,7 @@ fn push_result(
         field,
         item_label: item_label.to_string(),
         snippet: compact_text(text, 160),
-        preview: text.to_string(),
+        preview_bytes: preview_bytes.to_vec(),
         locator,
     });
 }

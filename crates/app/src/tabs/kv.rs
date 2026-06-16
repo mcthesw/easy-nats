@@ -51,6 +51,7 @@ pub fn kv_bucket_ui(
         state.load_generation = new_gen;
         state.keys.clear();
         state.fetched_values.clear();
+        state.fetched_value_bytes.clear();
         key_filter::invalidate(state);
         state.value_search_cursor = 0;
         state.value_search_scanning = 0;
@@ -319,6 +320,7 @@ fn refresh_kv_keys(
     state.load_generation = new_gen;
     state.keys.clear();
     state.fetched_values.clear();
+    state.fetched_value_bytes.clear();
     key_filter::invalidate(state);
     state.value_search_cursor = 0;
     state.value_search_scanning = 0;
