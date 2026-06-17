@@ -37,20 +37,38 @@ impl eframe::App for EasyNatsApp {
 
         let mut dock_style = egui_dock::Style::from_egui(ui.style().as_ref());
 
-        // Main
+        // Flat tab chrome: the tab bar matches the content background, with no
+        // bar/content hairline, no per-leaf body border, and no per-tab outline boxes.
+        // Tabs are frameless pills separated by a small gap and distinguished by fill
+        // (inactive darker, active merging into content) plus text color — so the only
+        // border at the window edge is the OS frame, and at the sidebar the sidebar
+        // separator, instead of a doubled edge line.
         dock_style.main_surface_border_rounding = egui::CornerRadius::ZERO;
-        // Tab bar
         dock_style.tab_bar.bg_fill = ui.visuals().window_fill;
+        dock_style.tab_bar.hline_color = egui::Color32::TRANSPARENT;
         dock_style.tab_bar.corner_radius = egui::CornerRadius::ZERO;
-        // Tabs
-        dock_style.tab.active.corner_radius = egui::CornerRadius::ZERO;
-        dock_style.tab.inactive.corner_radius = egui::CornerRadius::ZERO;
-        dock_style.tab.focused.corner_radius = egui::CornerRadius::ZERO;
-        dock_style.tab.hovered.corner_radius = egui::CornerRadius::ZERO;
-        dock_style.tab.active_with_kb_focus.corner_radius = egui::CornerRadius::ZERO;
-        dock_style.tab.inactive_with_kb_focus.corner_radius = egui::CornerRadius::ZERO;
-        dock_style.tab.focused_with_kb_focus.corner_radius = egui::CornerRadius::ZERO;
+        dock_style.tab.tab_body.stroke = egui::Stroke::NONE;
         dock_style.tab.tab_body.corner_radius = egui::CornerRadius::ZERO;
+        dock_style.tab.spacing = 4.0;
+        // Flatten every tab interaction state: no outline box, no rounding.
+        let flatten_tab = |tab: &mut egui_dock::TabInteractionStyle| {
+            tab.outline_color = egui::Color32::TRANSPARENT;
+            tab.corner_radius = egui::CornerRadius::ZERO;
+        };
+        flatten_tab(&mut dock_style.tab.active);
+        flatten_tab(&mut dock_style.tab.inactive);
+        flatten_tab(&mut dock_style.tab.focused);
+        flatten_tab(&mut dock_style.tab.hovered);
+        flatten_tab(&mut dock_style.tab.active_with_kb_focus);
+        flatten_tab(&mut dock_style.tab.inactive_with_kb_focus);
+        flatten_tab(&mut dock_style.tab.focused_with_kb_focus);
+
+        // Darken inactive pills so the lighter active tab (which matches the content
+        // background) stands out more clearly. Uses extreme_bg_color (already the
+        // TextEdit background) rather than a foreign chrome color.
+        let inactive_fill = ui.visuals().extreme_bg_color;
+        dock_style.tab.inactive.bg_fill = inactive_fill;
+        dock_style.tab.inactive_with_kb_focus.bg_fill = inactive_fill;
 
         DockArea::new(&mut self.dock_state)
             .style(dock_style)
