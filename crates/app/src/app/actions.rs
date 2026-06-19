@@ -32,6 +32,14 @@ impl EasyNatsApp {
 
     pub(crate) fn disconnect(&mut self, id: u64) {
         self.user_wants_connected.remove(&id);
+        // Close every tab bound to this connection so their auto-refresh loops and
+        // loading spinners stop driving backend commands against a connection that
+        // is being torn down (which would surface "Not connected" error toasts).
+        // The `Disconnect` command below aborts the connection's subscriptions and
+        // KV tasks wholesale, so `close_tabs_for_connection` does not send per-tab
+        // `Unsubscribe` (that is reserved for closing individual tabs on a live
+        // connection via `remove_tabs_matching`).
+        self.close_tabs_for_connection(id);
         self.backend.send(BackendCommand::Disconnect { id });
     }
 
@@ -507,14 +515,41 @@ impl EasyNatsApp {
                 (tab.tab_id(), unsubs)
             })
             .collect();
-        for (tid, unsubs) in to_remove {
+        for (_tid, unsubs) in &to_remove {
             for (connection_id, backend_id, subject) in unsubs {
                 self.backend.send(BackendCommand::Unsubscribe {
-                    connection_id,
-                    backend_id,
-                    subject,
+                    connection_id: *connection_id,
+                    backend_id: *backend_id,
+                    subject: subject.clone(),
                 });
             }
+        }
+        self.remove_tabs_by_ids(to_remove.into_iter().map(|(tid, _)| tid).collect());
+    }
+
+    /// Close every dock tab bound to a connection.
+    ///
+    /// Used during connection teardown (user disconnect / delete). The backend
+    /// `Disconnect` command already aborts that connection's subscriptions and KV
+    /// tasks wholesale, so — unlike closing an individual tab on a live connection
+    /// (`remove_tabs_matching`) — we do *not* send per-tab `Unsubscribe` here; doing
+    /// so would race the teardown and surface spurious "not subscribed" errors.
+    /// Dropping the tabs still fires each `TabGuard::drop` for token cancellation
+    /// and display-ID recycling.
+    pub(crate) fn close_tabs_for_connection(&mut self, connection_id: u64) {
+        let ids: Vec<egui::Id> = self
+            .dock_state
+            .iter_all_tabs()
+            .filter(|(_, tab)| tab.connection_id() == Some(connection_id))
+            .map(|(_, tab)| tab.tab_id())
+            .collect();
+        self.remove_tabs_by_ids(ids);
+    }
+
+    /// Remove tabs from the dock by structural id. Dropping each removed tab
+    /// fires its `TabGuard::drop` (token cancellation + display-ID recycling).
+    fn remove_tabs_by_ids(&mut self, ids: Vec<egui::Id>) {
+        for tid in ids {
             if let Some(pos) = self.dock_state.find_tab_from(|t| t.tab_id() == tid) {
                 self.dock_state.remove_tab(pos);
             }
