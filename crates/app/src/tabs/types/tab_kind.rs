@@ -189,6 +189,29 @@ impl TabKind {
             TabKind::LogViewer => egui::Id::new("tab:log-viewer"),
         }
     }
+
+    /// The connection this tab is bound to, if any.
+    ///
+    /// Tabs without a backing connection (Welcome, SearchWorkspace, MessageSchemas,
+    /// Settings, LogViewer) return `None`. Used for connection-scoped teardown such
+    /// as closing every tab belonging to a disconnected connection.
+    pub fn connection_id(&self) -> Option<u64> {
+        match self {
+            TabKind::Welcome
+            | TabKind::SearchWorkspace { .. }
+            | TabKind::MessageSchemas { .. }
+            | TabKind::Settings
+            | TabKind::LogViewer => None,
+            TabKind::Publisher { connection_id, .. }
+            | TabKind::Subscriber { connection_id, .. }
+            | TabKind::Stream { connection_id, .. }
+            | TabKind::KvBucket { connection_id, .. }
+            | TabKind::ObjectStoreBucket { connection_id, .. }
+            | TabKind::ServerInfo { connection_id, .. }
+            | TabKind::Metrics { connection_id, .. }
+            | TabKind::Clients { connection_id, .. } => Some(*connection_id),
+        }
+    }
 }
 
 pub struct AppTabViewer<'a> {
