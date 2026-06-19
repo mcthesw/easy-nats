@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.25](https://github.com/mcthesw/easy-nats/compare/v0.1.24...v0.1.25) (2026-06-19)
+
+
+### Bug Fixes
+
+* **connection:** close bound tabs on disconnect ([2eec10e](https://github.com/mcthesw/easy-nats/commit/2eec10e972903082a275eaac63e807d4bb86bcdb))
+
 ## [0.1.24](https://github.com/mcthesw/easy-nats/compare/v0.1.23...v0.1.24) (2026-06-16)
 
 
