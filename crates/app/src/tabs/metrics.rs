@@ -2,7 +2,7 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use eframe::egui;
 use egui::RichText;
-use egui_plot::{Corner, Legend, Line, Plot, PlotPoints};
+use egui_plot::{Corner, HoverPosition, Legend, Line, Plot, PlotPoints};
 use nats_backend::{BackendCommand, BackendHandle, MetricsSection, MetricsSnapshot, VarzMetrics};
 
 use crate::i18n::t;
@@ -321,7 +321,7 @@ fn render_charts(
 
 fn render_plot(
     ui: &mut egui::Ui,
-    id_source: impl std::hash::Hash,
+    id_source: impl egui::AsId,
     title: &str,
     y_axis_label: &str,
     series: Vec<(&str, Vec<[f64; 2]>)>,
@@ -346,12 +346,20 @@ fn render_plot(
         .allow_boxed_zoom(false)
         .x_axis_formatter(|mark, _range| format_time(mark.value))
         .y_axis_formatter(|mark, _range| formatter.format(mark.value))
-        .label_formatter(move |name, value| {
-            format!(
-                "{name}\n{}\n{}",
-                format_time(value.x),
-                formatter.format(value.y)
-            )
+        .label_formatter(move |position| {
+            let HoverPosition::NearDataPoint {
+                plot_name,
+                position,
+                ..
+            } = position
+            else {
+                return None;
+            };
+            Some(format!(
+                "{plot_name}\n{}\n{}",
+                format_time(position.x),
+                formatter.format(position.y)
+            ))
         })
         .x_axis_label(t("metrics.chart_time"))
         .y_axis_label(y_axis_label);

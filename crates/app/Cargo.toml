@@ -2,6 +2,7 @@
 name = "easy-nats"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 license.workspace = true
 description = "Desktop GUI client for NATS servers, JetStream, KV, and Object Store"
 homepage = "https://github.com/mcthesw/easy-nats"
@@ -18,9 +19,9 @@ nats-backend = { path = "../nats-backend" }
 base64 = "0.22"
 # Keep native desktop functionality, but avoid eframe's default feature bundle
 # (notably wgpu + web_screen_reader) since this app explicitly uses Glow.
-eframe = { version = "0.34", default-features = false, features = ["glow", "default_fonts", "accesskit"] }
+eframe = { version = "0.35", default-features = false, features = ["glow", "default_fonts", "accesskit"] }
 egui_dock = "0.19.1"
-egui_plot = "0.35.0"
+egui_plot = "0.36.0"
 mimalloc = "0.1"
 protox = "0.9"
 prost = "0.14"
@@ -39,7 +40,7 @@ jsonschema = { version = "0.46.2", default-features = false }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 # Linux desktop support still needs both backends enabled.
-eframe = { version = "0.34", default-features = false, features = ["x11", "wayland"] }
+eframe = { version = "0.35", default-features = false, features = ["x11", "wayland"] }
 
 [target.'cfg(target_os = "windows")'.build-dependencies]
 winresource = "0.1"

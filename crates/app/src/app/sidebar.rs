@@ -28,7 +28,7 @@ pub(crate) enum SidebarAction {
 pub(crate) fn render_sidebar(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     egui::Panel::left("sidebar_panel")
         .default_size(220.0)
-        .show_inside(ui, |ui| {
+        .show(ui, |ui| {
             render_sidebar_header(app, ui);
             ui.separator();
             render_connection_tree(app, ui);

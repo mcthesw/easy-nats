@@ -57,7 +57,7 @@ See [roadmap.md](roadmap.md) for additional distribution channels (AUR, etc.).
 
 ## Build
 
-Requires **Rust 2024 edition** (rustc 1.85+).
+Requires **Rust 2024 edition** (rustc 1.92+).
 
 ```bash
 cargo build --release

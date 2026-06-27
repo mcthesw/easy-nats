@@ -58,7 +58,7 @@ impl SearchStatus {
 
 pub(crate) fn render_search_row(
     ui: &mut egui::Ui,
-    id_salt: impl std::hash::Hash,
+    id_salt: impl egui::AsIdSalt,
     search: &mut super::types::ScopedSearchState,
     placeholder: &str,
     primary_label: &str,
@@ -169,7 +169,7 @@ pub(crate) fn auto_refresh_ui(ui: &mut egui::Ui, id_salt: &str, ar: &mut AutoRef
 
 pub(crate) fn topic_history_text_edit(
     ui: &mut egui::Ui,
-    id_salt: impl std::hash::Hash,
+    id_salt: impl egui::AsIdSalt,
     value: &mut String,
     selected_suggestion: &mut Option<usize>,
     topic_suggestions: &[&str],

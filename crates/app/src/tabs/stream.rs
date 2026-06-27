@@ -59,11 +59,11 @@ pub fn stream_ui(
         .resizable(true)
         .default_size(300.0)
         .size_range(200.0..=f32::INFINITY)
-        .show_inside(ui, |ui| {
+        .show(ui, |ui| {
             render_message_list(ui, state);
         });
 
-    egui::CentralPanel::default().show_inside(ui, |ui| {
+    egui::CentralPanel::default().show(ui, |ui| {
         // Bottom: consumers + purge (resizable, scrollable to avoid overlap)
         egui::Panel::bottom(egui::Id::new((
             "stream_right_bottom",
@@ -72,7 +72,7 @@ pub fn stream_ui(
         )))
         .resizable(true)
         .default_size(150.0)
-        .show_inside(ui, |ui| {
+        .show(ui, |ui| {
             egui::ScrollArea::vertical()
                 .id_salt(("stream_bottom_scroll", connection_id, stream_name))
                 .auto_shrink(false)
