@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
 use crate::proto::ProtoSchemaManager;
+use rmpv::Value;
 
 use super::json_schema::{JsonSchemaCatalog, json_schema_template, schema_entry_name};
 
@@ -273,6 +274,174 @@ fn blocking_json_schema_binding_prevents_invalid_publish() {
     let valid = manager.prepare_outgoing(1, "orders.created", r#"{"id":"A1"}"#);
     assert!(valid.can_send);
     assert_eq!(valid.payload, br#"{"id":"A1"}"#);
+}
+
+#[test]
+fn messagepack_input_without_binding_encodes_json_payload() {
+    let manager = MessageSchemaManager::default();
+
+    let outgoing = manager.prepare_outgoing_with_input_format(
+        1,
+        "orders.created",
+        r#"{"id":"A1","items":[true,null]}"#,
+        PayloadInputFormat::MessagePack,
+    );
+
+    assert!(outgoing.can_send);
+    assert_ne!(outgoing.payload, br#"{"id":"A1","items":[true,null]}"#);
+
+    let decoded = crate::format::msgpack::decode_value(&outgoing.payload).unwrap();
+    let Value::Map(entries) = decoded else {
+        panic!("expected MessagePack map");
+    };
+    assert!(entries.contains(&(rmpv::Value::from("id"), rmpv::Value::from("A1"))));
+}
+
+#[test]
+fn messagepack_input_without_binding_rejects_invalid_json() {
+    let manager = MessageSchemaManager::default();
+
+    let outgoing = manager.prepare_outgoing_with_input_format(
+        1,
+        "orders.created",
+        r#"{"id":}"#,
+        PayloadInputFormat::MessagePack,
+    );
+
+    assert!(!outgoing.can_send);
+    assert!(outgoing.payload.is_empty());
+    let status = outgoing.status.unwrap();
+    assert_eq!(status.level, SchemaStatusLevel::Error);
+    assert!(
+        status
+            .message
+            .starts_with("Invalid JSON for MsgPack input:")
+    );
+}
+
+#[test]
+fn json_schema_binding_ignores_messagepack_input_format() {
+    let mut config = MessageSchemaConfig::default();
+    let source_id = config.add_source(
+        "schemas".to_string(),
+        SchemaSourceKind::JsonSchema,
+        "unused".to_string(),
+    );
+    config
+        .add_binding(
+            "orders".to_string(),
+            None,
+            "orders.created".to_string(),
+            source_id,
+            SchemaSelector::JsonSchema {
+                entry: "order".to_string(),
+            },
+            ValidationPolicy::Block,
+        )
+        .unwrap();
+    let mut manager = MessageSchemaManager::from_config(config);
+    let schema = serde_json::json!({
+        "type": "object",
+        "required": ["id"],
+        "properties": { "id": { "type": "string" } }
+    });
+    let mut validators = HashMap::new();
+    validators.insert(
+        "order".to_string(),
+        jsonschema::validator_for(&schema).unwrap(),
+    );
+    manager.json_sources.insert(
+        source_id,
+        JsonSchemaCatalog {
+            validators,
+            schemas: HashMap::from([("order".to_string(), schema)]),
+        },
+    );
+    manager.statuses.insert(
+        source_id,
+        SchemaSourceStatus::loaded(vec!["order".to_string()]),
+    );
+
+    let payload = r#"{"id":"A1"}"#;
+    let outgoing = manager.prepare_outgoing_with_input_format(
+        1,
+        "orders.created",
+        payload,
+        PayloadInputFormat::MessagePack,
+    );
+
+    assert!(outgoing.can_send);
+    assert_eq!(outgoing.payload, payload.as_bytes());
+    assert_eq!(
+        outgoing
+            .status
+            .as_ref()
+            .map(|status| status.message.as_str()),
+        Some("Valid JSON Schema payload")
+    );
+}
+
+#[test]
+fn protobuf_binding_ignores_messagepack_input_format() {
+    let dir = unique_temp_dir("easy-nats-proto-input-precedence");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(
+        dir.join("order.proto"),
+        r#"
+                syntax = "proto3";
+                package demo;
+                message Order {
+                    string id = 1;
+                    int32 count = 2;
+                }
+            "#,
+    )
+    .unwrap();
+
+    let mut config = MessageSchemaConfig::default();
+    let source_id = config.add_source(
+        "schemas".to_string(),
+        SchemaSourceKind::Protobuf,
+        dir.to_string_lossy().to_string(),
+    );
+    config
+        .add_binding(
+            "orders".to_string(),
+            None,
+            "orders.created".to_string(),
+            source_id,
+            SchemaSelector::ProtobufMessage {
+                type_name: "demo.Order".to_string(),
+            },
+            ValidationPolicy::Block,
+        )
+        .unwrap();
+    let mut manager = MessageSchemaManager::from_config(config);
+    let mut proto = ProtoSchemaManager::default();
+    proto.set_schema_dir(dir.clone());
+    manager.proto_sources.insert(source_id, proto);
+    manager.statuses.insert(
+        source_id,
+        SchemaSourceStatus::loaded(vec!["demo.Order".to_string()]),
+    );
+
+    let payload = r#"{"id":"A1","count":2}"#;
+    let outgoing = manager.prepare_outgoing_with_input_format(
+        1,
+        "orders.created",
+        payload,
+        PayloadInputFormat::MessagePack,
+    );
+
+    assert!(outgoing.can_send);
+    assert_ne!(outgoing.payload, payload.as_bytes());
+    let decoded = manager
+        .decode_manual_proto(&outgoing.payload, "demo.Order")
+        .unwrap();
+    assert!(decoded.contains(r#""id": "A1""#));
+    assert!(decoded.contains(r#""count": 2"#));
+
+    let _ = std::fs::remove_dir_all(dir);
 }
 
 #[test]

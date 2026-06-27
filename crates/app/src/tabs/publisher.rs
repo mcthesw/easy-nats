@@ -5,7 +5,7 @@ use crate::format;
 use crate::i18n::t;
 use crate::schema::MessageSchemaManager;
 
-use super::common::topic_history_text_edit;
+use super::common::{payload_input_format_selector, topic_history_text_edit};
 use super::types::{PublisherState, TabAction};
 
 #[allow(clippy::too_many_arguments)]
@@ -65,6 +65,8 @@ pub fn publisher_ui(
     let payload_template = schema_manager.payload_template(connection_id, &subject);
     ui.horizontal(|ui| {
         ui.label(t("publisher.payload"));
+        ui.label(t("common.payload_input_format"));
+        payload_input_format_selector(ui, "pub_payload_input_fmt", &mut state.payload_input_format);
         if ui.small_button(t("publisher.format_json")).clicked()
             && let Ok(val) = serde_json::from_str::<serde_json::Value>(&state.payload)
             && let Ok(pretty) = serde_json::to_string_pretty(&val)
@@ -88,7 +90,12 @@ pub fn publisher_ui(
     ui.add_space(4.0);
     let can_send = !subject.is_empty();
     let outgoing_preview = if can_send {
-        schema_manager.prepare_outgoing(connection_id, &subject, &state.payload)
+        schema_manager.prepare_outgoing_with_input_format(
+            connection_id,
+            &subject,
+            &state.payload,
+            state.payload_input_format,
+        )
     } else {
         crate::schema::OutgoingPayload {
             payload: Vec::new(),
@@ -96,12 +103,18 @@ pub fn publisher_ui(
             can_send: false,
         }
     };
+    let can_submit = can_send && outgoing_preview.can_send;
     ui.horizontal(|ui| {
         if ui
-            .add_enabled(can_send, egui::Button::new(t("publisher.publish")))
+            .add_enabled(can_submit, egui::Button::new(t("publisher.publish")))
             .clicked()
         {
-            let outgoing = schema_manager.prepare_outgoing(connection_id, &subject, &state.payload);
+            let outgoing = schema_manager.prepare_outgoing_with_input_format(
+                connection_id,
+                &subject,
+                &state.payload,
+                state.payload_input_format,
+            );
             if outgoing.can_send {
                 actions.push(TabAction::RecordTopic {
                     topic: subject.clone(),
@@ -121,12 +134,17 @@ pub fn publisher_ui(
 
         if ui
             .add_enabled(
-                can_send && !state.waiting,
+                can_submit && !state.waiting,
                 egui::Button::new(t("publisher.request")),
             )
             .clicked()
         {
-            let outgoing = schema_manager.prepare_outgoing(connection_id, &subject, &state.payload);
+            let outgoing = schema_manager.prepare_outgoing_with_input_format(
+                connection_id,
+                &subject,
+                &state.payload,
+                state.payload_input_format,
+            );
             if outgoing.can_send {
                 actions.push(TabAction::RecordTopic {
                     topic: subject.clone(),

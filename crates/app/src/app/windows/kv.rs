@@ -3,6 +3,7 @@ use eframe::egui;
 use crate::format;
 use crate::i18n::t;
 use crate::schema::kv_subject;
+use crate::tabs::payload_input_format_selector;
 
 use super::super::{editors::StorageSelection, model::EasyNatsApp};
 
@@ -203,16 +204,23 @@ fn render_entry_create_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     app.kv_entry_create_editor.key.trim(),
                 );
                 let outgoing_preview = if !app.kv_entry_create_editor.key.trim().is_empty() {
-                    Some(app.schema_manager.prepare_outgoing(
+                    Some(app.schema_manager.prepare_outgoing_with_input_format(
                         app.kv_entry_create_editor.connection_id,
                         &entry_subject,
                         &app.kv_entry_create_editor.value,
+                        app.kv_entry_create_editor.value_input_format,
                     ))
                 } else {
                     None
                 };
                 ui.horizontal(|ui| {
                     ui.label(t("kv.value_editor"));
+                    ui.label(t("common.payload_input_format"));
+                    payload_input_format_selector(
+                        ui,
+                        "kv_entry_create_value_input_fmt",
+                        &mut app.kv_entry_create_editor.value_input_format,
+                    );
                     if ui.small_button(t("kv.format_json")).clicked()
                         && let Ok(val) = serde_json::from_str::<serde_json::Value>(
                             &app.kv_entry_create_editor.value,

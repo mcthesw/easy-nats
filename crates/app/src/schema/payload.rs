@@ -1,25 +1,39 @@
 use std::collections::BTreeMap;
 
 use crate::proto::{AutoDetectResult, ProtoSchemaManager};
+use rmpv::{Value, encode::write_value};
 
 use super::{
-    BindingResolution, MessageSchemaManager, OutgoingPayload, PayloadSchemaStatus,
-    RenderedSchemaPayload, SchemaBinding, SchemaSelector, SchemaStatusLevel, ValidationPolicy,
+    BindingResolution, MessageSchemaManager, OutgoingPayload, PayloadInputFormat,
+    PayloadSchemaStatus, RenderedSchemaPayload, SchemaBinding, SchemaSelector, SchemaStatusLevel,
+    ValidationPolicy,
 };
 
 impl MessageSchemaManager {
+    #[allow(dead_code)]
     pub fn prepare_outgoing(
         &self,
         connection_id: u64,
         subject: &str,
         payload_text: &str,
     ) -> OutgoingPayload {
+        self.prepare_outgoing_with_input_format(
+            connection_id,
+            subject,
+            payload_text,
+            PayloadInputFormat::Text,
+        )
+    }
+
+    pub fn prepare_outgoing_with_input_format(
+        &self,
+        connection_id: u64,
+        subject: &str,
+        payload_text: &str,
+        input_format: PayloadInputFormat,
+    ) -> OutgoingPayload {
         match self.resolve_binding(connection_id, subject) {
-            BindingResolution::NoMatch => OutgoingPayload {
-                payload: payload_text.as_bytes().to_vec(),
-                status: None,
-                can_send: true,
-            },
+            BindingResolution::NoMatch => prepare_without_binding(payload_text, input_format),
             BindingResolution::Ambiguous(bindings) => {
                 let status = PayloadSchemaStatus {
                     level: SchemaStatusLevel::Warning,
@@ -349,4 +363,79 @@ impl MessageSchemaManager {
             .unwrap_or("Unknown source");
         format!("{source_name} / {}", binding.selector.entry())
     }
+}
+
+fn prepare_without_binding(
+    payload_text: &str,
+    input_format: PayloadInputFormat,
+) -> OutgoingPayload {
+    match input_format {
+        PayloadInputFormat::Text => OutgoingPayload {
+            payload: payload_text.as_bytes().to_vec(),
+            status: None,
+            can_send: true,
+        },
+        PayloadInputFormat::MessagePack => match encode_messagepack_json(payload_text) {
+            Ok(payload) => OutgoingPayload {
+                payload,
+                status: Some(PayloadSchemaStatus {
+                    level: SchemaStatusLevel::Info,
+                    label: "MsgPack input".to_string(),
+                    message: "JSON will be encoded as MsgPack".to_string(),
+                    can_send: true,
+                }),
+                can_send: true,
+            },
+            Err(error) => OutgoingPayload {
+                payload: Vec::new(),
+                status: Some(PayloadSchemaStatus {
+                    level: SchemaStatusLevel::Error,
+                    label: "MsgPack input".to_string(),
+                    message: error,
+                    can_send: false,
+                }),
+                can_send: false,
+            },
+        },
+    }
+}
+
+fn encode_messagepack_json(input: &str) -> Result<Vec<u8>, String> {
+    let json = serde_json::from_str::<serde_json::Value>(input)
+        .map_err(|error| format!("Invalid JSON for MsgPack input: {error}"))?;
+    let value = json_to_msgpack(json)?;
+    let mut out = Vec::new();
+    write_value(&mut out, &value).map_err(|error| format!("MsgPack encode error: {error}"))?;
+    Ok(out)
+}
+
+fn json_to_msgpack(value: serde_json::Value) -> Result<Value, String> {
+    Ok(match value {
+        serde_json::Value::Null => Value::Nil,
+        serde_json::Value::Bool(value) => Value::Boolean(value),
+        serde_json::Value::Number(value) => {
+            if let Some(value) = value.as_i64() {
+                Value::from(value)
+            } else if let Some(value) = value.as_u64() {
+                Value::from(value)
+            } else if let Some(value) = value.as_f64() {
+                Value::F64(value)
+            } else {
+                return Err("Unsupported JSON number".to_string());
+            }
+        }
+        serde_json::Value::String(value) => Value::String(value.into()),
+        serde_json::Value::Array(values) => Value::Array(
+            values
+                .into_iter()
+                .map(json_to_msgpack)
+                .collect::<Result<Vec<_>, _>>()?,
+        ),
+        serde_json::Value::Object(values) => Value::Map(
+            values
+                .into_iter()
+                .map(|(key, value)| Ok((Value::String(key.into()), json_to_msgpack(value)?)))
+                .collect::<Result<Vec<_>, String>>()?,
+        ),
+    })
 }

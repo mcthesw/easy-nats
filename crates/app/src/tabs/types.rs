@@ -17,7 +17,7 @@ use nats_backend::{
 
 use crate::format::PayloadFormat;
 use crate::proto::ProtoViewState;
-use crate::schema::{SchemaSelector, SchemaSourceKind, ValidationPolicy};
+use crate::schema::{PayloadInputFormat, SchemaSelector, SchemaSourceKind, ValidationPolicy};
 use crate::theme::ThemeId;
 
 /// Auto-refresh configuration for periodic data reloading.
@@ -147,6 +147,7 @@ pub struct PublisherState {
     pub timeout_ms: String,
     pub response: Option<ResponseData>,
     pub waiting: bool,
+    pub payload_input_format: PayloadInputFormat,
     pub response_format: PayloadFormat,
     pub proto_view: ProtoViewState,
 }
@@ -161,6 +162,7 @@ impl Default for PublisherState {
             timeout_ms: "5000".to_string(),
             response: None,
             waiting: false,
+            payload_input_format: PayloadInputFormat::Text,
             response_format: PayloadFormat::Auto,
             proto_view: ProtoViewState::default(),
         }
@@ -583,6 +585,7 @@ pub struct KvBucketState {
     pub entry_revision: Option<u64>,
     pub entry_operation: Option<String>,
     pub entry_created: Option<String>,
+    pub editor_input_format: PayloadInputFormat,
     pub editor_format: PayloadFormat,
     pub history: Vec<KvHistoryItem>,
     pub history_format: PayloadFormat,
@@ -617,6 +620,7 @@ impl Default for KvBucketState {
             entry_revision: None,
             entry_operation: None,
             entry_created: None,
+            editor_input_format: PayloadInputFormat::Text,
             editor_format: PayloadFormat::Auto,
             history: Vec::new(),
             history_format: PayloadFormat::Auto,

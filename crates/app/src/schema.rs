@@ -11,7 +11,7 @@ pub use config::MessageSchemaConfig;
 pub use manager::MessageSchemaManager;
 pub use subject::SubjectPattern;
 pub use types::{
-    BindingResolution, OutgoingPayload, PayloadSchemaStatus, RenderedSchemaPayload, SchemaBinding,
-    SchemaSelector, SchemaSource, SchemaSourceKind, SchemaSourceState, SchemaSourceStatus,
-    SchemaStatusLevel, ValidationPolicy, kv_subject,
+    BindingResolution, OutgoingPayload, PayloadInputFormat, PayloadSchemaStatus,
+    RenderedSchemaPayload, SchemaBinding, SchemaSelector, SchemaSource, SchemaSourceKind,
+    SchemaSourceState, SchemaSourceStatus, SchemaStatusLevel, ValidationPolicy, kv_subject,
 };

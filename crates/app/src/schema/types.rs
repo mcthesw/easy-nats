@@ -28,6 +28,24 @@ impl SchemaSourceKind {
     }
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum PayloadInputFormat {
+    #[default]
+    Text,
+    MessagePack,
+}
+
+impl PayloadInputFormat {
+    pub const ALL: [Self; 2] = [Self::Text, Self::MessagePack];
+
+    pub fn label_key(self) -> &'static str {
+        match self {
+            Self::Text => "common.payload_input_text",
+            Self::MessagePack => "common.payload_input_messagepack",
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SchemaBinding {
     pub id: u64,

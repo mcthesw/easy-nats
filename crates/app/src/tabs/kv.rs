@@ -7,7 +7,8 @@ use crate::schema::{MessageSchemaManager, kv_subject};
 use crate::tabs::guard::TabGuard;
 
 use super::common::{
-    KV_VALUE_SEARCH_BATCH, SearchStatus, auto_refresh_ui, format_bytes, render_search_row,
+    KV_VALUE_SEARCH_BATCH, SearchStatus, auto_refresh_ui, format_bytes,
+    payload_input_format_selector, render_search_row,
 };
 use super::types::{KvBucketState, TabAction};
 
@@ -364,7 +365,12 @@ fn render_detail_panel(
     let can_save = !entry_key.is_empty();
     let subject = kv_subject(bucket_name, &entry_key);
     let outgoing_preview = if can_save {
-        Some(schema_manager.prepare_outgoing(connection_id, &subject, &state.entry_value))
+        Some(schema_manager.prepare_outgoing_with_input_format(
+            connection_id,
+            &subject,
+            &state.entry_value,
+            state.editor_input_format,
+        ))
     } else {
         None
     };
@@ -461,6 +467,9 @@ fn render_detail_panel(
     // Value editor
     ui.horizontal(|ui| {
         ui.label(t("kv.value_editor"));
+        ui.label(t("common.payload_input_format"));
+        payload_input_format_selector(ui, "kv_value_input_fmt", &mut state.editor_input_format);
+        ui.label(t("common.payload_preview_format"));
         format::format_selector(ui, "kv_value_fmt", &mut state.editor_format);
         if ui.small_button(t("kv.format_json")).clicked()
             && let Ok(val) = serde_json::from_str::<serde_json::Value>(&state.entry_value)
@@ -488,13 +497,18 @@ fn render_detail_panel(
 
     ui.add_space(4.0);
     ui.label(t("kv.value_preview"));
+    let preview_bytes = outgoing_preview
+        .as_ref()
+        .filter(|outgoing| outgoing.can_send)
+        .map(|outgoing| outgoing.payload.as_slice())
+        .unwrap_or_else(|| state.entry_value.as_bytes());
     egui::ScrollArea::vertical()
         .id_salt(("kv_value_preview", connection_id, bucket_name))
         .auto_shrink([false; 2])
         .show(ui, |ui| {
             format::render_payload_with_proto(
                 ui,
-                state.entry_value.as_bytes(),
+                preview_bytes,
                 state.editor_format,
                 "kv_editor_proto",
                 &mut state.editor_proto_view,

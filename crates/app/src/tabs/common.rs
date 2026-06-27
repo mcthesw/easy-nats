@@ -4,6 +4,7 @@ use eframe::egui;
 use eframe::egui::{Popup, PopupCloseBehavior, TextEdit};
 
 use crate::i18n::t;
+use crate::schema::PayloadInputFormat;
 
 use super::types::AutoRefresh;
 
@@ -148,6 +149,22 @@ fn contains_ascii_case_insensitive(value: &[u8], query: &[u8]) -> bool {
 
 pub(crate) fn searchable_payload_text(payload: &[u8]) -> String {
     String::from_utf8_lossy(payload).into_owned()
+}
+
+pub(crate) fn payload_input_format_selector(
+    ui: &mut egui::Ui,
+    id_salt: &str,
+    format: &mut PayloadInputFormat,
+) -> bool {
+    let before = *format;
+    egui::ComboBox::from_id_salt(id_salt)
+        .selected_text(t(format.label_key()))
+        .show_ui(ui, |ui| {
+            for choice in PayloadInputFormat::ALL {
+                ui.selectable_value(format, choice, t(choice.label_key()));
+            }
+        });
+    *format != before
 }
 
 /// Render auto-refresh toggle + interval selector inline.
