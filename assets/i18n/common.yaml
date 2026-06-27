@@ -114,6 +114,18 @@ storage_label:
 replicas:
   en: "Replicas"
   zh: "副本数"
+payload_input_format:
+  en: "Input"
+  zh: "输入"
+payload_preview_format:
+  en: "Preview"
+  zh: "预览"
+payload_input_text:
+  en: "Text"
+  zh: "文本"
+payload_input_messagepack:
+  en: "MsgPack"
+  zh: "MsgPack"
 
 clear:
   en: "Clear"

@@ -3,6 +3,8 @@ use nats_backend::{
     ConsumerAckPolicyKind, ConsumerDeliverPolicyKind, ConsumerInfo, KvBucketInfo, StorageKind,
 };
 
+use crate::schema::PayloadInputFormat;
+
 #[derive(Default)]
 pub(crate) struct ConnectionEditor {
     pub(crate) visible: bool,
@@ -95,6 +97,7 @@ pub(crate) struct StreamPublishEditor {
     pub(crate) stream_name: String,
     pub(crate) subject: String,
     pub(crate) payload: String,
+    pub(crate) payload_input_format: PayloadInputFormat,
     pub(crate) headers: Vec<(String, String)>,
 }
 
@@ -106,6 +109,7 @@ impl StreamPublishEditor {
             stream_name,
             subject,
             payload: String::new(),
+            payload_input_format: PayloadInputFormat::Text,
             headers: Vec::new(),
         }
     }
@@ -359,6 +363,7 @@ pub(crate) struct KvEntryCreateEditor {
     pub(crate) bucket_name: String,
     pub(crate) key: String,
     pub(crate) value: String,
+    pub(crate) value_input_format: PayloadInputFormat,
 }
 
 impl KvEntryCreateEditor {
@@ -369,6 +374,7 @@ impl KvEntryCreateEditor {
             bucket_name,
             key: initial_key,
             value: String::new(),
+            value_input_format: PayloadInputFormat::Text,
         }
     }
 }

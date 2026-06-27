@@ -16,7 +16,9 @@ mod subscriber;
 mod types;
 mod viewer;
 
-pub(crate) use common::{KV_VALUE_SEARCH_BATCH, NormalizedSearchQuery};
+pub(crate) use common::{
+    KV_VALUE_SEARCH_BATCH, NormalizedSearchQuery, payload_input_format_selector,
+};
 pub use guard::{TabGuard, next_backend_id, next_generation};
 pub use kv::kv_bucket_ui;
 pub use message_schemas::message_schemas_ui;

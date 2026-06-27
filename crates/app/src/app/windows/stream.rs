@@ -2,6 +2,7 @@ use eframe::egui;
 
 use crate::format;
 use crate::i18n::t;
+use crate::tabs::payload_input_format_selector;
 
 use super::super::model::EasyNatsApp;
 
@@ -169,16 +170,23 @@ fn render_publish(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                 ui.add_space(4.0);
                 let stream_subject = app.stream_publish_editor.subject.trim().to_string();
                 let outgoing_preview = if !stream_subject.is_empty() {
-                    Some(app.schema_manager.prepare_outgoing(
+                    Some(app.schema_manager.prepare_outgoing_with_input_format(
                         app.stream_publish_editor.connection_id,
                         &stream_subject,
                         &app.stream_publish_editor.payload,
+                        app.stream_publish_editor.payload_input_format,
                     ))
                 } else {
                     None
                 };
                 ui.horizontal(|ui| {
                     ui.label(t("publisher.payload"));
+                    ui.label(t("common.payload_input_format"));
+                    payload_input_format_selector(
+                        ui,
+                        "stream_publish_payload_input_fmt",
+                        &mut app.stream_publish_editor.payload_input_format,
+                    );
                     if ui.small_button(t("publisher.format_json")).clicked()
                         && let Ok(val) = serde_json::from_str::<serde_json::Value>(
                             &app.stream_publish_editor.payload,

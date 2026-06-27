@@ -367,10 +367,11 @@ impl EasyNatsApp {
 
     pub(crate) fn publish_stream_editor(&mut self) {
         let subject = self.stream_publish_editor.subject.trim().to_string();
-        let outgoing = self.schema_manager.prepare_outgoing(
+        let outgoing = self.schema_manager.prepare_outgoing_with_input_format(
             self.stream_publish_editor.connection_id,
             &subject,
             &self.stream_publish_editor.payload,
+            self.stream_publish_editor.payload_input_format,
         );
         if !outgoing.can_send {
             if let Some(status) = outgoing.status {
@@ -466,10 +467,11 @@ impl EasyNatsApp {
             &self.kv_entry_create_editor.bucket_name,
             self.kv_entry_create_editor.key.trim(),
         );
-        let outgoing = self.schema_manager.prepare_outgoing(
+        let outgoing = self.schema_manager.prepare_outgoing_with_input_format(
             self.kv_entry_create_editor.connection_id,
             &subject,
             &self.kv_entry_create_editor.value,
+            self.kv_entry_create_editor.value_input_format,
         );
         if !outgoing.can_send {
             if let Some(status) = outgoing.status {
