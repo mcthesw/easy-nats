@@ -1,10 +1,18 @@
 use base64::Engine;
 use eframe::egui;
-use egui::text::LayoutJob;
-use std::ops::Range;
 
 use crate::proto::{AutoDetectResult, ProtoViewState};
 use crate::schema::{MessageSchemaManager, PayloadSchemaStatus, SchemaStatusLevel};
+
+mod json;
+pub mod msgpack;
+mod preview;
+
+pub use json::{format_json, json_syntax_highlight};
+pub use msgpack::format_msgpack;
+pub use preview::{
+    READ_ONLY_PREVIEW_FORMATS, format_read_only_preview, read_only_preview_layout_job,
+};
 
 /// Display format for message payloads.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -13,6 +21,7 @@ pub enum PayloadFormat {
     Auto,
     Text,
     Json,
+    MessagePack,
     Hex,
     Base64,
     Protobuf,
@@ -23,6 +32,7 @@ impl PayloadFormat {
         PayloadFormat::Auto,
         PayloadFormat::Text,
         PayloadFormat::Json,
+        PayloadFormat::MessagePack,
         PayloadFormat::Hex,
         PayloadFormat::Base64,
         PayloadFormat::Protobuf,
@@ -33,6 +43,7 @@ impl PayloadFormat {
             PayloadFormat::Auto => "Auto",
             PayloadFormat::Text => "Text",
             PayloadFormat::Json => "JSON",
+            PayloadFormat::MessagePack => "MsgPack",
             PayloadFormat::Hex => "Hex",
             PayloadFormat::Base64 => "Base64",
             PayloadFormat::Protobuf => "Protobuf",
@@ -41,7 +52,7 @@ impl PayloadFormat {
 }
 
 /// Detects the best display format for `data`.
-/// Order: valid JSON → valid UTF-8 text → hex dump.
+/// Order: valid JSON -> valid UTF-8 text -> confident MessagePack -> hex dump.
 pub fn detect_format(data: &[u8]) -> PayloadFormat {
     if data.is_empty() {
         return PayloadFormat::Text;
@@ -53,6 +64,9 @@ pub fn detect_format(data: &[u8]) -> PayloadFormat {
     // Try UTF-8 text
     if std::str::from_utf8(data).is_ok() {
         return PayloadFormat::Text;
+    }
+    if msgpack::is_confident_auto(data) {
+        return PayloadFormat::MessagePack;
     }
     PayloadFormat::Hex
 }
@@ -71,124 +85,6 @@ pub fn resolve_format(format: PayloadFormat, data: &[u8]) -> PayloadFormat {
 /// Render payload as plain UTF-8 text (lossy).
 pub fn format_text(data: &[u8]) -> String {
     String::from_utf8_lossy(data).into_owned()
-}
-
-/// Pretty-print JSON. Returns the formatted string.
-pub fn format_json(data: &[u8]) -> String {
-    match serde_json::from_slice::<serde_json::Value>(data) {
-        Ok(val) => serde_json::to_string_pretty(&val).unwrap_or_else(|_| format_text(data)),
-        Err(_) => format_text(data),
-    }
-}
-
-/// Build a `LayoutJob` with basic JSON syntax highlighting.
-pub fn json_syntax_highlight(json: &str, style: &egui::Style) -> LayoutJob {
-    let mut job = LayoutJob::default();
-    let mono = egui::FontId::monospace(13.0);
-    let base_color = style.visuals.text_color();
-
-    let string_color = if style.visuals.dark_mode {
-        egui::Color32::from_rgb(152, 195, 121) // green
-    } else {
-        egui::Color32::from_rgb(80, 161, 79)
-    };
-    let number_color = if style.visuals.dark_mode {
-        egui::Color32::from_rgb(209, 154, 102) // orange
-    } else {
-        egui::Color32::from_rgb(152, 104, 1)
-    };
-    let keyword_color = if style.visuals.dark_mode {
-        egui::Color32::from_rgb(86, 182, 194) // cyan
-    } else {
-        egui::Color32::from_rgb(1, 132, 188)
-    };
-    let key_color = if style.visuals.dark_mode {
-        egui::Color32::from_rgb(224, 108, 117) // red
-    } else {
-        egui::Color32::from_rgb(228, 86, 73)
-    };
-
-    let chars: Vec<char> = json.chars().collect();
-    let mut i = 0;
-    let mut after_colon = false;
-
-    while i < chars.len() {
-        let ch = chars[i];
-        match ch {
-            '"' => {
-                // Scan string
-                let start = i;
-                i += 1;
-                while i < chars.len() {
-                    if chars[i] == '\\' {
-                        i += 2;
-                        continue;
-                    }
-                    if chars[i] == '"' {
-                        i += 1;
-                        break;
-                    }
-                    i += 1;
-                }
-                let s: String = chars[start..i].iter().collect();
-                let color = if after_colon { string_color } else { key_color };
-                job.append(&s, 0.0, egui::TextFormat::simple(mono.clone(), color));
-                after_colon = false;
-            }
-            ':' => {
-                job.append(":", 0.0, egui::TextFormat::simple(mono.clone(), base_color));
-                after_colon = true;
-                i += 1;
-            }
-            ',' | '{' | '}' | '[' | ']' => {
-                let s = String::from(ch);
-                job.append(&s, 0.0, egui::TextFormat::simple(mono.clone(), base_color));
-                after_colon = false;
-                i += 1;
-            }
-            't' | 'f' | 'n' => {
-                // true, false, null
-                let start = i;
-                while i < chars.len() && chars[i].is_alphabetic() {
-                    i += 1;
-                }
-                let word: String = chars[start..i].iter().collect();
-                job.append(
-                    &word,
-                    0.0,
-                    egui::TextFormat::simple(mono.clone(), keyword_color),
-                );
-                after_colon = false;
-            }
-            c if c == '-' || c.is_ascii_digit() => {
-                let start = i;
-                while i < chars.len()
-                    && (chars[i].is_ascii_digit()
-                        || chars[i] == '.'
-                        || chars[i] == '-'
-                        || chars[i] == '+'
-                        || chars[i] == 'e'
-                        || chars[i] == 'E')
-                {
-                    i += 1;
-                }
-                let num: String = chars[start..i].iter().collect();
-                job.append(
-                    &num,
-                    0.0,
-                    egui::TextFormat::simple(mono.clone(), number_color),
-                );
-                after_colon = false;
-            }
-            _ => {
-                // Whitespace or other
-                let s = String::from(ch);
-                job.append(&s, 0.0, egui::TextFormat::simple(mono.clone(), base_color));
-                i += 1;
-            }
-        }
-    }
-    job
 }
 
 /// Format as hex dump with offset | hex | ASCII columns.
@@ -236,152 +132,6 @@ pub fn format_base64(data: &[u8]) -> String {
     base64::engine::general_purpose::STANDARD.encode(data)
 }
 
-pub const READ_ONLY_PREVIEW_FORMATS: &[PayloadFormat] = &[
-    PayloadFormat::Auto,
-    PayloadFormat::Text,
-    PayloadFormat::Json,
-    PayloadFormat::Hex,
-    PayloadFormat::Base64,
-];
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ReadOnlyPreview {
-    pub resolved_format: PayloadFormat,
-    pub text: String,
-}
-
-pub fn format_read_only_preview(data: &[u8], format: PayloadFormat) -> ReadOnlyPreview {
-    let requested = if READ_ONLY_PREVIEW_FORMATS.contains(&format) {
-        format
-    } else {
-        PayloadFormat::Auto
-    };
-    let resolved = resolve_format(requested, data);
-    let text = match resolved {
-        PayloadFormat::Json => format_json(data),
-        PayloadFormat::Hex => format_hex(data),
-        PayloadFormat::Base64 => format_base64(data),
-        PayloadFormat::Text | PayloadFormat::Auto => format_text(data),
-        PayloadFormat::Protobuf => format_text(data),
-    };
-    ReadOnlyPreview {
-        resolved_format: resolved,
-        text,
-    }
-}
-
-pub fn preview_match_ranges(text: &str, query: &str) -> Vec<Range<usize>> {
-    let query = query.trim();
-    if text.is_empty() || query.is_empty() {
-        return Vec::new();
-    }
-
-    if text.is_ascii() && query.is_ascii() {
-        return ascii_match_ranges(text, query);
-    }
-
-    unicode_match_ranges(text, query)
-}
-
-pub fn read_only_preview_layout_job(
-    preview: &ReadOnlyPreview,
-    style: &egui::Style,
-    query: &str,
-) -> LayoutJob {
-    let ranges = preview_match_ranges(&preview.text, query);
-    highlighted_monospace_job(&preview.text, style, &ranges)
-}
-
-fn ascii_match_ranges(text: &str, query: &str) -> Vec<Range<usize>> {
-    let text_bytes = text.as_bytes();
-    let query_bytes = query.as_bytes();
-    if query_bytes.len() > text_bytes.len() {
-        return Vec::new();
-    }
-
-    let mut ranges = Vec::new();
-    let mut index = 0;
-    while index + query_bytes.len() <= text_bytes.len() {
-        let window = &text_bytes[index..index + query_bytes.len()];
-        let matches = window
-            .iter()
-            .zip(query_bytes.iter())
-            .all(|(value, query)| value.eq_ignore_ascii_case(query));
-        if matches {
-            ranges.push(index..index + query_bytes.len());
-            index += query_bytes.len();
-        } else {
-            index += 1;
-        }
-    }
-    ranges
-}
-
-fn unicode_match_ranges(text: &str, query: &str) -> Vec<Range<usize>> {
-    let query_chars = query.chars().count();
-    if query_chars == 0 {
-        return Vec::new();
-    }
-    let query_lower = query.to_lowercase();
-    let starts = text.char_indices().map(|(idx, _)| idx).collect::<Vec<_>>();
-    let mut ranges = Vec::new();
-    let mut cursor = 0;
-
-    while cursor < starts.len() {
-        let start = starts[cursor];
-        let Some(end) = byte_index_after_chars(text, start, query_chars) else {
-            break;
-        };
-        if text[start..end].to_lowercase() == query_lower {
-            ranges.push(start..end);
-            cursor += query_chars;
-        } else {
-            cursor += 1;
-        }
-    }
-    ranges
-}
-
-fn byte_index_after_chars(text: &str, start: usize, char_count: usize) -> Option<usize> {
-    let mut iter = text[start..].char_indices();
-    for _ in 0..char_count {
-        iter.next()?;
-    }
-    iter.next().map(|(idx, _)| start + idx).or(Some(text.len()))
-}
-
-fn highlighted_monospace_job(
-    text: &str,
-    style: &egui::Style,
-    ranges: &[Range<usize>],
-) -> LayoutJob {
-    let mut job = LayoutJob::default();
-    let mono = egui::FontId::monospace(13.0);
-    let text_color = style.visuals.text_color();
-    let highlight_bg = style.visuals.selection.bg_fill;
-    let highlight_fg = style.visuals.selection.stroke.color;
-    let normal = egui::TextFormat::simple(mono.clone(), text_color);
-    let highlighted = egui::TextFormat {
-        font_id: mono,
-        color: highlight_fg,
-        background: highlight_bg,
-        ..Default::default()
-    };
-
-    let mut cursor = 0;
-    for range in ranges {
-        if range.start > cursor {
-            job.append(&text[cursor..range.start], 0.0, normal.clone());
-        }
-        job.append(&text[range.clone()], 0.0, highlighted.clone());
-        cursor = range.end;
-    }
-    if cursor < text.len() {
-        job.append(&text[cursor..], 0.0, normal);
-    }
-    job
-}
-
 /// Show a format selector combo box. Returns true if the format changed.
 pub fn format_selector(ui: &mut egui::Ui, id_salt: &str, format: &mut PayloadFormat) -> bool {
     let before = *format;
@@ -411,6 +161,10 @@ pub fn render_payload(ui: &mut egui::Ui, data: &[u8], format: PayloadFormat) {
         PayloadFormat::Base64 => {
             let b64 = format_base64(data);
             ui.label(egui::RichText::new(b64).monospace());
+        }
+        PayloadFormat::MessagePack => {
+            let msgpack = format_msgpack(data);
+            ui.label(egui::RichText::new(msgpack).monospace());
         }
         PayloadFormat::Protobuf => {
             // Wire-format fallback when called without proto state
@@ -619,6 +373,13 @@ fn render_proto_decoded(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rmpv::{Value, encode::write_value};
+
+    fn encode_msgpack(value: Value) -> Vec<u8> {
+        let mut data = Vec::new();
+        write_value(&mut data, &value).unwrap();
+        data
+    }
 
     #[test]
     fn detect_json() {
@@ -635,6 +396,41 @@ mod tests {
     #[test]
     fn detect_hex_for_binary() {
         assert_eq!(detect_format(&[0xFF, 0xFE, 0x00, 0x01]), PayloadFormat::Hex);
+    }
+
+    #[test]
+    fn detect_messagepack_only_for_confident_structures() {
+        let map = encode_msgpack(Value::Map(vec![(Value::from("kind"), Value::from("path"))]));
+        let array = encode_msgpack(Value::Array(vec![Value::from(1), Value::from(2)]));
+        let binary = encode_msgpack(Value::Binary(vec![0, 1, 255]));
+        let ext = encode_msgpack(Value::Ext(-1, vec![0, 0, 0, 1]));
+
+        assert_eq!(detect_format(&map), PayloadFormat::MessagePack);
+        assert_eq!(detect_format(&array), PayloadFormat::MessagePack);
+        assert_eq!(detect_format(&binary), PayloadFormat::MessagePack);
+        assert_eq!(detect_format(&ext), PayloadFormat::MessagePack);
+
+        let boolean = encode_msgpack(Value::Boolean(true));
+        assert_eq!(detect_format(&boolean), PayloadFormat::Hex);
+    }
+
+    #[test]
+    fn detect_auto_keeps_json_and_utf8_before_messagepack() {
+        assert_eq!(detect_format(br#"{"a":1}"#), PayloadFormat::Json);
+
+        let msgpack_positive_integer = encode_msgpack(Value::from(42));
+        assert_eq!(
+            detect_format(&msgpack_positive_integer),
+            PayloadFormat::Text
+        );
+    }
+
+    #[test]
+    fn detect_auto_rejects_messagepack_with_trailing_bytes() {
+        let mut data = encode_msgpack(Value::Map(vec![(Value::from("a"), Value::from(1))]));
+        data.push(0);
+
+        assert_eq!(detect_format(&data), PayloadFormat::Hex);
     }
 
     #[test]
@@ -665,6 +461,46 @@ mod tests {
     #[test]
     fn base64_output() {
         assert_eq!(format_base64(b"Hello"), "SGVsbG8=");
+    }
+
+    #[test]
+    fn messagepack_display_formats_maps_arrays_and_scalars() {
+        let data = encode_msgpack(Value::Map(vec![
+            (Value::from("kind"), Value::from("path")),
+            (
+                Value::from("items"),
+                Value::Array(vec![Value::from(1), Value::Boolean(true)]),
+            ),
+        ]));
+
+        let rendered = format_msgpack(&data);
+
+        assert!(rendered.contains(r#""kind": "path""#));
+        assert!(rendered.contains(r#""items": ["#));
+        assert!(rendered.contains("1,"));
+        assert!(rendered.contains("true"));
+
+        let scalar = encode_msgpack(Value::from(42));
+        assert_eq!(format_msgpack(&scalar), "42");
+    }
+
+    #[test]
+    fn messagepack_display_preserves_binary_ext_and_non_string_keys() {
+        let binary = encode_msgpack(Value::Binary(vec![0, 1, 255]));
+        assert!(format_msgpack(&binary).contains("bin(3): 00 01 FF"));
+
+        let timestamp_ext = encode_msgpack(Value::Ext(-1, vec![0, 0, 0, 1]));
+        assert!(format_msgpack(&timestamp_ext).contains("ext(type: -1, len: 4): 00 00 00 01"));
+
+        let map = encode_msgpack(Value::Map(vec![(Value::from(7), Value::from("lucky"))]));
+        assert!(format_msgpack(&map).contains(r#"[7]: "lucky""#));
+    }
+
+    #[test]
+    fn messagepack_display_reports_local_decode_errors() {
+        let rendered = format_msgpack(&[0x81, 0xa1]);
+
+        assert!(rendered.starts_with("MsgPack decode error:"));
     }
 
     #[test]
@@ -704,6 +540,29 @@ mod tests {
     }
 
     #[test]
+    fn read_only_preview_supports_messagepack_selection() {
+        assert!(READ_ONLY_PREVIEW_FORMATS.contains(&PayloadFormat::MessagePack));
+
+        let data = encode_msgpack(Value::Map(vec![(Value::from("a"), Value::from(1))]));
+        let preview = format_read_only_preview(&data, PayloadFormat::Auto);
+
+        assert_eq!(preview.resolved_format, PayloadFormat::MessagePack);
+        assert!(preview.text.contains(r#""a": 1"#));
+    }
+
+    #[test]
+    fn read_only_preview_keeps_display_errors_isolated() {
+        let invalid = [0x81, 0xa1];
+        let msgpack = format_read_only_preview(&invalid, PayloadFormat::MessagePack);
+        let hex = format_read_only_preview(&invalid, PayloadFormat::Hex);
+        let text = format_read_only_preview(&invalid, PayloadFormat::Text);
+
+        assert!(msgpack.text.starts_with("MsgPack decode error:"));
+        assert!(hex.text.contains("81 A1"));
+        assert!(!text.text.starts_with("MsgPack decode error:"));
+    }
+
+    #[test]
     fn read_only_preview_falls_back_for_unsupported_format() {
         let preview = format_read_only_preview(br#"{"a":1}"#, PayloadFormat::Protobuf);
 
@@ -713,7 +572,7 @@ mod tests {
 
     #[test]
     fn preview_match_ranges_find_ascii_matches_case_insensitively() {
-        let ranges = preview_match_ranges("Balance balance BALANCE", "balance");
+        let ranges = preview::preview_match_ranges("Balance balance BALANCE", "balance");
 
         assert_eq!(ranges, vec![0..7, 8..15, 16..23]);
     }
@@ -722,7 +581,7 @@ mod tests {
     fn preview_match_ranges_find_matches_after_json_formatting() {
         let preview =
             format_read_only_preview(br#"{"event_id":"abc","kind":"path"}"#, PayloadFormat::Json);
-        let ranges = preview_match_ranges(&preview.text, "kind");
+        let ranges = preview::preview_match_ranges(&preview.text, "kind");
 
         assert_eq!(ranges.len(), 1);
         assert_eq!(&preview.text[ranges[0].clone()], "kind");
@@ -732,6 +591,6 @@ mod tests {
     fn preview_match_ranges_omit_absent_transformed_output() {
         let preview = format_read_only_preview(b"balance", PayloadFormat::Base64);
 
-        assert!(preview_match_ranges(&preview.text, "balance").is_empty());
+        assert!(preview::preview_match_ranges(&preview.text, "balance").is_empty());
     }
 }

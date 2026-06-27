@@ -17,6 +17,7 @@ path = "src/main.rs"
 [dependencies]
 nats-backend = { path = "../nats-backend" }
 base64 = "0.22"
+rmpv = "1.3.1"
 # Keep native desktop functionality, but avoid eframe's default feature bundle
 # (notably wgpu + web_screen_reader) since this app explicitly uses Glow.
 # Inspection stays inactive unless EGUI_INSPECTION is explicitly set at runtime.
