@@ -19,7 +19,13 @@ nats-backend = { path = "../nats-backend" }
 base64 = "0.22"
 # Keep native desktop functionality, but avoid eframe's default feature bundle
 # (notably wgpu + web_screen_reader) since this app explicitly uses Glow.
-eframe = { version = "0.35", default-features = false, features = ["glow", "default_fonts", "accesskit"] }
+# Inspection stays inactive unless EGUI_INSPECTION is explicitly set at runtime.
+eframe = { version = "0.35", default-features = false, features = [
+    "glow",
+    "default_fonts",
+    "accesskit",
+    "inspection",
+] }
 egui_dock = "0.19.1"
 egui_plot = "0.36.0"
 mimalloc = "0.1"
