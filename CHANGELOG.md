@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.1.26](https://github.com/mcthesw/easy-nats/compare/v0.1.25...v0.1.26) (2026-06-27)
+
+
+### Features
+
+* add MsgPack payload display ([db1d66f](https://github.com/mcthesw/easy-nats/commit/db1d66f924eb2ed77ad5b7840a2154d259767e52))
+* add MsgPack payload input mode ([3762861](https://github.com/mcthesw/easy-nats/commit/3762861ca6b6272ce572d1667a134f86d521113e))
+
 ## [0.1.25](https://github.com/mcthesw/easy-nats/compare/v0.1.24...v0.1.25) (2026-06-19)
 
 
