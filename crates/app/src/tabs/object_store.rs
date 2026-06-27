@@ -54,11 +54,11 @@ pub fn obj_store_bucket_ui(
         .resizable(true)
         .default_size(300.0)
         .size_range(200.0..=f32::INFINITY)
-        .show_inside(ui, |ui| {
+        .show(ui, |ui| {
             render_object_list(ui, connection_id, bucket_name, state, backend);
         });
 
-    egui::CentralPanel::default().show_inside(ui, |ui| {
+    egui::CentralPanel::default().show(ui, |ui| {
         render_detail_panel(ui, connection_id, bucket_name, state, backend);
     });
 }

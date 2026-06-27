@@ -44,11 +44,11 @@ pub fn subscriber_ui(
         .resizable(true)
         .default_size(300.0)
         .size_range(200.0..=f32::INFINITY)
-        .show_inside(ui, |ui| {
+        .show(ui, |ui| {
             render_message_list(ui, state);
         });
 
-    egui::CentralPanel::default().show_inside(ui, |ui| {
+    egui::CentralPanel::default().show(ui, |ui| {
         let selected_msg = state.selected_idx.and_then(|idx| state.messages.get(idx));
         if let Some(msg) = selected_msg {
             message_detail_ui(

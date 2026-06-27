@@ -5,6 +5,7 @@ resolver = "2"
 [workspace.package]
 version = "0.1.25" # x-release-please-version
 edition = "2024"
+rust-version = "1.92"
 license = "MIT"
 repository = "https://github.com/mcthesw/easy-nats"
 
@@ -15,4 +16,5 @@ strip = "symbols"
 panic = "unwind"
 
 [patch.crates-io]
-egui_dock = { git = "https://github.com/mcthesw/egui_dock.git", rev = "5dfa88feb4dddbc26eda0c0a5b469182816cb2ce" }
+egui_dock = { git = "https://github.com/mcthesw/egui_dock.git", branch = "compat/egui-0-35" }
+

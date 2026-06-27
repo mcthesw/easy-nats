@@ -126,11 +126,11 @@ pub fn search_workspace_ui(
         .resizable(true)
         .default_size(360.0)
         .size_range(260.0..=f32::INFINITY)
-        .show_inside(ui, |ui| {
+        .show(ui, |ui| {
             render_results(ui, state, sources, results);
         });
 
-    egui::CentralPanel::default().show_inside(ui, |ui| {
+    egui::CentralPanel::default().show(ui, |ui| {
         render_preview(ui, state, results, actions);
     });
 

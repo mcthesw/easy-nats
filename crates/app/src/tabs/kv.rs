@@ -86,7 +86,7 @@ pub fn kv_bucket_ui(
         .resizable(true)
         .default_size(300.0)
         .size_range(200.0..=f32::INFINITY)
-        .show_inside(ui, |ui| {
+        .show(ui, |ui| {
             render_key_list(
                 ui,
                 connection_id,
@@ -99,7 +99,7 @@ pub fn kv_bucket_ui(
         });
 
     // Right panel: detail or history
-    egui::CentralPanel::default().show_inside(ui, |ui| {
+    egui::CentralPanel::default().show(ui, |ui| {
         if state.show_history {
             render_history(ui, connection_id, bucket_name, state, schema_manager);
         } else {
