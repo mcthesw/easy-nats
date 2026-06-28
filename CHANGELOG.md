@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.1.27](https://github.com/mcthesw/easy-nats/compare/v0.1.26...v0.1.27) (2026-06-28)
+
+
+### Features
+
+* **app:** route pubsub request reply state ([affebee](https://github.com/mcthesw/easy-nats/commit/affebee2dd5ba2c55548d8cb5e63782fd9f761e7))
+* **backend:** add request reply operations ([cd1da2c](https://github.com/mcthesw/easy-nats/commit/cd1da2c3f93b9a00d2c8c34960f2ebbd0dfc7714))
+* **tabs:** add request reply workflows ([72fa638](https://github.com/mcthesw/easy-nats/commit/72fa638916ab32ded00f37f672f49df1098f0ce9))
+
 ## [0.1.26](https://github.com/mcthesw/easy-nats/compare/v0.1.25...v0.1.26) (2026-06-27)
 
 
