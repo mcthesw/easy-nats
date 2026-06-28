@@ -34,6 +34,19 @@ pub(crate) fn format_bytes(bytes: u64) -> String {
     }
 }
 
+pub(crate) fn collect_headers(headers: &[(String, String)]) -> Option<Vec<(String, String)>> {
+    let non_empty: Vec<(String, String)> = headers
+        .iter()
+        .filter(|(key, value)| !key.trim().is_empty() || !value.trim().is_empty())
+        .cloned()
+        .collect();
+    if non_empty.is_empty() {
+        None
+    } else {
+        Some(non_empty)
+    }
+}
+
 pub(crate) const SEARCH_RESULT_LIMIT: usize = 200;
 pub(crate) const KV_VALUE_SEARCH_BATCH: usize = 100;
 

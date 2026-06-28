@@ -13,6 +13,7 @@ pub(crate) mod settings;
 mod stream;
 mod stream_consumers;
 mod subscriber;
+mod subscriber_detail;
 mod types;
 mod viewer;
 

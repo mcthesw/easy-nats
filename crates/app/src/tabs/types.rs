@@ -1,13 +1,19 @@
 mod client_status_state;
 mod metrics_state;
+mod publisher_state;
+mod subscriber_state;
 mod tab_kind;
 
 pub use client_status_state::ClientStatusState;
 pub use metrics_state::MetricsState;
+pub use publisher_state::{CurrentRequest, PublisherState, RequestStatus, ResponseData};
+pub use subscriber_state::{
+    ReceivedMessage, ReplyDraft, ReplyListStatus, ReplyState, SubjectSubscription, SubscriberState,
+};
 pub use tab_kind::{AppTabViewer, TabKind};
 
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::time::{Instant, SystemTime};
+use std::collections::{HashMap, HashSet};
+use std::time::Instant;
 
 use eframe::egui;
 use nats_backend::{
@@ -138,56 +144,6 @@ pub enum TabAction {
     },
 }
 
-#[derive(Debug)]
-pub struct PublisherState {
-    pub subject: String,
-    pub subject_suggestion_idx: Option<usize>,
-    pub payload: String,
-    pub headers: Vec<(String, String)>,
-    pub timeout_ms: String,
-    pub response: Option<ResponseData>,
-    pub waiting: bool,
-    pub payload_input_format: PayloadInputFormat,
-    pub response_format: PayloadFormat,
-    pub proto_view: ProtoViewState,
-}
-
-impl Default for PublisherState {
-    fn default() -> Self {
-        Self {
-            subject: String::new(),
-            subject_suggestion_idx: None,
-            payload: String::new(),
-            headers: Vec::new(),
-            timeout_ms: "5000".to_string(),
-            response: None,
-            waiting: false,
-            payload_input_format: PayloadInputFormat::Text,
-            response_format: PayloadFormat::Auto,
-            proto_view: ProtoViewState::default(),
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ResponseData {
-    pub subject: Option<String>,
-    pub payload: Vec<u8>,
-    pub headers: Vec<(String, String)>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ReceivedMessage {
-    pub id: u64,
-    pub subject: String,
-    pub reply: Option<String>,
-    pub headers: Vec<(String, String)>,
-    pub payload: Vec<u8>,
-    pub timestamp: SystemTime,
-}
-
-pub type SubscriberListRow = (usize, String, String);
-pub type CachedSubscriberRows = (u64, Option<String>, SearchCacheKey, Vec<SubscriberListRow>);
 pub type StreamListRow = (usize, String);
 pub type CachedStreamRows = (u64, SearchCacheKey, Vec<StreamListRow>);
 
@@ -426,89 +382,6 @@ impl Default for SearchWorkspaceState {
             preview_format: PayloadFormat::Auto,
             cached_results: None,
         }
-    }
-}
-
-#[derive(Debug)]
-pub struct SubjectSubscription {
-    pub subject: String,
-    pub active: bool,
-}
-
-#[derive(Debug)]
-pub struct SubscriberState {
-    pub subject_input: String,
-    pub subject_suggestion_idx: Option<usize>,
-    pub subscriptions: Vec<SubjectSubscription>,
-    pub messages: VecDeque<ReceivedMessage>,
-    pub next_message_id: u64,
-    pub max_messages: usize,
-    pub selected_idx: Option<usize>,
-    pub payload_format: PayloadFormat,
-    /// When set, only display messages matching this subject.
-    pub subject_filter: Option<String>,
-    pub cache_generation: u64,
-    pub cached_filtered: Option<CachedSubscriberRows>,
-    pub search: ScopedSearchState,
-    pub proto_view: ProtoViewState,
-}
-
-impl Default for SubscriberState {
-    fn default() -> Self {
-        Self {
-            subject_input: String::new(),
-            subject_suggestion_idx: None,
-            subscriptions: Vec::new(),
-            messages: VecDeque::new(),
-            next_message_id: 1,
-            max_messages: 1000,
-            selected_idx: None,
-            payload_format: PayloadFormat::Auto,
-            subject_filter: None,
-            cache_generation: 0,
-            cached_filtered: None,
-            search: ScopedSearchState::default(),
-            proto_view: ProtoViewState::default(),
-        }
-    }
-}
-
-impl SubscriberState {
-    pub fn push_messages<I>(&mut self, messages: I)
-    where
-        I: IntoIterator<Item = ReceivedMessage>,
-    {
-        let mut pushed = false;
-        for msg in messages {
-            self.push_message_without_invalidation(msg);
-            pushed = true;
-        }
-        if pushed {
-            self.invalidate_filtered_cache();
-        }
-    }
-
-    fn push_message_without_invalidation(&mut self, mut msg: ReceivedMessage) {
-        if self.messages.len() >= self.max_messages {
-            self.messages.pop_front();
-            if let Some(idx) = self.selected_idx {
-                self.selected_idx = idx.checked_sub(1);
-            }
-        }
-        msg.id = self.next_message_id;
-        self.next_message_id = self.next_message_id.wrapping_add(1).max(1);
-        self.messages.push_back(msg);
-    }
-
-    pub fn clear_messages(&mut self) {
-        self.messages.clear();
-        self.selected_idx = None;
-        self.invalidate_filtered_cache();
-    }
-
-    pub fn invalidate_filtered_cache(&mut self) {
-        self.cache_generation = self.cache_generation.wrapping_add(1);
-        self.cached_filtered = None;
     }
 }
 
