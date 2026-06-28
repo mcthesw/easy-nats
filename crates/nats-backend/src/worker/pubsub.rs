@@ -5,7 +5,7 @@ use bytes::Bytes;
 use futures_util::StreamExt;
 use tokio::sync::mpsc;
 
-use crate::event::{BackendEvent, BackendOperation, MessageData};
+use crate::event::{BackendEvent, BackendOperation, MessageData, RequestFailureKind};
 
 use super::helpers::{build_header_map, extract_headers};
 use super::state::WorkerState;
@@ -15,10 +15,20 @@ const MAX_BATCH_SIZE: usize = 256;
 pub(crate) struct RequestParams {
     pub connection_id: u64,
     pub backend_id: u64,
+    pub request_id: u64,
     pub subject: String,
     pub payload: Vec<u8>,
     pub headers: Option<Vec<(String, String)>>,
     pub timeout_ms: u64,
+}
+
+pub(crate) struct ReplyParams {
+    pub connection_id: u64,
+    pub backend_id: u64,
+    pub reply_id: u64,
+    pub reply_to: String,
+    pub payload: Vec<u8>,
+    pub headers: Option<Vec<(String, String)>>,
 }
 
 pub(crate) async fn handle_publish(
@@ -31,10 +41,22 @@ pub(crate) async fn handle_publish(
 ) {
     if let Some(client) = state.clients.get(&connection_id) {
         let payload = Bytes::from(payload);
+        let headers = match build_optional_header_map(headers) {
+            Ok(headers) => headers,
+            Err(message) => {
+                send_err(
+                    evt_tx,
+                    connection_id,
+                    None,
+                    BackendOperation::Publish,
+                    message,
+                )
+                .await;
+                return;
+            }
+        };
         let result = if let Some(hdrs) = headers {
-            client
-                .publish_with_headers(subject, build_header_map(&hdrs), payload)
-                .await
+            client.publish_with_headers(subject, hdrs, payload).await
         } else {
             client.publish(subject, payload).await
         };
@@ -189,64 +211,151 @@ pub(crate) async fn handle_request(
     let RequestParams {
         connection_id,
         backend_id,
+        request_id,
         subject,
         payload,
         headers,
         timeout_ms,
     } = params;
     if let Some(client) = state.clients.get(&connection_id) {
-        let request_subject = subject.clone();
-        let payload = Bytes::from(payload);
-        let timeout = std::time::Duration::from_millis(timeout_ms);
-        let result = tokio::time::timeout(timeout, async {
-            if let Some(hdrs) = headers {
-                client
-                    .request_with_headers(subject, build_header_map(&hdrs), payload)
-                    .await
-            } else {
-                client.request(subject, payload).await
+        let headers = match build_optional_header_map(headers) {
+            Ok(headers) => headers,
+            Err(message) => {
+                send_request_failed(
+                    evt_tx,
+                    connection_id,
+                    backend_id,
+                    request_id,
+                    message,
+                    RequestFailureKind::Other,
+                )
+                .await;
+                return;
             }
-        })
-        .await;
-        match result {
-            Ok(Ok(msg)) => {
-                let _ = evt_tx
-                    .send(BackendEvent::RequestResponse {
+        };
+        let client = client.clone();
+        let evt_tx = evt_tx.clone();
+        let request_subject = subject.clone();
+        tokio::spawn(async move {
+            let payload = Bytes::from(payload);
+            let timeout = std::time::Duration::from_millis(timeout_ms);
+            let result = tokio::time::timeout(timeout, async {
+                if let Some(hdrs) = headers {
+                    client.request_with_headers(subject, hdrs, payload).await
+                } else {
+                    client.request(subject, payload).await
+                }
+            })
+            .await;
+            match result {
+                Ok(Ok(msg)) => {
+                    let _ = evt_tx
+                        .send(BackendEvent::RequestResponse {
+                            connection_id,
+                            backend_id,
+                            request_id,
+                            subject: Some(request_subject),
+                            payload: msg.payload.to_vec(),
+                            headers: extract_headers(&msg.headers),
+                        })
+                        .await;
+                }
+                Ok(Err(e)) => {
+                    let kind = request_failure_kind(e.kind());
+                    send_request_failed(
+                        &evt_tx,
                         connection_id,
                         backend_id,
-                        subject: Some(request_subject),
-                        payload: msg.payload.to_vec(),
-                        headers: extract_headers(&msg.headers),
-                    })
+                        request_id,
+                        e.to_string(),
+                        kind,
+                    )
                     .await;
+                }
+                Err(_) => {
+                    send_request_failed(
+                        &evt_tx,
+                        connection_id,
+                        backend_id,
+                        request_id,
+                        "Request timed out".to_string(),
+                        RequestFailureKind::TimedOut,
+                    )
+                    .await;
+                }
             }
-            Ok(Err(e)) => {
-                send_err(
-                    evt_tx,
-                    connection_id,
-                    Some(backend_id),
-                    BackendOperation::Request,
-                    e.to_string(),
-                )
-                .await
-            }
-            Err(_) => {
-                send_err(
-                    evt_tx,
-                    connection_id,
-                    Some(backend_id),
-                    BackendOperation::Request,
-                    "Request timed out".to_string(),
-                )
-                .await
-            }
-        }
+        });
     } else {
-        send_not_connected(
+        send_request_failed(
             evt_tx,
             connection_id,
-            Some(backend_id),
-            BackendOperation::Request,
+            backend_id,
+            request_id,
+            "Not connected".to_string(),
+            RequestFailureKind::Other,
+        )
+        .await;
+    }
+}
+
+pub(crate) async fn handle_reply(
+    state: &WorkerState,
+    params: ReplyParams,
+    evt_tx: &mpsc::Sender<BackendEvent>,
+) {
+    let ReplyParams {
+        connection_id,
+        backend_id,
+        reply_id,
+        reply_to,
+        payload,
+        headers,
+    } = params;
+
+    if let Some(client) = state.clients.get(&connection_id) {
+        let headers = match build_optional_header_map(headers) {
+            Ok(headers) => headers,
+            Err(message) => {
+                send_reply_failed(evt_tx, connection_id, backend_id, reply_id, message).await;
+                return;
+            }
+        };
+        let client = client.clone();
+        let evt_tx = evt_tx.clone();
+        tokio::spawn(async move {
+            let payload = Bytes::from(payload);
+            let result = if let Some(hdrs) = headers {
+                client
+                    .publish_with_headers(reply_to.clone(), hdrs, payload)
+                    .await
+            } else {
+                client.publish(reply_to.clone(), payload).await
+            };
+
+            match result {
+                Ok(()) => {
+                    let _ = evt_tx
+                        .send(BackendEvent::Replied {
+                            connection_id,
+                            backend_id,
+                            reply_id,
+                            subject: reply_to,
+                        })
+                        .await;
+                }
+                Err(e) => {
+                    send_reply_failed(&evt_tx, connection_id, backend_id, reply_id, e.to_string())
+                        .await;
+                }
+            }
+        });
+    } else {
+        send_reply_failed(
+            evt_tx,
+            connection_id,
+            backend_id,
+            reply_id,
+            "Not connected".to_string(),
         )
         .await;
     }
@@ -260,6 +369,22 @@ fn to_message_data(msg: async_nats::Message) -> MessageData {
         payload: msg.payload.to_vec(),
         timestamp: SystemTime::now(),
     }
+}
+
+fn request_failure_kind(kind: async_nats::RequestErrorKind) -> RequestFailureKind {
+    match kind {
+        async_nats::RequestErrorKind::TimedOut => RequestFailureKind::TimedOut,
+        async_nats::RequestErrorKind::NoResponders => RequestFailureKind::NoResponders,
+        async_nats::RequestErrorKind::InvalidSubject | async_nats::RequestErrorKind::Other => {
+            RequestFailureKind::Other
+        }
+    }
+}
+
+fn build_optional_header_map(
+    headers: Option<Vec<(String, String)>>,
+) -> Result<Option<async_nats::HeaderMap>, String> {
+    headers.as_deref().map(build_header_map).transpose()
 }
 
 async fn send_ok(
@@ -307,4 +432,65 @@ async fn send_not_connected(
         "Not connected".to_string(),
     )
     .await;
+}
+
+async fn send_request_failed(
+    evt_tx: &mpsc::Sender<BackendEvent>,
+    connection_id: u64,
+    backend_id: u64,
+    request_id: u64,
+    message: String,
+    kind: RequestFailureKind,
+) {
+    let _ = evt_tx
+        .send(BackendEvent::RequestFailed {
+            connection_id,
+            backend_id,
+            request_id,
+            message,
+            kind,
+        })
+        .await;
+}
+
+async fn send_reply_failed(
+    evt_tx: &mpsc::Sender<BackendEvent>,
+    connection_id: u64,
+    backend_id: u64,
+    reply_id: u64,
+    message: String,
+) {
+    let _ = evt_tx
+        .send(BackendEvent::ReplyFailed {
+            connection_id,
+            backend_id,
+            reply_id,
+            message,
+        })
+        .await;
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn request_failure_kind_preserves_user_visible_categories() {
+        assert_eq!(
+            request_failure_kind(async_nats::RequestErrorKind::TimedOut),
+            RequestFailureKind::TimedOut
+        );
+        assert_eq!(
+            request_failure_kind(async_nats::RequestErrorKind::NoResponders),
+            RequestFailureKind::NoResponders
+        );
+        assert_eq!(
+            request_failure_kind(async_nats::RequestErrorKind::InvalidSubject),
+            RequestFailureKind::Other
+        );
+        assert_eq!(
+            request_failure_kind(async_nats::RequestErrorKind::Other),
+            RequestFailureKind::Other
+        );
+    }
 }

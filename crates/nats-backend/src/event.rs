@@ -22,6 +22,7 @@ pub enum BackendOperation {
     Subscribe,
     Unsubscribe,
     Request,
+    Reply,
     ListStreams,
     CreateStream,
     UpdateStream,
@@ -64,6 +65,7 @@ impl BackendOperation {
             Self::Subscribe => "subscribe",
             Self::Unsubscribe => "unsubscribe",
             Self::Request => "request",
+            Self::Reply => "reply",
             Self::ListStreams => "list_streams",
             Self::CreateStream => "create_stream",
             Self::UpdateStream => "update_stream",
@@ -124,9 +126,29 @@ pub enum BackendEvent {
     RequestResponse {
         connection_id: u64,
         backend_id: u64,
+        request_id: u64,
         subject: Option<String>,
         payload: Vec<u8>,
         headers: Vec<(String, String)>,
+    },
+    RequestFailed {
+        connection_id: u64,
+        backend_id: u64,
+        request_id: u64,
+        message: String,
+        kind: RequestFailureKind,
+    },
+    Replied {
+        connection_id: u64,
+        backend_id: u64,
+        reply_id: u64,
+        subject: String,
+    },
+    ReplyFailed {
+        connection_id: u64,
+        backend_id: u64,
+        reply_id: u64,
+        message: String,
     },
     MetricsSnapshot {
         connection_id: u64,
@@ -296,4 +318,11 @@ pub enum ConnectionStatusKind {
     Disconnected,
     Connecting,
     Error(String),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum RequestFailureKind {
+    TimedOut,
+    NoResponders,
+    Other,
 }
