@@ -41,6 +41,21 @@ response_headers:
 waiting:
   en: "Waiting for response..."
   zh: "等待响应中..."
+request_status_waiting:
+  en: "Waiting"
+  zh: "等待中"
+request_status_responded:
+  en: "Responded"
+  zh: "已响应"
+request_status_timed_out:
+  en: "Timed out"
+  zh: "已超时"
+request_status_no_responders:
+  en: "No responders"
+  zh: "无响应者"
+request_status_failed:
+  en: "Failed"
+  zh: "失败"
 format_json:
   en: "Format JSON"
   zh: "格式化 JSON"

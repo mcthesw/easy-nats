@@ -56,6 +56,42 @@ detail_headers:
 detail_payload:
   en: "Payload:"
   zh: "载荷:"
+reply:
+  en: "Reply"
+  zh: "回复"
+reply_payload:
+  en: "Reply Payload"
+  zh: "回复载荷"
+reply_headers:
+  en: "Reply Headers"
+  zh: "回复头部"
+header_key:
+  en: "Key"
+  zh: "键"
+header_value:
+  en: "Value"
+  zh: "值"
+add_header:
+  en: "+ Header"
+  zh: "+ 头部"
+send_reply:
+  en: "Send Reply"
+  zh: "发送回复"
+reply_failed_message:
+  en: "Reply failed"
+  zh: "回复失败"
+reply_status_replyable:
+  en: "Replyable"
+  zh: "可回复"
+reply_status_sending:
+  en: "Sending"
+  zh: "发送中"
+reply_status_replied:
+  en: "Replied"
+  zh: "已回复"
+reply_status_failed:
+  en: "Failed"
+  zh: "失败"
 
 search_placeholder:
   en: "Search retained messages"

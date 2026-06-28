@@ -1,7 +1,6 @@
 use eframe::egui;
 use nats_backend::{BackendCommand, BackendHandle};
 
-use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
 use crate::schema::MessageSchemaManager;
 
@@ -10,8 +9,10 @@ use super::common::{
     searchable_payload_text, topic_history_text_edit,
 };
 use super::guard::TabGuard;
+use super::subscriber_detail::message_detail_ui;
 use super::types::{
-    ReceivedMessage, SearchCacheKey, SubjectSubscription, SubscriberState, TabAction,
+    ReceivedMessage, ReplyListStatus, SearchCacheKey, SubjectSubscription, SubscriberState,
+    TabAction,
 };
 
 #[allow(clippy::too_many_arguments)]
@@ -49,14 +50,14 @@ pub fn subscriber_ui(
         });
 
     egui::CentralPanel::default().show(ui, |ui| {
-        let selected_msg = state.selected_idx.and_then(|idx| state.messages.get(idx));
-        if let Some(msg) = selected_msg {
+        if let Some(selected_idx) = state.selected_idx.filter(|idx| *idx < state.messages.len()) {
             message_detail_ui(
                 ui,
                 connection_id,
-                msg,
-                &mut state.payload_format,
-                &mut state.proto_view,
+                backend_id,
+                selected_idx,
+                state,
+                backend,
                 schema_manager,
             );
         } else {
@@ -239,7 +240,7 @@ fn render_message_list(ui: &mut egui::Ui, state: &mut SubscriberState) {
         .stick_to_bottom(true)
         .auto_shrink(false)
         .show_rows(ui, 36.0, filtered.len(), |ui, row_range| {
-            for (idx, time, subject) in &filtered[row_range] {
+            for (idx, time, subject, reply_status) in &filtered[row_range] {
                 let selected = next_selected_idx == Some(*idx);
                 let visuals = ui.visuals();
                 let time_color = visuals.weak_text_color();
@@ -258,6 +259,21 @@ fn render_message_list(ui: &mut egui::Ui, state: &mut SubscriberState) {
                         ..Default::default()
                     },
                 );
+                if let Some(reply_status) = reply_status {
+                    let reply_color = match reply_status {
+                        ReplyListStatus::Failed => visuals.error_fg_color,
+                        _ => time_color,
+                    };
+                    job.append(
+                        &format!("  {}", t(reply_status.label_key())),
+                        0.0,
+                        egui::TextFormat {
+                            font_id: egui::FontId::proportional(11.0),
+                            color: reply_color,
+                            ..Default::default()
+                        },
+                    );
+                }
                 job.append(
                     &format!("\n{subject}"),
                     0.0,
@@ -286,7 +302,9 @@ fn subscriber_search_status(state: &mut SubscriberState) -> SearchStatus {
     }
 }
 
-fn filtered_rows(state: &mut SubscriberState) -> &[(usize, String, String)] {
+fn filtered_rows(
+    state: &mut SubscriberState,
+) -> &[(usize, String, String, Option<ReplyListStatus>)] {
     let search_key = SearchCacheKey::from_state(&state.search);
     let needs_refresh = match &state.cached_filtered {
         Some((generation, filter, cached_search, _)) => {
@@ -322,6 +340,7 @@ fn filtered_rows(state: &mut SubscriberState) -> &[(usize, String, String)] {
                     idx,
                     format_timestamp(message.timestamp),
                     message.subject.clone(),
+                    message.reply_list_status(),
                 )
             })
             .collect();
@@ -348,96 +367,35 @@ fn subscriber_message_matches(
     )
 }
 
-fn message_detail_ui(
-    ui: &mut egui::Ui,
-    connection_id: u64,
-    msg: &ReceivedMessage,
-    payload_format: &mut PayloadFormat,
-    proto_view: &mut crate::proto::ProtoViewState,
-    schema_manager: &MessageSchemaManager,
-) {
-    ui.horizontal(|ui| {
-        ui.label(t("subscriber.detail"));
-        format::format_selector(ui, "sub_detail_fmt", payload_format);
-    });
-
-    egui::Grid::new("msg_detail_grid")
-        .num_columns(2)
-        .spacing([8.0, 4.0])
-        .show(ui, |ui| {
-            ui.label(t("subscriber.detail_subject"));
-            ui.label(&msg.subject);
-            ui.end_row();
-
-            if let Some(reply) = &msg.reply {
-                ui.label(t("subscriber.detail_reply"));
-                ui.label(reply);
-                ui.end_row();
-            }
-
-            ui.label(t("subscriber.detail_timestamp"));
-            ui.label(format_timestamp(msg.timestamp));
-            ui.end_row();
-
-            ui.label(t("subscriber.detail_size"));
-            ui.label(format!("{} bytes", msg.payload.len()));
-            ui.end_row();
-        });
-
-    if !msg.headers.is_empty() {
-        ui.add_space(4.0);
-        ui.label(t("subscriber.detail_headers"));
-        egui::Grid::new("msg_detail_headers")
-            .num_columns(2)
-            .striped(true)
-            .show(ui, |ui| {
-                for (k, v) in &msg.headers {
-                    ui.label(k);
-                    ui.label(v);
-                    ui.end_row();
-                }
-            });
-    }
-
-    ui.add_space(4.0);
-    ui.label(t("subscriber.detail_payload"));
-    egui::ScrollArea::vertical()
-        .id_salt("msg_detail_payload")
-        .show(ui, |ui| {
-            format::render_payload_with_schema(
-                ui,
-                &msg.payload,
-                *payload_format,
-                "sub_proto",
-                proto_view,
-                format::SchemaRenderContext {
-                    manager: schema_manager,
-                    connection_id,
-                    subject: &msg.subject,
-                },
-            );
-        });
-}
-
 #[cfg(test)]
 mod tests {
     use std::time::SystemTime;
 
     use super::*;
+    use crate::tabs::types::ReplyState;
 
     fn make_msg(subject: &str) -> ReceivedMessage {
         make_msg_with_payload(subject, b"")
     }
 
     fn make_msg_with_payload(subject: &str, payload: &[u8]) -> ReceivedMessage {
-        ReceivedMessage {
-            id: 0,
-            subject: subject.to_string(),
-            reply: None,
-            headers: Vec::new(),
-            payload: payload.to_vec(),
-            timestamp: SystemTime::now(),
-        }
+        ReceivedMessage::new(
+            subject.to_string(),
+            None,
+            Vec::new(),
+            payload.to_vec(),
+            SystemTime::now(),
+        )
+    }
+
+    fn make_replyable_msg(subject: &str, reply_to: &str) -> ReceivedMessage {
+        ReceivedMessage::new(
+            subject.to_string(),
+            Some(reply_to.to_string()),
+            Vec::new(),
+            Vec::new(),
+            SystemTime::now(),
+        )
     }
 
     #[test]
@@ -512,6 +470,7 @@ mod tests {
         state.clear_messages();
 
         assert!(state.messages.is_empty());
+        assert!(state.in_flight_replies.is_empty());
         assert_eq!(state.selected_idx, None);
         assert!(state.cached_filtered.is_none());
         assert_eq!(state.cache_generation, 2);
@@ -565,5 +524,72 @@ mod tests {
         assert_eq!(subjects, vec!["gamma", "delta", "epsilon"]);
         assert_eq!(state.selected_idx, Some(0));
         assert_eq!(state.cache_generation, 2);
+    }
+
+    #[test]
+    fn replyable_messages_start_with_reply_state_and_draft() {
+        let msg = make_replyable_msg("orders.created", "_INBOX.1");
+
+        assert_eq!(msg.reply_state, Some(ReplyState::Replyable));
+        assert!(msg.reply_draft.is_some());
+        assert_eq!(msg.reply_list_status(), Some(ReplyListStatus::Replyable));
+    }
+
+    #[test]
+    fn reply_success_updates_original_message() {
+        let mut state = SubscriberState::default();
+        state.push_messages([make_replyable_msg("orders.created", "_INBOX.1")]);
+        let message_id = state.messages[0].id;
+
+        let reply_id = state.begin_reply(message_id).expect("message is replyable");
+
+        assert_eq!(
+            state.messages[0].reply_state,
+            Some(ReplyState::Sending { reply_id })
+        );
+        assert_eq!(state.in_flight_replies.get(&reply_id), Some(&message_id));
+
+        state.apply_reply_success(reply_id);
+
+        assert_eq!(state.messages[0].reply_state, Some(ReplyState::Replied));
+        assert!(state.in_flight_replies.is_empty());
+    }
+
+    #[test]
+    fn replied_messages_cannot_start_second_reply_but_failed_replies_can_retry() {
+        let mut state = SubscriberState::default();
+        state.push_messages([make_replyable_msg("orders.created", "_INBOX.1")]);
+        let message_id = state.messages[0].id;
+
+        let reply_id = state.begin_reply(message_id).expect("message is replyable");
+        state.apply_reply_success(reply_id);
+
+        assert!(state.begin_reply(message_id).is_none());
+
+        state.push_messages([make_replyable_msg("orders.updated", "_INBOX.2")]);
+        let retry_message_id = state.messages[1].id;
+        let failed_reply_id = state
+            .begin_reply(retry_message_id)
+            .expect("message is replyable");
+        state.apply_reply_failure(failed_reply_id, "publish failed".to_string());
+
+        assert!(state.begin_reply(retry_message_id).is_some());
+    }
+
+    #[test]
+    fn evicting_message_forgets_in_flight_reply() {
+        let mut state = SubscriberState {
+            max_messages: 1,
+            ..Default::default()
+        };
+        state.push_messages([make_replyable_msg("orders.created", "_INBOX.1")]);
+        let message_id = state.messages[0].id;
+        let reply_id = state.begin_reply(message_id).expect("message is replyable");
+
+        state.push_messages([make_msg("orders.updated")]);
+
+        assert_eq!(state.messages.len(), 1);
+        assert_eq!(state.messages[0].subject, "orders.updated");
+        assert!(!state.in_flight_replies.contains_key(&reply_id));
     }
 }
