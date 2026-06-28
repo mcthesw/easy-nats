@@ -15,6 +15,3 @@ codegen-units = 1
 strip = "symbols"
 panic = "unwind"
 
-[patch.crates-io]
-egui_dock = { git = "https://github.com/mcthesw/egui_dock.git", branch = "compat/egui-0-35" }
-
