@@ -1,7 +1,6 @@
 use eframe::egui;
 use nats_backend::{BackendCommand, BackendEvent, ConnectionStatusKind};
 
-use crate::tabs::{ReceivedMessage, ResponseData, TabKind};
 use crate::toast::ToastLevel;
 
 use super::model::EasyNatsApp;
@@ -69,57 +68,62 @@ impl EasyNatsApp {
                 BackendEvent::RequestResponse {
                     connection_id,
                     backend_id: response_backend_id,
+                    request_id,
                     subject,
                     payload,
                     headers,
                 } => {
-                    for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
-                        if let TabKind::Publisher {
-                            connection_id: cid,
-                            backend_id,
-                            state,
-                            ..
-                        } = tab
-                            && *cid == connection_id
-                            && *backend_id == response_backend_id
-                        {
-                            state.response = Some(ResponseData {
-                                subject: subject.clone(),
-                                payload: payload.clone(),
-                                headers: headers.clone(),
-                            });
-                            state.waiting = false;
-                        }
-                    }
+                    self.apply_publisher_request_response(
+                        connection_id,
+                        response_backend_id,
+                        request_id,
+                        subject,
+                        payload,
+                        headers,
+                    );
+                }
+                BackendEvent::RequestFailed {
+                    connection_id,
+                    backend_id: response_backend_id,
+                    request_id,
+                    message,
+                    kind,
+                } => {
+                    self.apply_publisher_request_failed(
+                        connection_id,
+                        response_backend_id,
+                        request_id,
+                        kind,
+                        message,
+                    );
+                }
+                BackendEvent::Replied {
+                    connection_id,
+                    backend_id: reply_backend_id,
+                    reply_id,
+                    ..
+                } => {
+                    self.apply_subscriber_reply_success(connection_id, reply_backend_id, reply_id);
+                }
+                BackendEvent::ReplyFailed {
+                    connection_id,
+                    backend_id: reply_backend_id,
+                    reply_id,
+                    message,
+                } => {
+                    self.apply_subscriber_reply_failed(
+                        connection_id,
+                        reply_backend_id,
+                        reply_id,
+                        message,
+                    );
                 }
                 BackendEvent::MessageBatch {
                     connection_id,
                     backend_id: msg_backend_id,
                     messages,
                 } => {
-                    for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
-                        if let TabKind::Subscriber {
-                            connection_id: cid,
-                            backend_id,
-                            state,
-                            ..
-                        } = tab
-                            && *cid == connection_id
-                            && *backend_id == msg_backend_id
-                        {
-                            state.push_messages(messages.into_iter().map(|message| {
-                                ReceivedMessage {
-                                    id: 0,
-                                    subject: message.subject,
-                                    reply: message.reply,
-                                    headers: message.headers,
-                                    payload: message.payload,
-                                    timestamp: message.timestamp,
-                                }
-                            }));
-                            break;
-                        }
-                    }
+                    self.apply_subscriber_message_batch(connection_id, msg_backend_id, messages);
                 }
                 BackendEvent::MetricsSnapshot {
                     connection_id,

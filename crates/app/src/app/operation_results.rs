@@ -27,29 +27,11 @@ impl EasyNatsApp {
     pub(crate) fn handle_error(
         &mut self,
         connection_id: Option<u64>,
-        backend_id: Option<u64>,
+        _backend_id: Option<u64>,
         operation: BackendOperation,
         message: &str,
         context: Option<&BackendErrorContext>,
     ) {
-        if operation == BackendOperation::Request
-            && let Some(cid) = connection_id
-        {
-            for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
-                if let TabKind::Publisher {
-                    connection_id: tab_cid,
-                    backend_id: tab_backend_id,
-                    state,
-                    ..
-                } = tab
-                    && *tab_cid == cid
-                    && backend_id.is_none_or(|backend_id| *tab_backend_id == backend_id)
-                {
-                    state.waiting = false;
-                }
-            }
-        }
-
         if operation == BackendOperation::ListConsumers
             && let Some(cid) = connection_id
         {
