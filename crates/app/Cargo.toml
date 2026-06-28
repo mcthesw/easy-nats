@@ -27,7 +27,7 @@ eframe = { version = "0.35", default-features = false, features = [
     "accesskit",
     "inspection",
 ] }
-egui_dock = "0.19.1"
+egui_dock = "0.20.0"
 egui_plot = "0.36.0"
 mimalloc = "0.1"
 protox = "0.9"
