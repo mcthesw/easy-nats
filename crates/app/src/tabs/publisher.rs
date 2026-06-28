@@ -5,8 +5,8 @@ use crate::format;
 use crate::i18n::t;
 use crate::schema::MessageSchemaManager;
 
-use super::common::{payload_input_format_selector, topic_history_text_edit};
-use super::types::{PublisherState, TabAction};
+use super::common::{collect_headers, payload_input_format_selector, topic_history_text_edit};
+use super::types::{CurrentRequest, PublisherState, RequestStatus, TabAction};
 
 #[allow(clippy::too_many_arguments)]
 pub fn publisher_ui(
@@ -134,7 +134,7 @@ pub fn publisher_ui(
 
         if ui
             .add_enabled(
-                can_submit && !state.waiting,
+                can_submit && !state.is_request_waiting(),
                 egui::Button::new(t("publisher.request")),
             )
             .clicked()
@@ -150,16 +150,16 @@ pub fn publisher_ui(
                     topic: subject.clone(),
                 });
                 let timeout_ms = state.timeout_ms.parse::<u64>().unwrap_or(5000);
+                let request_id = state.start_request(subject.clone());
                 backend.send(BackendCommand::Request {
                     connection_id,
                     backend_id,
+                    request_id,
                     subject: subject.clone(),
                     payload: outgoing.payload,
                     headers: collect_headers(&state.headers),
                     timeout_ms,
                 });
-                state.response = None;
-                state.waiting = true;
             }
         }
     });
@@ -173,7 +173,7 @@ pub fn publisher_ui(
         ui.label(t("publisher.response"));
         format::format_selector(ui, "pub_resp_fmt", &mut state.response_format);
     });
-    render_response(ui, connection_id, state, schema_manager);
+    render_current_response(ui, connection_id, state, schema_manager);
 }
 
 fn render_generate_json_button(
@@ -205,19 +205,59 @@ fn render_generate_json_button(
     }
 }
 
-fn render_response(
+fn render_current_response(
     ui: &mut egui::Ui,
     connection_id: u64,
     state: &mut PublisherState,
     schema_manager: &MessageSchemaManager,
 ) {
-    if state.waiting {
-        ui.spinner();
-        ui.label(t("publisher.waiting"));
+    let PublisherState {
+        current_request,
+        response_format,
+        proto_view,
+        ..
+    } = state;
+    let Some(request) = current_request.as_ref() else {
+        ui.label(t("publisher.no_response"));
         return;
+    };
+    render_request_detail(
+        ui,
+        connection_id,
+        request,
+        *response_format,
+        proto_view,
+        schema_manager,
+    );
+}
+
+fn render_request_detail(
+    ui: &mut egui::Ui,
+    connection_id: u64,
+    request: &CurrentRequest,
+    response_format: format::PayloadFormat,
+    proto_view: &mut crate::proto::ProtoViewState,
+    schema_manager: &MessageSchemaManager,
+) {
+    match request.status {
+        RequestStatus::Waiting => {
+            ui.horizontal(|ui| {
+                ui.spinner();
+                ui.label(t("publisher.waiting"));
+            });
+        }
+        RequestStatus::TimedOut | RequestStatus::NoResponders | RequestStatus::Failed => {
+            if let Some(message) = &request.error_message {
+                ui.colored_label(
+                    ui.visuals().error_fg_color,
+                    format!("{}: {message}", t(request.status.label_key())),
+                );
+            }
+        }
+        RequestStatus::Responded => {}
     }
 
-    if let Some(resp) = &state.response {
+    if let Some(resp) = &request.response {
         if !resp.headers.is_empty() {
             ui.label(t("publisher.response_headers"));
             egui::Grid::new("resp_headers")
@@ -238,44 +278,19 @@ fn render_response(
             .id_salt("resp_payload")
             .max_height(200.0)
             .show(ui, |ui| {
-                if let Some(subject) = resp.subject.as_deref() {
-                    format::render_payload_with_schema(
-                        ui,
-                        &resp.payload,
-                        state.response_format,
-                        "pub_proto",
-                        &mut state.proto_view,
-                        format::SchemaRenderContext {
-                            manager: schema_manager,
-                            connection_id,
-                            subject,
-                        },
-                    );
-                } else {
-                    format::render_payload_with_proto(
-                        ui,
-                        &resp.payload,
-                        state.response_format,
-                        "pub_proto",
-                        &mut state.proto_view,
-                        schema_manager,
-                    );
-                }
+                let subject = resp.subject.as_deref().unwrap_or(&request.subject);
+                format::render_payload_with_schema(
+                    ui,
+                    &resp.payload,
+                    response_format,
+                    "pub_proto",
+                    proto_view,
+                    format::SchemaRenderContext {
+                        manager: schema_manager,
+                        connection_id,
+                        subject,
+                    },
+                );
             });
-    } else {
-        ui.label(t("publisher.no_response"));
-    }
-}
-
-fn collect_headers(headers: &[(String, String)]) -> Option<Vec<(String, String)>> {
-    let non_empty: Vec<(String, String)> = headers
-        .iter()
-        .filter(|(k, v)| !k.trim().is_empty() || !v.trim().is_empty())
-        .cloned()
-        .collect();
-    if non_empty.is_empty() {
-        None
-    } else {
-        Some(non_empty)
     }
 }
