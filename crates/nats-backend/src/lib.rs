@@ -14,7 +14,9 @@ pub use cancellation::TaskCancellation;
 pub use command::BackendCommand;
 pub use config::AppConfig;
 pub use connection::{AuthMethod, ConnectionConfig, ConnectionStatus, MonitoringConfig};
-pub use event::{BackendEvent, BackendOperation, ConnectionStatusKind, MessageData};
+pub use event::{
+    BackendEvent, BackendOperation, ConnectionStatusKind, MessageData, RequestFailureKind,
+};
 pub use models::{
     BackendErrorContext, ConsumerAckPolicyKind, ConsumerConfigInput, ConsumerDeliverPolicyKind,
     KvBucketConfigInput, KvBucketInfo, KvEntryInfo, KvHistoryItem, KvKeyBatch,

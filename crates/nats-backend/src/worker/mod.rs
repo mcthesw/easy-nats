@@ -69,6 +69,7 @@ pub async fn run_worker(
             BackendCommand::Request {
                 connection_id,
                 backend_id,
+                request_id,
                 subject,
                 payload,
                 headers,
@@ -79,10 +80,33 @@ pub async fn run_worker(
                     pubsub::RequestParams {
                         connection_id,
                         backend_id,
+                        request_id,
                         subject,
                         payload,
                         headers,
                         timeout_ms,
+                    },
+                    &evt_tx,
+                )
+                .await;
+            }
+            BackendCommand::Reply {
+                connection_id,
+                backend_id,
+                reply_id,
+                reply_to,
+                payload,
+                headers,
+            } => {
+                pubsub::handle_reply(
+                    &state,
+                    pubsub::ReplyParams {
+                        connection_id,
+                        backend_id,
+                        reply_id,
+                        reply_to,
+                        payload,
+                        headers,
                     },
                     &evt_tx,
                 )

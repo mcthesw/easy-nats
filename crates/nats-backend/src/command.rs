@@ -36,10 +36,19 @@ pub enum BackendCommand {
     Request {
         connection_id: u64,
         backend_id: u64,
+        request_id: u64,
         subject: String,
         payload: Vec<u8>,
         headers: Option<Vec<(String, String)>>,
         timeout_ms: u64,
+    },
+    Reply {
+        connection_id: u64,
+        backend_id: u64,
+        reply_id: u64,
+        reply_to: String,
+        payload: Vec<u8>,
+        headers: Option<Vec<(String, String)>>,
     },
     // JetStream
     ListStreams {
