@@ -23,6 +23,21 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.1.27" date="2026-06-28">
+      <description>
+        <p>Adds scoped request/reply debugging with subscriber replies.</p>
+      </description>
+    </release>
+    <release version="0.1.26" date="2026-06-27">
+      <description>
+        <p>Adds MessagePack payload input and display.</p>
+      </description>
+    </release>
+    <release version="0.1.25" date="2026-06-19">
+      <description>
+        <p>Closes connection-bound tabs on disconnect.</p>
+      </description>
+    </release>
     <release version="0.1.24" date="2026-06-16">
       <description>
         <p>Adds formatted Search Workspace result previews.</p>
