@@ -114,6 +114,38 @@ impl EasyNatsApp {
                 && *cid == connection_id
                 && *bucket_name == entry.bucket
             {
+                // Missing entry guard: the key was deleted between listing and
+                // fetching. Do NOT store an empty payload — clean up stale
+                // references and bump generation so search results rebuild.
+                if entry.revision.is_none() {
+                    state.fetched_values.remove(entry_key);
+                    state.fetched_value_bytes.remove(entry_key);
+                    if let Some(idx) = state.keys.iter().position(|k| k == entry_key) {
+                        state.keys.remove(idx);
+                        if idx < state.value_search_cursor {
+                            state.value_search_cursor = state.value_search_cursor.saturating_sub(1);
+                        }
+                    }
+                    state.invalidate_filtered_key_cache();
+                    state.search_generation = state.search_generation.wrapping_add(1);
+                    if state.value_search_pending.remove(entry_key) {
+                        state.value_search_scanning = state.value_search_pending.len();
+                    }
+                    if state.selected_key.as_deref() == Some(entry_key) {
+                        state.selected_key = None;
+                        state.loading_entry = false;
+                        state.loading_history = false;
+                        state.show_history = false;
+                        state.entry_key.clear();
+                        state.entry_value.clear();
+                        state.entry_revision = None;
+                        state.entry_operation = None;
+                        state.entry_created = None;
+                        state.history.clear();
+                    }
+                    continue;
+                }
+
                 state
                     .fetched_values
                     .insert(entry_key.to_string(), entry_value.clone());
@@ -321,7 +353,7 @@ mod tests {
     use std::sync::{Arc, Mutex};
 
     use egui_dock::DockState;
-    use nats_backend::{BackendErrorContext, BackendOperation, KvEntryInfo};
+    use nats_backend::{BackendErrorContext, BackendOperation, KvEntryInfo, KvHistoryItem};
     use tokio_util::sync::CancellationToken;
 
     use super::EasyNatsApp;
@@ -439,5 +471,248 @@ mod tests {
         assert!(state.loading_entry);
         assert_eq!(state.value_search_scanning, 0);
         assert!(state.value_search_pending.is_empty());
+    }
+
+    #[test]
+    fn apply_kv_entry_missing_entry_removes_key_and_does_not_store_value() {
+        let state = KvBucketState {
+            keys: vec!["orders/1".to_string()],
+            ..Default::default()
+        };
+        let initial_generation = state.search_generation;
+        let mut app = test_app_with_kv_tab(7, "ORDERS", state);
+        app.apply_kv_entry(
+            7,
+            KvEntryInfo {
+                bucket: "ORDERS".to_string(),
+                key: "orders/1".to_string(),
+                value: Vec::new(),
+                revision: None,
+                delta: None,
+                created: None,
+                operation: None,
+            },
+        );
+
+        let (_, tab) = app
+            .dock_state
+            .iter_all_tabs()
+            .next()
+            .expect("KV tab exists");
+        let TabKind::KvBucket { state, .. } = tab else {
+            panic!("expected KV bucket tab");
+        };
+        assert!(!state.keys.contains(&"orders/1".to_string()));
+        assert!(!state.fetched_values.contains_key("orders/1"));
+        assert!(!state.fetched_value_bytes.contains_key("orders/1"));
+        assert_ne!(state.search_generation, initial_generation);
+    }
+
+    #[test]
+    fn apply_kv_entry_missing_entry_removes_previously_cached_value() {
+        let mut state = KvBucketState::default();
+        state
+            .fetched_values
+            .insert("orders/1".to_string(), "old".to_string());
+        state
+            .fetched_value_bytes
+            .insert("orders/1".to_string(), b"old".to_vec());
+        let mut app = test_app_with_kv_tab(7, "ORDERS", state);
+        app.apply_kv_entry(
+            7,
+            KvEntryInfo {
+                bucket: "ORDERS".to_string(),
+                key: "orders/1".to_string(),
+                value: Vec::new(),
+                revision: None,
+                delta: None,
+                created: None,
+                operation: None,
+            },
+        );
+
+        let (_, tab) = app
+            .dock_state
+            .iter_all_tabs()
+            .next()
+            .expect("KV tab exists");
+        let TabKind::KvBucket { state, .. } = tab else {
+            panic!("expected KV bucket tab");
+        };
+        assert!(!state.fetched_values.contains_key("orders/1"));
+        assert!(!state.fetched_value_bytes.contains_key("orders/1"));
+    }
+
+    #[test]
+    fn apply_kv_entry_missing_entry_cleans_value_search_pending() {
+        let mut state = KvBucketState {
+            value_search_scanning: 2,
+            ..Default::default()
+        };
+        state.value_search_pending.insert("orders/1".to_string());
+        state.value_search_pending.insert("orders/2".to_string());
+        let mut app = test_app_with_kv_tab(7, "ORDERS", state);
+        app.apply_kv_entry(
+            7,
+            KvEntryInfo {
+                bucket: "ORDERS".to_string(),
+                key: "orders/1".to_string(),
+                value: Vec::new(),
+                revision: None,
+                delta: None,
+                created: None,
+                operation: None,
+            },
+        );
+
+        let (_, tab) = app
+            .dock_state
+            .iter_all_tabs()
+            .next()
+            .expect("KV tab exists");
+        let TabKind::KvBucket { state, .. } = tab else {
+            panic!("expected KV bucket tab");
+        };
+        assert_eq!(state.value_search_scanning, 1);
+        assert!(state.value_search_pending.contains("orders/2"));
+        assert!(!state.value_search_pending.contains("orders/1"));
+    }
+
+    #[test]
+    fn apply_kv_entry_missing_entry_rewinds_value_search_cursor() {
+        let state = KvBucketState {
+            keys: vec![
+                "orders/1".to_string(),
+                "orders/2".to_string(),
+                "orders/3".to_string(),
+            ],
+            value_search_cursor: 2,
+            ..Default::default()
+        };
+        let mut app = test_app_with_kv_tab(7, "ORDERS", state);
+        app.apply_kv_entry(
+            7,
+            KvEntryInfo {
+                bucket: "ORDERS".to_string(),
+                key: "orders/1".to_string(),
+                value: Vec::new(),
+                revision: None,
+                delta: None,
+                created: None,
+                operation: None,
+            },
+        );
+
+        let (_, tab) = app
+            .dock_state
+            .iter_all_tabs()
+            .next()
+            .expect("KV tab exists");
+        let TabKind::KvBucket { state, .. } = tab else {
+            panic!("expected KV bucket tab");
+        };
+        assert_eq!(
+            state.keys,
+            vec!["orders/2".to_string(), "orders/3".to_string()]
+        );
+        assert_eq!(state.value_search_cursor, 1);
+    }
+
+    #[test]
+    fn apply_kv_entry_missing_entry_clears_selected_entry_state() {
+        let state = KvBucketState {
+            loading_entry: true,
+            loading_history: true,
+            show_history: true,
+            selected_key: Some("orders/1".to_string()),
+            entry_key: "orders/1".to_string(),
+            entry_value: "stale".to_string(),
+            entry_revision: Some(3),
+            entry_operation: Some("PUT".to_string()),
+            entry_created: Some("2025-01-01T00:00:00Z".to_string()),
+            history: vec![KvHistoryItem {
+                key: "orders/1".to_string(),
+                value: b"stale".to_vec(),
+                revision: 3,
+                delta: 0,
+                created: "2025-01-01T00:00:00Z".to_string(),
+                operation: "PUT".to_string(),
+            }],
+            ..Default::default()
+        };
+        let mut app = test_app_with_kv_tab(7, "ORDERS", state);
+        app.apply_kv_entry(
+            7,
+            KvEntryInfo {
+                bucket: "ORDERS".to_string(),
+                key: "orders/1".to_string(),
+                value: Vec::new(),
+                revision: None,
+                delta: None,
+                created: None,
+                operation: None,
+            },
+        );
+
+        let (_, tab) = app
+            .dock_state
+            .iter_all_tabs()
+            .next()
+            .expect("KV tab exists");
+        let TabKind::KvBucket { state, .. } = tab else {
+            panic!("expected KV bucket tab");
+        };
+        assert_eq!(state.selected_key, None);
+        assert!(!state.loading_entry);
+        assert!(!state.loading_history);
+        assert!(!state.show_history);
+        assert!(state.entry_key.is_empty());
+        assert!(state.entry_value.is_empty());
+        assert_eq!(state.entry_revision, None);
+        assert_eq!(state.entry_operation, None);
+        assert_eq!(state.entry_created, None);
+        assert!(state.history.is_empty());
+    }
+
+    #[test]
+    fn apply_kv_entry_missing_entry_does_not_clear_unrelated_selected_entry() {
+        let state = KvBucketState {
+            loading_entry: true,
+            selected_key: Some("orders/2".to_string()),
+            entry_revision: Some(3),
+            entry_operation: Some("PUT".to_string()),
+            entry_created: Some("2025-01-01T00:00:00Z".to_string()),
+            keys: vec!["orders/1".to_string(), "orders/2".to_string()],
+            ..Default::default()
+        };
+        let mut app = test_app_with_kv_tab(7, "ORDERS", state);
+        app.apply_kv_entry(
+            7,
+            KvEntryInfo {
+                bucket: "ORDERS".to_string(),
+                key: "orders/1".to_string(),
+                value: Vec::new(),
+                revision: None,
+                delta: None,
+                created: None,
+                operation: None,
+            },
+        );
+
+        let (_, tab) = app
+            .dock_state
+            .iter_all_tabs()
+            .next()
+            .expect("KV tab exists");
+        let TabKind::KvBucket { state, .. } = tab else {
+            panic!("expected KV bucket tab");
+        };
+        // The unrelated selected entry's loading/detail state must be untouched.
+        assert!(state.loading_entry);
+        assert_eq!(state.entry_revision, Some(3));
+        assert_eq!(state.entry_operation.as_deref(), Some("PUT"));
+        // The missing key should still be removed from keys.
+        assert!(!state.keys.contains(&"orders/1".to_string()));
+        assert!(state.keys.contains(&"orders/2".to_string()));
     }
 }
