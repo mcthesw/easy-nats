@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.28](https://github.com/mcthesw/easy-nats/compare/v0.1.27...v0.1.28) (2026-07-08)
+
+
+### Features
+
+* **search:** show value payloads in workspace previews ([dea92e2](https://github.com/mcthesw/easy-nats/commit/dea92e22b6067b432930bb625a9c3c71633ee5ca))
+
+
+### Bug Fixes
+
+* **kv:** handle missing entry cleanup ([cee5f1a](https://github.com/mcthesw/easy-nats/commit/cee5f1a45b1c4278e78baa0c7db37ae975693add))
+
 ## [0.1.27](https://github.com/mcthesw/easy-nats/compare/v0.1.26...v0.1.27) (2026-06-28)
 
 
