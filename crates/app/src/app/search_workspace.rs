@@ -186,6 +186,52 @@ impl EasyNatsApp {
         }
     }
 
+    pub(crate) fn fetch_search_workspace_kv_value(
+        &mut self,
+        source_id: &SearchSourceId,
+        key: &str,
+    ) {
+        let SearchSourceId::Kv {
+            connection_id,
+            bucket_name,
+        } = source_id
+        else {
+            return;
+        };
+
+        let mut send_request = None;
+        for (_surface, tab) in self.dock_state.iter_all_tabs_mut() {
+            if let TabKind::KvBucket {
+                connection_id: cid,
+                bucket_name: current_bucket,
+                state,
+                ..
+            } = tab
+                && *cid == *connection_id
+                && current_bucket == bucket_name
+            {
+                // Double-check before sending: value not already cached,
+                // not already being fetched by batch scan, and key still exists.
+                if state.fetched_value_bytes.contains_key(key)
+                    || state.value_search_pending.contains(key)
+                    || !state.keys.iter().any(|k| k == key)
+                {
+                    break;
+                }
+                send_request = Some((*connection_id, bucket_name.clone(), key.to_string()));
+                break;
+            }
+        }
+
+        if let Some((cid, bucket, key)) = send_request {
+            self.backend.send(BackendCommand::GetKvEntry {
+                connection_id: cid,
+                bucket,
+                key,
+            });
+        }
+    }
+
     pub(crate) fn navigate_search_result(&mut self, locator: SearchResultLocator) {
         let resolved = match locator {
             SearchResultLocator::KvKey {
@@ -459,11 +505,18 @@ fn tab_matches_search_source(tab: &TabKind, source_id: &SearchSourceId) -> bool 
 
 #[cfg(test)]
 mod tests {
-    use nats_backend::StreamMessageInfo;
+    use std::sync::{Arc, Mutex};
+    use std::time::Duration;
+
+    use egui_dock::DockState;
+    use nats_backend::{BackendEvent, BackendOperation, StreamMessageInfo};
     use tokio_util::sync::CancellationToken;
 
     use super::*;
-    use crate::tabs::{StreamState, TabGuard};
+    use crate::log_layer::LogBuffer;
+    use crate::settings::AppSettings;
+    use crate::tabs::{KvBucketState, StreamState, TabGuard};
+    use crate::theme::ThemeId;
 
     fn stream_source(stream_name: &str, generation: u64) -> SearchSourceSummary {
         let tab = TabKind::Stream {
@@ -565,5 +618,169 @@ mod tests {
         let (_, query_changed) =
             search_workspace_refresh_decision(&state, std::slice::from_ref(&source));
         assert_eq!(query_changed, Some("query"));
+    }
+
+    fn test_app_with_kv_tab(
+        connection_id: u64,
+        bucket_name: &str,
+        state: KvBucketState,
+    ) -> EasyNatsApp {
+        let mut app = EasyNatsApp::new(
+            AppSettings::default(),
+            ThemeId::EguiDark,
+            Arc::new(Mutex::new(LogBuffer::default())),
+        );
+        app.dock_state = DockState::new(vec![TabKind::KvBucket {
+            connection_id,
+            connection_name: "local".to_string(),
+            bucket_name: bucket_name.to_string(),
+            guard: TabGuard::new_without_id(CancellationToken::new()),
+            state,
+        }]);
+        app
+    }
+
+    /// Polls the backend event channel for a short period and returns true if
+    /// a `GetKvEntry` error event is received.
+    fn backend_emitted_get_kv_entry_error(app: &mut EasyNatsApp) -> bool {
+        let deadline = std::time::Instant::now() + Duration::from_millis(500);
+        while std::time::Instant::now() < deadline {
+            if let Some(event) = app.backend.try_recv()
+                && let BackendEvent::Error { operation, .. } = event
+                && operation == BackendOperation::GetKvEntry
+            {
+                return true;
+            }
+            std::thread::sleep(Duration::from_millis(10));
+        }
+        false
+    }
+
+    #[test]
+    fn fetch_kv_value_sends_get_kv_entry_when_guards_pass() {
+        let state = KvBucketState {
+            keys: vec!["order/1".to_string()],
+            ..Default::default()
+        };
+        let mut app = test_app_with_kv_tab(7, "ORDERS", state);
+        let source_id = SearchSourceId::Kv {
+            connection_id: 7,
+            bucket_name: "ORDERS".to_string(),
+        };
+
+        app.fetch_search_workspace_kv_value(&source_id, "order/1");
+
+        assert!(
+            backend_emitted_get_kv_entry_error(&mut app),
+            "expected a GetKvEntry error event after fetching an uncached key"
+        );
+    }
+
+    #[test]
+    fn fetch_kv_value_skips_when_value_already_cached() {
+        let mut state = KvBucketState {
+            keys: vec!["order/1".to_string()],
+            ..Default::default()
+        };
+        state
+            .fetched_value_bytes
+            .insert("order/1".to_string(), b"value".to_vec());
+        let mut app = test_app_with_kv_tab(7, "ORDERS", state);
+        let source_id = SearchSourceId::Kv {
+            connection_id: 7,
+            bucket_name: "ORDERS".to_string(),
+        };
+
+        app.fetch_search_workspace_kv_value(&source_id, "order/1");
+
+        assert!(
+            !backend_emitted_get_kv_entry_error(&mut app),
+            "should not send GetKvEntry when value is already cached"
+        );
+    }
+
+    #[test]
+    fn fetch_kv_value_skips_when_key_in_value_search_pending() {
+        let mut state = KvBucketState {
+            keys: vec!["order/1".to_string()],
+            value_search_scanning: 1,
+            ..Default::default()
+        };
+        state.value_search_pending.insert("order/1".to_string());
+        let mut app = test_app_with_kv_tab(7, "ORDERS", state);
+        let source_id = SearchSourceId::Kv {
+            connection_id: 7,
+            bucket_name: "ORDERS".to_string(),
+        };
+
+        app.fetch_search_workspace_kv_value(&source_id, "order/1");
+
+        assert!(
+            !backend_emitted_get_kv_entry_error(&mut app),
+            "should not send GetKvEntry when key is in value_search_pending"
+        );
+    }
+
+    #[test]
+    fn fetch_kv_value_skips_when_key_not_in_keys_list() {
+        let state = KvBucketState {
+            keys: vec!["order/2".to_string()],
+            ..Default::default()
+        };
+        let mut app = test_app_with_kv_tab(7, "ORDERS", state);
+        let source_id = SearchSourceId::Kv {
+            connection_id: 7,
+            bucket_name: "ORDERS".to_string(),
+        };
+
+        app.fetch_search_workspace_kv_value(&source_id, "order/1");
+
+        assert!(
+            !backend_emitted_get_kv_entry_error(&mut app),
+            "should not send GetKvEntry when key is not in the keys list"
+        );
+    }
+
+    #[test]
+    fn fetch_kv_value_skips_when_kv_tab_does_not_exist() {
+        let mut app = EasyNatsApp::new(
+            AppSettings::default(),
+            ThemeId::EguiDark,
+            Arc::new(Mutex::new(LogBuffer::default())),
+        );
+        app.dock_state = DockState::new(vec![TabKind::Welcome]);
+        let source_id = SearchSourceId::Kv {
+            connection_id: 7,
+            bucket_name: "ORDERS".to_string(),
+        };
+
+        // Should not panic and should not send anything.
+        app.fetch_search_workspace_kv_value(&source_id, "order/1");
+
+        assert!(
+            !backend_emitted_get_kv_entry_error(&mut app),
+            "should not send GetKvEntry when no matching KV tab exists"
+        );
+    }
+
+    #[test]
+    fn fetch_kv_value_ignores_non_kv_source_id() {
+        let state = KvBucketState {
+            keys: vec!["order/1".to_string()],
+            ..Default::default()
+        };
+        let mut app = test_app_with_kv_tab(7, "ORDERS", state);
+        let source_id = SearchSourceId::Stream {
+            connection_id: 7,
+            stream_name: "ORDERS".to_string(),
+        };
+
+        // Should return early for non-Kv source_id without panicking.
+        app.fetch_search_workspace_kv_value(&source_id, "order/1");
+
+        assert!(
+            !backend_emitted_get_kv_entry_error(&mut app),
+            "should not send GetKvEntry for a non-Kv source_id"
+        );
     }
 }

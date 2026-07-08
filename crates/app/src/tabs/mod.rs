@@ -14,7 +14,7 @@ mod stream;
 mod stream_consumers;
 mod subscriber;
 mod subscriber_detail;
-mod types;
+pub(crate) mod types;
 mod viewer;
 
 pub(crate) use common::{
@@ -36,7 +36,8 @@ pub use stream::stream_ui;
 pub use subscriber::subscriber_ui;
 pub use types::{
     AppTabViewer, ClientStatusState, KvBucketState, MessageSchemasState, MetricsState,
-    ObjectStoreBucketState, PublisherState, ReceivedMessage, ResponseData, SearchResultLocator,
-    SearchSourceId, SearchSourceSummary, SearchWorkspaceCacheKey, SearchWorkspaceResult,
-    SearchWorkspaceState, ServerInfoState, StreamState, SubscriberState, TabAction, TabKind,
+    ObjectStoreBucketState, PreviewFetchState, PublisherState, ReceivedMessage, ResponseData,
+    SearchResultLocator, SearchSourceId, SearchSourceSummary, SearchWorkspaceCacheKey,
+    SearchWorkspaceResult, SearchWorkspaceState, ServerInfoState, StreamState, SubscriberState,
+    TabAction, TabKind,
 };
