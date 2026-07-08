@@ -5,8 +5,9 @@ use crate::i18n::t;
 
 use super::common::SEARCH_RESULT_LIMIT;
 use super::types::{
-    SearchField, SearchSourceCoverage, SearchSourceId, SearchSourceKind, SearchSourceSummary,
-    SearchWorkspaceResult, SearchWorkspaceState, TabAction, TabKind,
+    PreviewFetchState, SearchField, SearchResultKey, SearchResultLocator, SearchSourceCoverage,
+    SearchSourceId, SearchSourceKind, SearchSourceSummary, SearchWorkspaceResult,
+    SearchWorkspaceState, TabAction, TabKind,
 };
 
 mod results;
@@ -116,7 +117,7 @@ pub fn search_workspace_ui(
         .map(|(_, results)| results.as_slice())
         .unwrap_or(&[]);
     if let Some(selected) = &state.selected_result
-        && !results.iter().any(|result| &result.identity == selected)
+        && !results.iter().any(|result| &result.key == selected)
         && state.selected_preview.is_none()
     {
         state.selected_result = None;
@@ -183,6 +184,7 @@ fn render_toolbar(
         state.cached_results = None;
         state.selected_result = None;
         state.selected_preview = None;
+        state.preview_fetch = PreviewFetchState::Idle;
     }
 }
 
@@ -222,6 +224,7 @@ fn render_selected_sources(
         {
             state.selected_result = None;
             state.selected_preview = None;
+            state.preview_fetch = PreviewFetchState::Idle;
         }
     }
 }
@@ -335,7 +338,7 @@ fn render_results(
             for source_id in state.selected_sources.clone() {
                 let mut group_results = results
                     .iter()
-                    .filter(|result| result.identity.source_id == source_id);
+                    .filter(|result| result.key.source_id == source_id);
                 let Some(first_result) = group_results.next() else {
                     continue;
                 };
@@ -357,7 +360,7 @@ fn render_result_group_header(
 ) {
     let source = sources
         .iter()
-        .find(|source| source.id == first_result.identity.source_id);
+        .find(|source| source.id == first_result.key.source_id);
     ui.horizontal_wrapped(|ui| {
         ui.label(egui::RichText::new(&first_result.source_label).strong());
         if let Some(source) = source {
@@ -376,7 +379,7 @@ fn render_result_row(
         let selected = state
             .selected_result
             .as_ref()
-            .is_some_and(|identity| identity == &result.identity);
+            .is_some_and(|identity| identity == &result.key);
         let row = format!(
             "{} · {}",
             field_label(result.field),
@@ -387,8 +390,9 @@ fn render_result_row(
             .on_hover_text(&result.snippet)
             .clicked()
         {
-            state.selected_result = Some(result.identity.clone());
+            state.selected_result = Some(result.key.clone());
             state.selected_preview = Some(result.clone());
+            state.preview_fetch = PreviewFetchState::Idle;
         }
     });
 }
@@ -399,30 +403,120 @@ fn render_preview(
     results: &[SearchWorkspaceResult],
     actions: &mut Vec<TabAction>,
 ) {
-    let Some(preview) = state.selected_preview.as_ref() else {
+    let Some(preview_key) = state
+        .selected_preview
+        .as_ref()
+        .map(|preview| preview.key.clone())
+    else {
         ui.centered_and_justified(|ui| {
             ui.label(t("search_workspace.select_result"));
         });
         return;
     };
 
-    let (active_preview, is_stale) = active_preview_result(preview, results);
+    if let Some(active_preview) = results.iter().find(|result| result.key == preview_key) {
+        render_current_preview(ui, state, active_preview, actions);
+    } else {
+        render_stale_preview(ui, state, actions);
+    }
+}
 
-    ui.heading(&active_preview.item_label);
+fn render_current_preview(
+    ui: &mut egui::Ui,
+    state: &mut SearchWorkspaceState,
+    active_preview: &SearchWorkspaceResult,
+    actions: &mut Vec<TabAction>,
+) {
+    render_preview_header(
+        ui,
+        state,
+        actions,
+        PreviewHeader {
+            item_label: &active_preview.item_label,
+            source_label: &active_preview.source_label,
+            field: active_preview.field,
+            locator: Some(&active_preview.locator),
+        },
+    );
+    match &active_preview.preview_bytes {
+        Some(bytes) => {
+            state.preview_fetch = PreviewFetchState::Idle;
+            render_formatted_preview_bytes(ui, bytes, state.preview_format, &state.query);
+        }
+        None => {
+            render_pending_kv_value_preview(ui, state, active_preview, actions);
+        }
+    }
+}
+
+fn render_stale_preview(
+    ui: &mut egui::Ui,
+    state: &mut SearchWorkspaceState,
+    actions: &mut Vec<TabAction>,
+) {
+    let Some(snapshot) = state.selected_preview.as_ref() else {
+        return;
+    };
+    let item_label = snapshot.item_label.clone();
+    let source_label = snapshot.source_label.clone();
+    let field = snapshot.field;
+    let has_preview_bytes = snapshot.preview_bytes.is_some();
+
+    render_preview_header(
+        ui,
+        state,
+        actions,
+        PreviewHeader {
+            item_label: &item_label,
+            source_label: &source_label,
+            field,
+            locator: None,
+        },
+    );
+    state.preview_fetch = PreviewFetchState::Idle;
+    if has_preview_bytes {
+        let selected_format = state.preview_format;
+        let query = state.query.clone();
+        if let Some(bytes) = state
+            .selected_preview
+            .as_ref()
+            .and_then(|preview| preview.preview_bytes.as_deref())
+        {
+            render_formatted_preview_bytes(ui, bytes, selected_format, &query);
+        }
+    } else {
+        ui.weak(t("search_workspace.value_not_found"));
+    }
+}
+
+struct PreviewHeader<'a> {
+    item_label: &'a str,
+    source_label: &'a str,
+    field: SearchField,
+    locator: Option<&'a SearchResultLocator>,
+}
+
+fn render_preview_header(
+    ui: &mut egui::Ui,
+    state: &mut SearchWorkspaceState,
+    actions: &mut Vec<TabAction>,
+    header: PreviewHeader<'_>,
+) {
+    ui.heading(header.item_label);
     ui.horizontal_wrapped(|ui| {
-        ui.label(&active_preview.source_label);
-        ui.weak(field_label(active_preview.field));
-        if is_stale {
+        ui.label(header.source_label);
+        ui.weak(field_label(header.field));
+        if header.locator.is_none() {
             ui.weak(t("search_workspace.stale_result"));
         }
     });
     ui.add_space(4.0);
     ui.horizontal_wrapped(|ui| {
         render_preview_format_selector(ui, &mut state.preview_format);
-        if !is_stale {
+        if let Some(locator) = header.locator {
             if ui.button(t("search_workspace.open_source")).clicked() {
                 actions.push(TabAction::NavigateSearchResult {
-                    locator: active_preview.locator.clone(),
+                    locator: locator.clone(),
                 });
             }
         } else {
@@ -430,7 +524,90 @@ fn render_preview(
         }
     });
     ui.separator();
-    render_formatted_preview(ui, active_preview, state.preview_format, &state.query);
+}
+
+/// Renders the preview area for a KV Key match whose value hasn't been
+/// fetched yet. Manages the `PreviewFetchState` lifecycle: idle triggers a
+/// fetch, loading shows a spinner, failed shows an error with retry.
+fn render_pending_kv_value_preview(
+    ui: &mut egui::Ui,
+    state: &mut SearchWorkspaceState,
+    active_preview: &SearchWorkspaceResult,
+    actions: &mut Vec<TabAction>,
+) {
+    let active_key = active_preview.key.clone();
+    let active_locator = active_preview.locator.clone();
+    // Clone the fetch state so we can read it and then mutate `state`
+    // without a borrow conflict.
+    let fetch_state = state.preview_fetch.clone();
+
+    match &fetch_state {
+        PreviewFetchState::Idle => {
+            state.preview_fetch = PreviewFetchState::Loading(active_key.clone());
+            emit_fetch_action(&active_locator, actions);
+            show_loading(ui);
+        }
+        PreviewFetchState::Loading(expected) if expected == &active_key => {
+            show_loading(ui);
+        }
+        PreviewFetchState::Loading(_) => {
+            // Selection changed to a different key — reset and re-trigger next frame.
+            state.preview_fetch = PreviewFetchState::Idle;
+            show_loading(ui);
+        }
+        PreviewFetchState::Failed { key, message } if key == &active_key => {
+            let message = message.clone();
+            show_error_with_retry(ui, &message, &active_key, &active_locator, state, actions);
+        }
+        PreviewFetchState::Failed { .. } => {
+            // Selection changed — reset and re-trigger next frame.
+            state.preview_fetch = PreviewFetchState::Idle;
+            show_loading(ui);
+        }
+    }
+}
+
+fn emit_fetch_action(locator: &SearchResultLocator, actions: &mut Vec<TabAction>) {
+    if let SearchResultLocator::KvKey {
+        connection_id,
+        bucket_name,
+        key,
+    } = locator
+    {
+        actions.push(TabAction::FetchSearchWorkspaceKvValue {
+            source_id: SearchSourceId::Kv {
+                connection_id: *connection_id,
+                bucket_name: bucket_name.clone(),
+            },
+            key: key.clone(),
+        });
+    }
+}
+
+fn show_loading(ui: &mut egui::Ui) {
+    ui.horizontal(|ui| {
+        ui.spinner();
+        ui.label(t("search_workspace.loading_value"));
+    });
+}
+
+fn show_error_with_retry(
+    ui: &mut egui::Ui,
+    message: &str,
+    active_key: &SearchResultKey,
+    active_locator: &SearchResultLocator,
+    state: &mut SearchWorkspaceState,
+    actions: &mut Vec<TabAction>,
+) {
+    ui.colored_label(
+        ui.visuals().error_fg_color,
+        t("search_workspace.fetch_error"),
+    );
+    ui.weak(message);
+    if ui.button(t("search_workspace.retry")).clicked() {
+        state.preview_fetch = PreviewFetchState::Loading(active_key.clone());
+        emit_fetch_action(active_locator, actions);
+    }
 }
 
 fn render_preview_format_selector(ui: &mut egui::Ui, format: &mut PayloadFormat) {
@@ -447,13 +624,13 @@ fn render_preview_format_selector(ui: &mut egui::Ui, format: &mut PayloadFormat)
         });
 }
 
-fn render_formatted_preview(
+fn render_formatted_preview_bytes(
     ui: &mut egui::Ui,
-    result: &SearchWorkspaceResult,
+    bytes: &[u8],
     selected_format: PayloadFormat,
     query: &str,
 ) {
-    let preview = format::format_read_only_preview(&result.preview_bytes, selected_format);
+    let preview = format::format_read_only_preview(bytes, selected_format);
     let job = format::read_only_preview_layout_job(&preview, ui.style(), query);
     egui::ScrollArea::both()
         .id_salt("search_workspace_preview")
@@ -463,13 +640,14 @@ fn render_formatted_preview(
         });
 }
 
+#[cfg(test)]
 fn active_preview_result<'a>(
     preview: &'a SearchWorkspaceResult,
     results: &'a [SearchWorkspaceResult],
 ) -> (&'a SearchWorkspaceResult, bool) {
     results
         .iter()
-        .find(|result| result.identity == preview.identity)
+        .find(|result| result.key == preview.key)
         .map_or((preview, true), |current| (current, false))
 }
 

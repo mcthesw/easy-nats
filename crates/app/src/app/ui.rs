@@ -213,6 +213,9 @@ impl eframe::App for EasyNatsApp {
                 TabAction::ScanSearchWorkspaceKvValues { source_id } => {
                     self.scan_search_workspace_kv_values(&source_id);
                 }
+                TabAction::FetchSearchWorkspaceKvValue { source_id, key } => {
+                    self.fetch_search_workspace_kv_value(&source_id, &key);
+                }
                 TabAction::NavigateSearchResult { locator } => {
                     self.navigate_search_result(locator);
                 }

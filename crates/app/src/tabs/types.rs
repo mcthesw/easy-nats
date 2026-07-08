@@ -136,6 +136,10 @@ pub enum TabAction {
     ScanSearchWorkspaceKvValues {
         source_id: SearchSourceId,
     },
+    FetchSearchWorkspaceKvValue {
+        source_id: SearchSourceId,
+        key: String,
+    },
     NavigateSearchResult {
         locator: SearchResultLocator,
     },
@@ -298,23 +302,43 @@ pub struct SearchSourceSummary {
     pub kind: SearchSourceKind,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct SearchResultIdentity {
+/// Stable identity for search result selection and preview matching.
+///
+/// `generation` is intentionally excluded — it lives only in
+/// `SearchWorkspaceCacheKey.sources` for cache invalidation. Genuine
+/// staleness (key deleted, value changed) is still detected because the
+/// result disappears from the rebuilt list.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct SearchResultKey {
     pub source_id: SearchSourceId,
-    pub generation: u64,
     pub field: SearchField,
     pub item_id: String,
 }
 
 #[derive(Debug, Clone)]
 pub struct SearchWorkspaceResult {
-    pub identity: SearchResultIdentity,
+    pub key: SearchResultKey,
     pub source_label: String,
     pub field: SearchField,
     pub item_label: String,
     pub snippet: String,
-    pub preview_bytes: Vec<u8>,
+    /// `None` means preview content is not yet materialized (only valid for
+    /// KV Key matches where the value hasn't been fetched).
+    /// `Some(vec![])` means the value exists but is empty.
+    pub preview_bytes: Option<Vec<u8>>,
     pub locator: SearchResultLocator,
+}
+
+/// Tracks the on-demand fetch lifecycle for a KV Key match preview.
+#[derive(Debug, Clone, Default)]
+pub enum PreviewFetchState {
+    #[default]
+    Idle,
+    Loading(SearchResultKey),
+    Failed {
+        key: SearchResultKey,
+        message: String,
+    },
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -333,9 +357,10 @@ pub struct SearchWorkspaceState {
     pub primary: bool,
     pub secondary: bool,
     pub selected_sources: Vec<SearchSourceId>,
-    pub selected_result: Option<SearchResultIdentity>,
+    pub selected_result: Option<SearchResultKey>,
     pub selected_preview: Option<SearchWorkspaceResult>,
     pub preview_format: PayloadFormat,
+    pub preview_fetch: PreviewFetchState,
     pub cached_results: Option<CachedSearchWorkspaceResults>,
 }
 
@@ -380,6 +405,7 @@ impl Default for SearchWorkspaceState {
             selected_result: None,
             selected_preview: None,
             preview_format: PayloadFormat::Auto,
+            preview_fetch: PreviewFetchState::default(),
             cached_results: None,
         }
     }

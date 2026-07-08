@@ -71,6 +71,18 @@ open_source:
 preview_format:
   en: "Display"
   zh: "显示"
+loading_value:
+  en: "Loading value..."
+  zh: "正在加载值…"
+fetch_error:
+  en: "Failed to load value"
+  zh: "加载值失败"
+retry:
+  en: "Retry"
+  zh: "重试"
+value_not_found:
+  en: "Value not found"
+  zh: "未找到值"
 field_key:
   en: "Key"
   zh: "键"

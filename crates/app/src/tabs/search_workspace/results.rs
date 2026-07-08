@@ -3,7 +3,7 @@ use crate::tabs::common::{
     NormalizedSearchQuery, SEARCH_RESULT_LIMIT, format_timestamp, searchable_payload_text,
 };
 use crate::tabs::types::{
-    KvBucketState, ReceivedMessage, SearchField, SearchResultIdentity, SearchResultLocator,
+    KvBucketState, ReceivedMessage, SearchField, SearchResultKey, SearchResultLocator,
     SearchSourceKind, SearchSourceSummary, SearchWorkspaceResult, StreamState, SubscriberState,
     TabKind,
 };
@@ -101,13 +101,14 @@ fn append_kv_results(
             }
             ctx.stats.records_scanned += 1;
             if ctx.query.matches(key) {
+                let preview_bytes = state.fetched_value_bytes.get(key.as_str()).cloned();
                 push_result(
                     &mut ctx,
                     SearchField::Key,
                     key,
                     key,
                     key,
-                    key.as_bytes(),
+                    preview_bytes,
                     SearchResultLocator::KvKey {
                         connection_id,
                         bucket_name: bucket_name.to_string(),
@@ -131,15 +132,15 @@ fn append_kv_results(
                 let preview_bytes = state
                     .fetched_value_bytes
                     .get(key.as_str())
-                    .map(Vec::as_slice)
-                    .unwrap_or_else(|| value.as_bytes());
+                    .cloned()
+                    .unwrap_or_else(|| value.as_bytes().to_vec());
                 push_result(
                     &mut ctx,
                     SearchField::Value,
                     key,
                     key,
                     value,
-                    preview_bytes,
+                    Some(preview_bytes),
                     SearchResultLocator::KvKey {
                         connection_id,
                         bucket_name: bucket_name.to_string(),
@@ -167,6 +168,7 @@ fn append_stream_results(
             }
             ctx.stats.records_scanned += 1;
             if ctx.query.matches(subject) {
+                ctx.stats.payload_value_bytes += msg.payload.len();
                 let item_label = stream_item_label(sequence, subject);
                 push_result(
                     &mut ctx,
@@ -174,7 +176,7 @@ fn append_stream_results(
                     &sequence.to_string(),
                     &item_label,
                     subject,
-                    subject.as_bytes(),
+                    Some(msg.payload.clone()),
                     SearchResultLocator::StreamMessage {
                         connection_id,
                         stream_name: stream_name.to_string(),
@@ -199,7 +201,7 @@ fn append_stream_results(
                     &sequence.to_string(),
                     &item_label,
                     &payload,
-                    &msg.payload,
+                    Some(msg.payload.clone()),
                     SearchResultLocator::StreamMessage {
                         connection_id,
                         stream_name: stream_name.to_string(),
@@ -224,6 +226,7 @@ fn append_subscriber_results(
             }
             ctx.stats.records_scanned += 1;
             if ctx.query.matches(&msg.subject) {
+                ctx.stats.payload_value_bytes += msg.payload.len();
                 let item_label = subscriber_item_label(msg);
                 push_result(
                     &mut ctx,
@@ -231,7 +234,7 @@ fn append_subscriber_results(
                     &msg.id.to_string(),
                     &item_label,
                     &msg.subject,
-                    msg.subject.as_bytes(),
+                    Some(msg.payload.clone()),
                     SearchResultLocator::SubscriberMessage {
                         connection_id,
                         backend_id,
@@ -256,7 +259,7 @@ fn append_subscriber_results(
                     &msg.id.to_string(),
                     &item_label,
                     &payload,
-                    &msg.payload,
+                    Some(msg.payload.clone()),
                     SearchResultLocator::SubscriberMessage {
                         connection_id,
                         backend_id,
@@ -286,13 +289,12 @@ fn push_result(
     item_id: &str,
     item_label: &str,
     text: &str,
-    preview_bytes: &[u8],
+    preview_bytes: Option<Vec<u8>>,
     locator: SearchResultLocator,
 ) {
     ctx.results.push(SearchWorkspaceResult {
-        identity: SearchResultIdentity {
+        key: SearchResultKey {
             source_id: ctx.source.id.clone(),
-            generation: ctx.source.generation,
             field,
             item_id: item_id.to_string(),
         },
@@ -300,7 +302,7 @@ fn push_result(
         field,
         item_label: item_label.to_string(),
         snippet: compact_text(text, 160),
-        preview_bytes: preview_bytes.to_vec(),
+        preview_bytes,
         locator,
     });
 }
