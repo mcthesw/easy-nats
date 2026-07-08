@@ -25,6 +25,11 @@
   <releases>
     <release version="0.1.27" date="2026-06-28">
       <description>
+        <p>Search Workspace preview now shows the value for Key matches and payload for Subject matches.</p>
+      </description>
+    </release>
+    <release version="0.1.27" date="2026-06-28">
+      <description>
         <p>Adds scoped request/reply debugging with subscriber replies.</p>
       </description>
     </release>
