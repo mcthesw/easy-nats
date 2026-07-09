@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.29](https://github.com/mcthesw/easy-nats/compare/v0.1.28...v0.1.29) (2026-07-09)
+
+
+### Features
+
+* **settings:** hide backing streams in sidebar by default ([573f852](https://github.com/mcthesw/easy-nats/commit/573f852e92a2aa02ed83f04477d908ce55cd77cf))
+
 ## [0.1.28](https://github.com/mcthesw/easy-nats/compare/v0.1.27...v0.1.28) (2026-07-08)
 
 
