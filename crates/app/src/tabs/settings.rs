@@ -75,6 +75,16 @@ pub fn settings_ui(
             });
     });
 
+    if ui
+        .checkbox(
+            &mut settings.show_backing_streams_in_sidebar,
+            t("settings.show_backing_streams"),
+        )
+        .changed()
+    {
+        settings.save();
+    }
+
     ui.add_space(12.0);
     ui.separator();
     ui.label(egui::RichText::new(t("settings.section_message_schemas")).strong());

@@ -55,6 +55,10 @@ pubsub_tab_mode_reuse:
   en: "Reuse existing tab"
   zh: "复用已有标签页"
 
+show_backing_streams:
+  en: "Show KV/Object backing streams"
+  zh: "显示 KV/Object 底层流"
+
 section_message_schemas:
   en: "Message Schemas"
   zh: "消息 Schema"

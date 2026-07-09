@@ -36,6 +36,8 @@ pub struct AppSettings {
     #[serde(default)]
     pub pubsub_tab_mode: PubSubTabMode,
     #[serde(default)]
+    pub show_backing_streams_in_sidebar: bool,
+    #[serde(default)]
     pub proto_schema_dir: Option<String>,
     #[serde(default)]
     pub topic_history: Vec<String>,
@@ -52,6 +54,8 @@ struct StoredAppSettings {
     #[serde(default)]
     pubsub_tab_mode: PubSubTabMode,
     #[serde(default)]
+    show_backing_streams_in_sidebar: bool,
+    #[serde(default)]
     proto_schema_dir: Option<String>,
     #[serde(default)]
     topic_history: Vec<String>,
@@ -63,6 +67,7 @@ impl Default for AppSettings {
             language: Language::En,
             theme: None,
             pubsub_tab_mode: PubSubTabMode::NewTab,
+            show_backing_streams_in_sidebar: false,
             proto_schema_dir: None,
             topic_history: Vec::new(),
         }
@@ -99,6 +104,7 @@ impl AppSettings {
                 .theme
                 .or_else(|| stored.dark_mode.map(ThemeId::from_legacy_dark_mode)),
             pubsub_tab_mode: stored.pubsub_tab_mode,
+            show_backing_streams_in_sidebar: stored.show_backing_streams_in_sidebar,
             proto_schema_dir: stored.proto_schema_dir,
             topic_history: stored.topic_history,
         })
@@ -196,6 +202,21 @@ mod tests {
         let settings = AppSettings::parse(r#"{ "pubsub_tab_mode": "reuse-existing" }"#).unwrap();
 
         assert_eq!(settings.pubsub_tab_mode, PubSubTabMode::ReuseExisting);
+    }
+
+    #[test]
+    fn backing_streams_sidebar_visibility_defaults_to_hidden() {
+        let settings = AppSettings::parse(r#"{}"#).unwrap();
+
+        assert!(!settings.show_backing_streams_in_sidebar);
+    }
+
+    #[test]
+    fn backing_streams_sidebar_visibility_parses_opt_in() {
+        let settings =
+            AppSettings::parse(r#"{ "show_backing_streams_in_sidebar": true }"#).unwrap();
+
+        assert!(settings.show_backing_streams_in_sidebar);
     }
 
     #[test]

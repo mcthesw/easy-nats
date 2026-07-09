@@ -278,6 +278,12 @@ fn render_streams_section(
             if let Some(infos) = app.stream_lists.get(&id) {
                 for info in infos {
                     let stream_name = info.name.as_str();
+                    if !stream_visible_in_sidebar(
+                        stream_name,
+                        app.settings.show_backing_streams_in_sidebar,
+                    ) {
+                        continue;
+                    }
                     if ui.selectable_label(false, stream_name).clicked() {
                         let cancel = CancellationToken::new();
                         let guard = TabGuard::new_without_id(cancel);
@@ -295,6 +301,14 @@ fn render_streams_section(
                 }
             }
         });
+}
+
+fn stream_visible_in_sidebar(stream_name: &str, show_backing_streams: bool) -> bool {
+    show_backing_streams || !is_backing_stream_name(stream_name)
+}
+
+fn is_backing_stream_name(stream_name: &str) -> bool {
+    stream_name.starts_with("KV_") || stream_name.starts_with("OBJ_")
 }
 
 fn render_kv_section(
@@ -460,5 +474,24 @@ fn apply_sidebar_action(app: &mut EasyNatsApp, action: Option<SidebarAction>) {
             app.open_or_focus_clients_tab(id);
         }
         None => {}
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::stream_visible_in_sidebar;
+
+    #[test]
+    fn backing_streams_are_hidden_by_default() {
+        assert!(!stream_visible_in_sidebar("KV_orders", false));
+        assert!(!stream_visible_in_sidebar("OBJ_reports", false));
+        assert!(stream_visible_in_sidebar("ORDERS", false));
+    }
+
+    #[test]
+    fn backing_streams_are_visible_when_opted_in() {
+        assert!(stream_visible_in_sidebar("KV_orders", true));
+        assert!(stream_visible_in_sidebar("OBJ_reports", true));
+        assert!(stream_visible_in_sidebar("ORDERS", true));
     }
 }
