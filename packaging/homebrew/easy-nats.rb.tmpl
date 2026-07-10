@@ -7,7 +7,7 @@ cask "easy-nats" do
   name "Easy NATS"
   desc "Desktop GUI client for NATS servers, JetStream, KV, and Object Store"
   homepage "https://github.com/mcthesw/easy-nats"
-  depends_on macos: ">= :catalina"
+  depends_on macos: :catalina
 
   livecheck do
     url :url
