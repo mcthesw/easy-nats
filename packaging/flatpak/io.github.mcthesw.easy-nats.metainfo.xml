@@ -23,6 +23,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.1.30" date="2026-07-22">
+      <description>
+        <p>Theme-aware JSON payload syntax highlighting now follows the selected application theme, and Subscriber payload previews use the available detail space.</p>
+      </description>
+    </release>
     <release version="0.1.29" date="2026-07-09">
       <description>
         <p>Hides KV/Object backing streams from the Streams sidebar by default, with a Settings toggle to show them.</p>
