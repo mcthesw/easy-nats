@@ -268,3 +268,92 @@ fn make_widget_visual(
         ..old
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn syntax_palettes_use_unmodified_official_colors() {
+        for (theme_id, expected) in [
+            (
+                ThemeId::CatppuccinLatte,
+                (
+                    [76, 79, 105],
+                    [30, 102, 245],
+                    [64, 160, 43],
+                    [254, 100, 11],
+                    [124, 127, 147],
+                ),
+            ),
+            (
+                ThemeId::CatppuccinFrappe,
+                (
+                    [198, 208, 245],
+                    [140, 170, 238],
+                    [166, 209, 137],
+                    [239, 159, 118],
+                    [148, 156, 187],
+                ),
+            ),
+            (
+                ThemeId::CatppuccinMacchiato,
+                (
+                    [202, 211, 245],
+                    [138, 173, 244],
+                    [166, 218, 149],
+                    [245, 169, 127],
+                    [147, 154, 183],
+                ),
+            ),
+            (
+                ThemeId::CatppuccinMocha,
+                (
+                    [205, 214, 244],
+                    [137, 180, 250],
+                    [166, 227, 161],
+                    [250, 179, 135],
+                    [147, 153, 178],
+                ),
+            ),
+        ] {
+            let syntax = syntax_palette(theme_id);
+            let (text, blue, green, peach, overlay2) = expected;
+            assert_eq!(syntax.plain, Color32::from_rgb(text[0], text[1], text[2]));
+            assert_eq!(
+                syntax.property,
+                Color32::from_rgb(blue[0], blue[1], blue[2])
+            );
+            assert_eq!(
+                syntax.string,
+                Color32::from_rgb(green[0], green[1], green[2])
+            );
+            assert_eq!(
+                syntax.number,
+                Color32::from_rgb(peach[0], peach[1], peach[2])
+            );
+            assert_eq!(
+                syntax.language_constant,
+                Color32::from_rgb(peach[0], peach[1], peach[2])
+            );
+            assert_eq!(
+                syntax.punctuation,
+                Color32::from_rgb(overlay2[0], overlay2[1], overlay2[2])
+            );
+        }
+    }
+
+    #[test]
+    fn each_catppuccin_flavor_has_distinct_syntax_colors() {
+        let palettes = [
+            syntax_palette(ThemeId::CatppuccinLatte),
+            syntax_palette(ThemeId::CatppuccinFrappe),
+            syntax_palette(ThemeId::CatppuccinMacchiato),
+            syntax_palette(ThemeId::CatppuccinMocha),
+        ];
+
+        for (index, palette) in palettes.iter().enumerate() {
+            assert!(palettes[index + 1..].iter().all(|other| other != palette));
+        }
+    }
+}
