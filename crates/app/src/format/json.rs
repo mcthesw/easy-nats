@@ -1,6 +1,8 @@
 use eframe::egui;
 use egui::text::LayoutJob;
 
+use crate::theme::SyntaxPalette;
+
 use super::format_text;
 
 /// Pretty-print JSON. Returns the formatted string.
@@ -12,31 +14,9 @@ pub fn format_json(data: &[u8]) -> String {
 }
 
 /// Build a `LayoutJob` with basic JSON syntax highlighting.
-pub fn json_syntax_highlight(json: &str, style: &egui::Style) -> LayoutJob {
+pub fn json_syntax_highlight(json: &str, palette: SyntaxPalette) -> LayoutJob {
     let mut job = LayoutJob::default();
     let mono = egui::FontId::monospace(13.0);
-    let base_color = style.visuals.text_color();
-
-    let string_color = if style.visuals.dark_mode {
-        egui::Color32::from_rgb(152, 195, 121)
-    } else {
-        egui::Color32::from_rgb(80, 161, 79)
-    };
-    let number_color = if style.visuals.dark_mode {
-        egui::Color32::from_rgb(209, 154, 102)
-    } else {
-        egui::Color32::from_rgb(152, 104, 1)
-    };
-    let keyword_color = if style.visuals.dark_mode {
-        egui::Color32::from_rgb(86, 182, 194)
-    } else {
-        egui::Color32::from_rgb(1, 132, 188)
-    };
-    let key_color = if style.visuals.dark_mode {
-        egui::Color32::from_rgb(224, 108, 117)
-    } else {
-        egui::Color32::from_rgb(228, 86, 73)
-    };
 
     let chars: Vec<char> = json.chars().collect();
     let mut i = 0;
@@ -60,18 +40,30 @@ pub fn json_syntax_highlight(json: &str, style: &egui::Style) -> LayoutJob {
                     i += 1;
                 }
                 let s: String = chars[start..i].iter().collect();
-                let color = if after_colon { string_color } else { key_color };
+                let color = if after_colon {
+                    palette.string
+                } else {
+                    palette.property
+                };
                 job.append(&s, 0.0, egui::TextFormat::simple(mono.clone(), color));
                 after_colon = false;
             }
             ':' => {
-                job.append(":", 0.0, egui::TextFormat::simple(mono.clone(), base_color));
+                job.append(
+                    ":",
+                    0.0,
+                    egui::TextFormat::simple(mono.clone(), palette.punctuation),
+                );
                 after_colon = true;
                 i += 1;
             }
             ',' | '{' | '}' | '[' | ']' => {
                 let s = String::from(ch);
-                job.append(&s, 0.0, egui::TextFormat::simple(mono.clone(), base_color));
+                job.append(
+                    &s,
+                    0.0,
+                    egui::TextFormat::simple(mono.clone(), palette.punctuation),
+                );
                 after_colon = false;
                 i += 1;
             }
@@ -84,7 +76,7 @@ pub fn json_syntax_highlight(json: &str, style: &egui::Style) -> LayoutJob {
                 job.append(
                     &word,
                     0.0,
-                    egui::TextFormat::simple(mono.clone(), keyword_color),
+                    egui::TextFormat::simple(mono.clone(), palette.language_constant),
                 );
                 after_colon = false;
             }
@@ -104,13 +96,17 @@ pub fn json_syntax_highlight(json: &str, style: &egui::Style) -> LayoutJob {
                 job.append(
                     &num,
                     0.0,
-                    egui::TextFormat::simple(mono.clone(), number_color),
+                    egui::TextFormat::simple(mono.clone(), palette.number),
                 );
                 after_colon = false;
             }
             _ => {
                 let s = String::from(ch);
-                job.append(&s, 0.0, egui::TextFormat::simple(mono.clone(), base_color));
+                job.append(
+                    &s,
+                    0.0,
+                    egui::TextFormat::simple(mono.clone(), palette.plain),
+                );
                 i += 1;
             }
         }

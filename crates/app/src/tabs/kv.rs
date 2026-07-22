@@ -5,6 +5,7 @@ use crate::format;
 use crate::i18n::t;
 use crate::schema::{MessageSchemaManager, kv_subject};
 use crate::tabs::guard::TabGuard;
+use crate::theme::SyntaxPalette;
 
 use super::common::{
     KV_VALUE_SEARCH_BATCH, SearchStatus, auto_refresh_ui, format_bytes,
@@ -24,6 +25,7 @@ pub fn kv_bucket_ui(
     actions: &mut Vec<TabAction>,
     schema_manager: &MessageSchemaManager,
     guard: &TabGuard,
+    syntax_palette: SyntaxPalette,
 ) {
     ui.horizontal(|ui| {
         ui.heading(bucket_name);
@@ -102,7 +104,14 @@ pub fn kv_bucket_ui(
     // Right panel: detail or history
     egui::CentralPanel::default().show(ui, |ui| {
         if state.show_history {
-            render_history(ui, connection_id, bucket_name, state, schema_manager);
+            render_history(
+                ui,
+                connection_id,
+                bucket_name,
+                state,
+                schema_manager,
+                syntax_palette,
+            );
         } else {
             render_detail_panel(
                 ui,
@@ -111,6 +120,7 @@ pub fn kv_bucket_ui(
                 state,
                 backend,
                 schema_manager,
+                syntax_palette,
             );
         }
     });
@@ -344,6 +354,7 @@ fn render_detail_panel(
     state: &mut KvBucketState,
     backend: &BackendHandle,
     schema_manager: &MessageSchemaManager,
+    syntax_palette: SyntaxPalette,
 ) {
     if state.selected_key.is_none() {
         ui.centered_and_justified(|ui| {
@@ -513,6 +524,7 @@ fn render_detail_panel(
                 "kv_editor_proto",
                 &mut state.editor_proto_view,
                 schema_manager,
+                syntax_palette,
             );
         });
 }
@@ -523,6 +535,7 @@ fn render_history(
     bucket_name: &str,
     state: &mut KvBucketState,
     schema_manager: &MessageSchemaManager,
+    syntax_palette: SyntaxPalette,
 ) {
     ui.horizontal(|ui| {
         if ui.button(t("kv.back_to_detail")).clicked() {
@@ -565,6 +578,7 @@ fn render_history(
                                     manager: schema_manager,
                                     connection_id,
                                     subject: &subject,
+                                    syntax_palette,
                                 },
                             );
                         });

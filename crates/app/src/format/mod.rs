@@ -3,6 +3,7 @@ use eframe::egui;
 
 use crate::proto::{AutoDetectResult, ProtoViewState};
 use crate::schema::{MessageSchemaManager, PayloadSchemaStatus, SchemaStatusLevel};
+use crate::theme::SyntaxPalette;
 
 mod json;
 pub mod msgpack;
@@ -146,12 +147,17 @@ pub fn format_selector(ui: &mut egui::Ui, id_salt: &str, format: &mut PayloadFor
 }
 
 /// Render formatted payload into the UI with appropriate styling.
-pub fn render_payload(ui: &mut egui::Ui, data: &[u8], format: PayloadFormat) {
+pub fn render_payload(
+    ui: &mut egui::Ui,
+    data: &[u8],
+    format: PayloadFormat,
+    syntax_palette: SyntaxPalette,
+) {
     let resolved = resolve_format(format, data);
     match resolved {
         PayloadFormat::Json => {
             let pretty = format_json(data);
-            let job = json_syntax_highlight(&pretty, ui.style());
+            let job = json_syntax_highlight(&pretty, syntax_palette);
             ui.label(job);
         }
         PayloadFormat::Hex => {
@@ -189,12 +195,13 @@ pub fn render_payload_with_proto(
     id_salt: &str,
     proto_state: &mut ProtoViewState,
     manager: &MessageSchemaManager,
+    syntax_palette: SyntaxPalette,
 ) {
     let resolved = resolve_format(format, data);
     if resolved == PayloadFormat::Protobuf {
-        render_protobuf_payload(ui, data, id_salt, proto_state, manager);
+        render_protobuf_payload(ui, data, id_salt, proto_state, manager, syntax_palette);
     } else {
-        render_payload(ui, data, format);
+        render_payload(ui, data, format, syntax_palette);
     }
 }
 
@@ -203,6 +210,7 @@ pub struct SchemaRenderContext<'a> {
     pub manager: &'a MessageSchemaManager,
     pub connection_id: u64,
     pub subject: &'a str,
+    pub syntax_palette: SyntaxPalette,
 }
 
 pub fn render_payload_with_schema(
@@ -222,16 +230,32 @@ pub fn render_payload_with_schema(
         ui.add_space(4.0);
         if format == PayloadFormat::Auto {
             if let Some(json) = rendered.json {
-                let job = json_syntax_highlight(&json, ui.style());
+                let job = json_syntax_highlight(&json, schema.syntax_palette);
                 ui.label(job);
             } else {
-                render_payload(ui, data, PayloadFormat::Auto);
+                render_payload(ui, data, PayloadFormat::Auto, schema.syntax_palette);
             }
         } else {
-            render_payload_with_proto(ui, data, format, id_salt, proto_state, schema.manager);
+            render_payload_with_proto(
+                ui,
+                data,
+                format,
+                id_salt,
+                proto_state,
+                schema.manager,
+                schema.syntax_palette,
+            );
         }
     } else {
-        render_payload_with_proto(ui, data, format, id_salt, proto_state, schema.manager);
+        render_payload_with_proto(
+            ui,
+            data,
+            format,
+            id_salt,
+            proto_state,
+            schema.manager,
+            schema.syntax_palette,
+        );
     }
 }
 
@@ -252,12 +276,13 @@ fn render_protobuf_payload(
     id_salt: &str,
     proto_state: &mut ProtoViewState,
     manager: &MessageSchemaManager,
+    syntax_palette: SyntaxPalette,
 ) {
     let message_types = manager.manual_message_types();
     if !message_types.is_empty() {
         render_proto_type_selector(ui, id_salt, proto_state, &message_types);
         ui.add_space(4.0);
-        render_proto_decoded(ui, data, proto_state, manager);
+        render_proto_decoded(ui, data, proto_state, manager, syntax_palette);
     } else {
         let text = MessageSchemaManager::decode_wire_format(data);
         ui.label(egui::RichText::new(text).monospace());
@@ -317,6 +342,7 @@ fn render_proto_decoded(
     data: &[u8],
     state: &mut ProtoViewState,
     manager: &MessageSchemaManager,
+    syntax_palette: SyntaxPalette,
 ) {
     if data.is_empty() {
         ui.label("(empty payload)");
@@ -331,7 +357,7 @@ fn render_proto_decoded(
                         .small()
                         .weak(),
                 );
-                let job = json_syntax_highlight(&json, ui.style());
+                let job = json_syntax_highlight(&json, syntax_palette);
                 ui.label(job);
             }
             AutoDetectResult::Ambiguous(types) => {
@@ -354,7 +380,7 @@ fn render_proto_decoded(
     } else if !state.selected_type.is_empty() {
         match manager.decode_manual_proto(data, &state.selected_type) {
             Ok(json) => {
-                let job = json_syntax_highlight(&json, ui.style());
+                let job = json_syntax_highlight(&json, syntax_palette);
                 ui.label(job);
             }
             Err(e) => {

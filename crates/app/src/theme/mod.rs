@@ -2,11 +2,13 @@ mod builtin;
 mod catalog;
 mod catppuccin;
 mod id;
+mod syntax;
 
 use eframe::egui;
 
 pub use catalog::{theme_catalog, theme_definition};
 pub use id::ThemeId;
+pub(crate) use syntax::{SyntaxPalette, syntax_palette};
 
 pub fn resolve_theme(saved_theme: Option<ThemeId>, system_prefers_dark: Option<bool>) -> ThemeId {
     saved_theme

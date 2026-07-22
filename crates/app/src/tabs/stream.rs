@@ -5,6 +5,7 @@ use std::time::{Duration, SystemTime};
 use crate::format::{self, PayloadFormat};
 use crate::i18n::t;
 use crate::schema::MessageSchemaManager;
+use crate::theme::SyntaxPalette;
 
 use super::common::{
     NormalizedSearchQuery, SEARCH_RESULT_LIMIT, SearchStatus, auto_refresh_ui, format_bytes,
@@ -13,6 +14,7 @@ use super::common::{
 use super::stream_consumers::render_consumers;
 use super::types::{SearchCacheKey, StreamState, TabAction};
 
+#[allow(clippy::too_many_arguments)]
 pub fn stream_ui(
     ui: &mut egui::Ui,
     connection_id: u64,
@@ -21,6 +23,7 @@ pub fn stream_ui(
     backend: &BackendHandle,
     actions: &mut Vec<TabAction>,
     schema_manager: &MessageSchemaManager,
+    syntax_palette: SyntaxPalette,
 ) {
     // Auto-refresh toggle
     ui.horizontal(|ui| {
@@ -96,6 +99,7 @@ pub fn stream_ui(
                             &mut state.payload_format,
                             &mut state.proto_view,
                             schema_manager,
+                            syntax_palette,
                         );
                     }
                 } else {
@@ -459,6 +463,7 @@ fn stream_message_detail(
     payload_format: &mut PayloadFormat,
     proto_view: &mut crate::proto::ProtoViewState,
     schema_manager: &MessageSchemaManager,
+    syntax_palette: SyntaxPalette,
 ) {
     ui.horizontal(|ui| {
         ui.label(t("stream.msg_detail"));
@@ -512,6 +517,7 @@ fn stream_message_detail(
                 manager: schema_manager,
                 connection_id,
                 subject: &msg.subject,
+                syntax_palette,
             },
         );
     } else {
@@ -522,6 +528,7 @@ fn stream_message_detail(
             "stream_proto",
             proto_view,
             schema_manager,
+            syntax_palette,
         );
     }
 }
