@@ -113,3 +113,49 @@ pub fn json_syntax_highlight(json: &str, palette: SyntaxPalette) -> LayoutJob {
     }
     job
 }
+
+#[cfg(test)]
+mod tests {
+    use eframe::egui::Color32;
+
+    use super::*;
+
+    const TEST_PALETTE: SyntaxPalette = SyntaxPalette {
+        plain: Color32::from_rgb(1, 2, 3),
+        property: Color32::from_rgb(4, 5, 6),
+        string: Color32::from_rgb(7, 8, 9),
+        number: Color32::from_rgb(10, 11, 12),
+        language_constant: Color32::from_rgb(13, 14, 15),
+        punctuation: Color32::from_rgb(16, 17, 18),
+    };
+
+    fn color_for(job: &LayoutJob, text: &str) -> Color32 {
+        let start = egui::text::ByteIndex(job.text.find(text).expect("token must be present"));
+        job.sections
+            .iter()
+            .find(|section| section.byte_range.contains(&start))
+            .map(|section| section.format.color)
+            .expect("token must belong to a layout section")
+    }
+
+    #[test]
+    fn syntax_highlight_uses_semantic_palette_roles() {
+        let json = r#"{"key":"value","number":-12.5e+2,"boolean":true,"empty":null}"#;
+        let job = json_syntax_highlight(json, TEST_PALETTE);
+
+        assert_eq!(color_for(&job, r#""key""#), TEST_PALETTE.property);
+        assert_eq!(color_for(&job, r#""value""#), TEST_PALETTE.string);
+        assert_eq!(color_for(&job, "-12.5e+2"), TEST_PALETTE.number);
+        assert_eq!(color_for(&job, "true"), TEST_PALETTE.language_constant);
+        assert_eq!(color_for(&job, "null"), TEST_PALETTE.language_constant);
+        assert_eq!(color_for(&job, "{"), TEST_PALETTE.punctuation);
+        assert_eq!(color_for(&job, ":"), TEST_PALETTE.punctuation);
+    }
+
+    #[test]
+    fn syntax_highlight_keeps_whitespace_in_plain_text_color() {
+        let job = json_syntax_highlight("{ \"key\": true }", TEST_PALETTE);
+
+        assert_eq!(color_for(&job, " "), TEST_PALETTE.plain);
+    }
+}
