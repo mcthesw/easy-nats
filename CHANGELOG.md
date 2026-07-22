@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.1.30](https://github.com/mcthesw/easy-nats/compare/v0.1.29...v0.1.30) (2026-07-22)
+
+
+### Features
+
+* **theme:** add theme-aware payload syntax highlighting ([eb68c77](https://github.com/mcthesw/easy-nats/commit/eb68c77932ba743f8b31eba8fb435e3d1bb0af1c))
+
+
+### Bug Fixes
+
+* **homebrew:** use supported macOS dependency syntax ([de64374](https://github.com/mcthesw/easy-nats/commit/de643742490595a429c7516a19e5b301944b3c22))
+* **ui:** expand subscriber payload preview ([29d7fe2](https://github.com/mcthesw/easy-nats/commit/29d7fe2990e1cee10b9ad00fbb869f3d7cee5d76))
+
 ## [0.1.29](https://github.com/mcthesw/easy-nats/compare/v0.1.28...v0.1.29) (2026-07-09)
 
 
