@@ -81,11 +81,32 @@ pub(super) fn message_detail_ui(
                 });
         }
 
+        if msg.reply.is_some() {
+            egui::Panel::bottom(egui::Id::new(("subscriber_reply", msg.id)))
+                .resizable(true)
+                .default_size(220.0)
+                .size_range(120.0..=f32::INFINITY)
+                .show(ui, |ui| {
+                    egui::ScrollArea::vertical()
+                        .id_salt(("subscriber_reply_scroll", msg.id))
+                        .auto_shrink([false; 2])
+                        .show(ui, |ui| {
+                            render_reply_composer(
+                                ui,
+                                connection_id,
+                                msg,
+                                schema_manager,
+                                &mut pending_reply,
+                            );
+                        });
+                });
+        }
+
         ui.add_space(4.0);
         ui.label(t("subscriber.detail_payload"));
         egui::ScrollArea::vertical()
             .id_salt("msg_detail_payload")
-            .max_height(220.0)
+            .auto_shrink([false; 2])
             .show(ui, |ui| {
                 format::render_payload_with_schema(
                     ui,
@@ -101,8 +122,6 @@ pub(super) fn message_detail_ui(
                     },
                 );
             });
-
-        render_reply_composer(ui, connection_id, msg, schema_manager, &mut pending_reply);
     }
 
     if let Some(reply) = pending_reply {
