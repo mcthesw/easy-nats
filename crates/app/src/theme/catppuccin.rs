@@ -1,6 +1,6 @@
 use eframe::egui::{self, Color32};
 
-use super::ThemeId;
+use super::{SyntaxPalette, ThemeId};
 
 // Portions of the Catppuccin theme implementation below are derived from
 // https://github.com/catppuccin/egui (commit ffb92d2da71b72bde41d83bbc0a46917de97b486),
@@ -173,16 +173,32 @@ const MOCHA: CatppuccinTheme = CatppuccinTheme {
 };
 
 pub(super) fn apply_theme(ctx: &egui::Context, theme_id: ThemeId) {
-    let theme = match theme_id {
+    let theme = resolve_theme(theme_id);
+
+    let old = ctx.global_style().visuals.clone();
+    ctx.set_visuals(make_visuals(theme, old));
+}
+
+pub(super) fn syntax_palette(theme_id: ThemeId) -> SyntaxPalette {
+    let theme = resolve_theme(theme_id);
+    SyntaxPalette {
+        plain: theme.text,
+        property: theme.blue,
+        string: theme.green,
+        number: theme.peach,
+        language_constant: theme.peach,
+        punctuation: theme.overlay2,
+    }
+}
+
+fn resolve_theme(theme_id: ThemeId) -> CatppuccinTheme {
+    match theme_id {
         ThemeId::CatppuccinLatte => LATTE,
         ThemeId::CatppuccinFrappe => FRAPPE,
         ThemeId::CatppuccinMacchiato => MACCHIATO,
         ThemeId::CatppuccinMocha => MOCHA,
         _ => unreachable!("Catppuccin theme provider only handles Catppuccin themes"),
-    };
-
-    let old = ctx.global_style().visuals.clone();
-    ctx.set_visuals(make_visuals(theme, old));
+    }
 }
 
 fn make_visuals(theme: CatppuccinTheme, old: egui::Visuals) -> egui::Visuals {

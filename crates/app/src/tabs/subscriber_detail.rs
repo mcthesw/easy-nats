@@ -4,6 +4,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 use crate::format;
 use crate::i18n::t;
 use crate::schema::{MessageSchemaManager, PayloadInputFormat};
+use crate::theme::SyntaxPalette;
 
 use super::common::{collect_headers, format_timestamp, payload_input_format_selector};
 use super::types::{ReceivedMessage, ReplyDraft, ReplyState, SubscriberState};
@@ -17,6 +18,7 @@ struct PendingReply {
     headers: Option<Vec<(String, String)>>,
 }
 
+#[allow(clippy::too_many_arguments)]
 pub(super) fn message_detail_ui(
     ui: &mut egui::Ui,
     connection_id: u64,
@@ -25,6 +27,7 @@ pub(super) fn message_detail_ui(
     state: &mut SubscriberState,
     backend: &BackendHandle,
     schema_manager: &MessageSchemaManager,
+    syntax_palette: SyntaxPalette,
 ) {
     let mut pending_reply = None;
     {
@@ -94,6 +97,7 @@ pub(super) fn message_detail_ui(
                         manager: schema_manager,
                         connection_id,
                         subject: &msg.subject,
+                        syntax_palette,
                     },
                 );
             });

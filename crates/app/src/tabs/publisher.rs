@@ -4,6 +4,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 use crate::format;
 use crate::i18n::t;
 use crate::schema::MessageSchemaManager;
+use crate::theme::SyntaxPalette;
 
 use super::common::{collect_headers, payload_input_format_selector, topic_history_text_edit};
 use super::types::{CurrentRequest, PublisherState, RequestStatus, TabAction};
@@ -18,6 +19,7 @@ pub fn publisher_ui(
     schema_manager: &MessageSchemaManager,
     actions: &mut Vec<TabAction>,
     topic_suggestions: &[&str],
+    syntax_palette: SyntaxPalette,
 ) {
     ui.horizontal(|ui| {
         ui.label(t("publisher.subject"));
@@ -173,7 +175,7 @@ pub fn publisher_ui(
         ui.label(t("publisher.response"));
         format::format_selector(ui, "pub_resp_fmt", &mut state.response_format);
     });
-    render_current_response(ui, connection_id, state, schema_manager);
+    render_current_response(ui, connection_id, state, schema_manager, syntax_palette);
 }
 
 fn render_generate_json_button(
@@ -210,6 +212,7 @@ fn render_current_response(
     connection_id: u64,
     state: &mut PublisherState,
     schema_manager: &MessageSchemaManager,
+    syntax_palette: SyntaxPalette,
 ) {
     let PublisherState {
         current_request,
@@ -228,6 +231,7 @@ fn render_current_response(
         *response_format,
         proto_view,
         schema_manager,
+        syntax_palette,
     );
 }
 
@@ -238,6 +242,7 @@ fn render_request_detail(
     response_format: format::PayloadFormat,
     proto_view: &mut crate::proto::ProtoViewState,
     schema_manager: &MessageSchemaManager,
+    syntax_palette: SyntaxPalette,
 ) {
     match request.status {
         RequestStatus::Waiting => {
@@ -289,6 +294,7 @@ fn render_request_detail(
                         manager: schema_manager,
                         connection_id,
                         subject,
+                        syntax_palette,
                     },
                 );
             });

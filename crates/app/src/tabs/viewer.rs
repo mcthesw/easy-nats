@@ -5,6 +5,7 @@ use crate::tabs::{
     clients_ui, kv_bucket_ui, message_schemas_ui, metrics_ui, obj_store_bucket_ui, publisher_ui,
     search_workspace_ui, server_info_ui, stream_ui, subscriber_ui,
 };
+use crate::theme::syntax_palette;
 
 use super::log_viewer::log_viewer_ui;
 use super::settings::settings_ui;
@@ -55,6 +56,7 @@ fn tab_scope_id(tab: &TabKind) -> String {
 }
 
 fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut TabKind) {
+    let syntax_palette = syntax_palette(*viewer.theme_id);
     match tab {
         TabKind::Welcome => {
             let available = ui.available_size();
@@ -100,6 +102,7 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
                 viewer.schema_manager,
                 viewer.actions,
                 &suggestions,
+                syntax_palette,
             );
         }
         TabKind::Subscriber {
@@ -120,6 +123,7 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
                 viewer.schema_manager,
                 viewer.actions,
                 &suggestions,
+                syntax_palette,
             );
         }
         TabKind::Stream {
@@ -136,6 +140,7 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
                 viewer.backend,
                 viewer.actions,
                 viewer.schema_manager,
+                syntax_palette,
             );
         }
         TabKind::KvBucket {
@@ -154,6 +159,7 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
                 viewer.actions,
                 viewer.schema_manager,
                 guard,
+                syntax_palette,
             );
         }
         TabKind::ObjectStoreBucket {

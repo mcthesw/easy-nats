@@ -3,6 +3,7 @@ use nats_backend::{BackendCommand, BackendHandle};
 
 use crate::i18n::t;
 use crate::schema::MessageSchemaManager;
+use crate::theme::SyntaxPalette;
 
 use super::common::{
     NormalizedSearchQuery, SEARCH_RESULT_LIMIT, SearchStatus, format_timestamp, render_search_row,
@@ -26,6 +27,7 @@ pub fn subscriber_ui(
     schema_manager: &MessageSchemaManager,
     actions: &mut Vec<TabAction>,
     topic_suggestions: &[&str],
+    syntax_palette: SyntaxPalette,
 ) {
     render_subscription_controls(
         ui,
@@ -59,6 +61,7 @@ pub fn subscriber_ui(
                 state,
                 backend,
                 schema_manager,
+                syntax_palette,
             );
         } else {
             ui.centered_and_justified(|ui| {
