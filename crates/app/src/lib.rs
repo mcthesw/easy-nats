@@ -63,9 +63,15 @@ pub fn run_native() {
 use wasm_bindgen::prelude::*;
 
 #[cfg(target_arch = "wasm32")]
+use std::cell::RefCell;
+#[cfg(target_arch = "wasm32")]
+use std::rc::Rc;
+
+#[cfg(target_arch = "wasm32")]
 #[wasm_bindgen]
 pub struct WebHandle {
     runner: eframe::WebRunner,
+    egui_ctx: Rc<RefCell<Option<eframe::egui::Context>>>,
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -82,13 +88,26 @@ impl WebHandle {
     pub fn new() -> Self {
         Self {
             runner: eframe::WebRunner::new(),
+            egui_ctx: Rc::new(RefCell::new(None)),
         }
     }
 
     /// Start the in-browser interactive demo.
-    pub async fn start(&self, canvas: web_sys::HtmlCanvasElement) -> Result<(), JsValue> {
-        let settings = settings::AppSettings::default();
-        i18n::init(settings.language);
+    pub async fn start(
+        &self,
+        canvas: web_sys::HtmlCanvasElement,
+        language: &str,
+        theme_id: &str,
+    ) -> Result<(), JsValue> {
+        let language = web_language(language)?;
+        let theme_id = web_theme(theme_id)?;
+        let mut settings = settings::AppSettings {
+            language,
+            theme: Some(theme_id),
+            ..Default::default()
+        };
+        i18n::init(language);
+        let egui_ctx = Rc::clone(&self.egui_ctx);
 
         self.runner
             .start(
@@ -99,21 +118,105 @@ impl WebHandle {
                         .egui_ctx
                         .options_mut(|options| options.reduce_texture_memory = true);
                     setup_fonts(&creation_context.egui_ctx);
-                    let theme_id = settings.resolved_theme(
-                        creation_context
-                            .egui_ctx
-                            .system_theme()
-                            .map(|theme| theme == eframe::egui::Theme::Dark),
-                    );
                     theme::apply_theme(&creation_context.egui_ctx, theme_id);
+                    *egui_ctx.borrow_mut() = Some(creation_context.egui_ctx.clone());
+                    settings.theme = Some(theme_id);
                     Ok(Box::new(app::EasyNatsApp::new_demo(settings, theme_id)))
                 }),
             )
             .await
     }
 
+    pub fn language(&self) -> Option<String> {
+        self.runner
+            .app_mut::<app::EasyNatsApp>()
+            .map(|app| web_language_id(app.demo_language()).to_owned())
+    }
+
+    pub fn set_language(&self, language: &str) -> Result<(), JsValue> {
+        let language = web_language(language)?;
+        let mut app = self
+            .runner
+            .app_mut::<app::EasyNatsApp>()
+            .ok_or_else(|| JsValue::from_str("Interactive Demo is not running"))?;
+        app.apply_demo_language(language);
+        drop(app);
+        self.request_repaint();
+        Ok(())
+    }
+
+    pub fn theme(&self) -> Option<String> {
+        self.runner
+            .app_mut::<app::EasyNatsApp>()
+            .map(|app| web_theme_id(app.demo_theme()).to_owned())
+    }
+
+    pub fn set_theme(&self, theme_id: &str) -> Result<(), JsValue> {
+        let theme_id = web_theme(theme_id)?;
+        let mut app = self
+            .runner
+            .app_mut::<app::EasyNatsApp>()
+            .ok_or_else(|| JsValue::from_str("Interactive Demo is not running"))?;
+        app.apply_demo_theme(theme_id);
+        drop(app);
+
+        if let Some(ctx) = self.egui_ctx.borrow().as_ref() {
+            theme::apply_theme(ctx, theme_id);
+        }
+        self.request_repaint();
+        Ok(())
+    }
+
     pub fn panic_message(&self) -> Option<String> {
         self.runner.panic_summary().map(|summary| summary.message())
+    }
+
+    fn request_repaint(&self) {
+        if let Some(ctx) = self.egui_ctx.borrow().as_ref() {
+            ctx.request_repaint();
+        }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn web_language(value: &str) -> Result<i18n::Language, JsValue> {
+    match value {
+        "en" => Ok(i18n::Language::En),
+        "zh" => Ok(i18n::Language::Zh),
+        _ => Err(JsValue::from_str("Unsupported Easy NATS language")),
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn web_language_id(language: i18n::Language) -> &'static str {
+    match language {
+        i18n::Language::En => "en",
+        i18n::Language::Zh => "zh",
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn web_theme(value: &str) -> Result<theme::ThemeId, JsValue> {
+    match value {
+        "egui-dark" => Ok(theme::ThemeId::EguiDark),
+        "egui-light" => Ok(theme::ThemeId::EguiLight),
+        "catppuccin-latte" => Ok(theme::ThemeId::CatppuccinLatte),
+        "catppuccin-frappe" => Ok(theme::ThemeId::CatppuccinFrappe),
+        "catppuccin-macchiato" => Ok(theme::ThemeId::CatppuccinMacchiato),
+        "catppuccin-mocha" => Ok(theme::ThemeId::CatppuccinMocha),
+        _ => Err(JsValue::from_str("Unsupported Easy NATS theme")),
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+fn web_theme_id(theme_id: theme::ThemeId) -> &'static str {
+    match theme_id {
+        theme::ThemeId::EguiDark => "egui-dark",
+        theme::ThemeId::EguiLight => "egui-light",
+        theme::ThemeId::CatppuccinLatte => "catppuccin-latte",
+        theme::ThemeId::CatppuccinFrappe => "catppuccin-frappe",
+        theme::ThemeId::CatppuccinMacchiato => "catppuccin-macchiato",
+        theme::ThemeId::CatppuccinMocha => "catppuccin-mocha",
     }
 }
 

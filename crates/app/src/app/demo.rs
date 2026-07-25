@@ -5,6 +5,7 @@ use nats_backend::{
     AppConfig, AuthMethod, BackendCommand, ConnectionConfig, ConnectionStatusKind, MonitoringConfig,
 };
 
+use crate::i18n::{self, Language};
 use crate::log_layer::SharedLogBuffer;
 use crate::runtime::RuntimeMode;
 use crate::schema::MessageSchemaManager;
@@ -28,7 +29,7 @@ impl EasyNatsApp {
     pub fn new_demo(settings: AppSettings, theme_id: ThemeId) -> Self {
         let connection = ConnectionConfig {
             id: DEMO_CONNECTION_ID,
-            name: "Interactive Demo".into(),
+            name: "Demo".into(),
             urls: vec!["nats://demo.invalid:4222".into()],
             auth: AuthMethod::None,
             tls_enabled: false,
@@ -113,19 +114,38 @@ impl EasyNatsApp {
         });
 
         self.dock_state = DockState::new(vec![TabKind::Welcome]);
+        self.open_or_focus_metrics_tab(DEMO_CONNECTION_ID);
 
         let subscriber_window = self.dock_state.add_window(vec![subscriber]);
         self.dock_state
             .get_window_state_mut(subscriber_window)
             .expect("new demo window should have window state")
-            .set_position(eframe::egui::pos2(300.0, 280.0))
-            .set_size(eframe::egui::vec2(700.0, 560.0));
+            .set_position(eframe::egui::pos2(180.0, 110.0))
+            .set_size(eframe::egui::vec2(550.0, 520.0));
 
         let publisher_window = self.dock_state.add_window(vec![publisher]);
         self.dock_state
             .get_window_state_mut(publisher_window)
             .expect("new demo window should have window state")
-            .set_position(eframe::egui::pos2(820.0, 150.0))
-            .set_size(eframe::egui::vec2(680.0, 540.0));
+            .set_position(eframe::egui::pos2(790.0, 110.0))
+            .set_size(eframe::egui::vec2(360.0, 300.0));
+    }
+
+    pub(crate) fn demo_language(&self) -> Language {
+        self.settings.language
+    }
+
+    pub(crate) fn apply_demo_language(&mut self, language: Language) {
+        self.settings.language = language;
+        i18n::set_language(language);
+    }
+
+    pub(crate) fn demo_theme(&self) -> ThemeId {
+        self.theme_id
+    }
+
+    pub(crate) fn apply_demo_theme(&mut self, theme_id: ThemeId) {
+        self.settings.theme = Some(theme_id);
+        self.theme_id = theme_id;
     }
 }

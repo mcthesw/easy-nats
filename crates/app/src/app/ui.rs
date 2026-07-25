@@ -13,6 +13,11 @@ use super::{
 };
 
 impl eframe::App for EasyNatsApp {
+    #[cfg(target_arch = "wasm32")]
+    fn as_any_mut(&mut self) -> Option<&mut dyn std::any::Any> {
+        Some(self)
+    }
+
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.handle_events(ctx);
         if let Some(delay) = self.backend.next_wakeup() {
