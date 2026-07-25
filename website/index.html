@@ -1,33 +1,16 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="egui-light">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="Try the Easy NATS desktop experience directly in your browser."
+      content="Try the Easy NATS live WebAssembly demo and find installation options for Windows, macOS, and Linux."
     />
-    <title>Easy NATS Interactive Demo</title>
+    <title>Easy NATS</title>
   </head>
   <body>
-    <main>
-      <header>
-        <a href="https://github.com/mcthesw/easy-nats">Easy NATS</a>
-        <span class="demo-label">
-          <span class="demo-label-long">Interactive Demo · 交互体验</span>
-          <span class="demo-label-short">体验 Demo</span>
-        </span>
-      </header>
-      <section class="demo-frame" aria-label="Easy NATS interactive demo">
-        <canvas id="easy-nats-canvas"></canvas>
-        <img
-          id="demo-preview"
-          src="/demo-preview.png"
-          alt="Easy NATS interactive demo preview / Easy NATS 交互体验预览"
-        />
-        <p id="demo-status">Loading Easy NATS… / 正在加载 Easy NATS…</p>
-      </section>
-    </main>
+    <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>
