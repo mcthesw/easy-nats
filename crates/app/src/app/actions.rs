@@ -626,7 +626,7 @@ fn monitoring_from_editor(editor: &super::editors::ConnectionEditor) -> Option<M
 }
 
 #[derive(Clone, Copy)]
-enum PubSubTabKind {
+pub(super) enum PubSubTabKind {
     Publisher,
     Subscriber,
 }
@@ -646,7 +646,11 @@ impl EasyNatsApp {
         self.open_tab(tab);
     }
 
-    fn new_pubsub_tab(&mut self, connection_id: u64, tab_kind: PubSubTabKind) -> TabKind {
+    pub(super) fn new_pubsub_tab(
+        &mut self,
+        connection_id: u64,
+        tab_kind: PubSubTabKind,
+    ) -> TabKind {
         let connection_name = self.conn_name(connection_id);
         let (display_id, id_return) = self.tab_id_alloc.allocate();
         let guard = TabGuard::new(CancellationToken::new(), display_id, id_return);

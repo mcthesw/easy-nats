@@ -55,11 +55,11 @@ pub fn obj_store_bucket_ui(
         .default_size(300.0)
         .size_range(200.0..=f32::INFINITY)
         .show(ui, |ui| {
-            render_object_list(ui, connection_id, bucket_name, state, backend);
+            render_object_list(ui, connection_id, bucket_name, state, backend, actions);
         });
 
     egui::CentralPanel::default().show(ui, |ui| {
-        render_detail_panel(ui, connection_id, bucket_name, state, backend);
+        render_detail_panel(ui, connection_id, bucket_name, state, backend, actions);
     });
 }
 
@@ -69,6 +69,7 @@ fn render_object_list(
     bucket_name: &str,
     state: &mut ObjectStoreBucketState,
     backend: &BackendHandle,
+    actions: &mut Vec<TabAction>,
 ) {
     ui.horizontal(|ui| {
         if ui
@@ -86,18 +87,10 @@ fn render_object_list(
             .button("⬆")
             .on_hover_text(t("obj_store.upload"))
             .clicked()
-            && let Some(path) = rfd::FileDialog::new().pick_file()
-            && let Ok(data) = std::fs::read(&path)
         {
-            let name = path
-                .file_name()
-                .map(|n| n.to_string_lossy().to_string())
-                .unwrap_or_else(|| "unnamed".to_string());
-            backend.send(BackendCommand::UploadObject {
+            actions.push(TabAction::UploadObject {
                 connection_id,
-                bucket: bucket_name.to_string(),
-                name,
-                data,
+                bucket_name: bucket_name.to_string(),
             });
         }
     });
@@ -138,6 +131,7 @@ fn render_detail_panel(
     bucket_name: &str,
     state: &mut ObjectStoreBucketState,
     backend: &BackendHandle,
+    actions: &mut Vec<TabAction>,
 ) {
     let Some(obj_name) = &state.selected_object else {
         ui.centered_and_justified(|ui| {
@@ -158,14 +152,11 @@ fn render_detail_panel(
 
     ui.add_space(8.0);
     ui.horizontal(|ui| {
-        if ui.button(t("obj_store.download")).clicked()
-            && let Some(path) = rfd::FileDialog::new().set_file_name(&obj_name).save_file()
-        {
-            backend.send(BackendCommand::DownloadObject {
+        if ui.button(t("obj_store.download")).clicked() {
+            actions.push(TabAction::DownloadObject {
                 connection_id,
-                bucket: bucket_name.to_string(),
-                name: obj_name.clone(),
-                file_path: path,
+                bucket_name: bucket_name.to_string(),
+                object_name: obj_name.clone(),
             });
         }
 

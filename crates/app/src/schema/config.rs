@@ -1,5 +1,10 @@
-use std::path::{Path, PathBuf};
+#![cfg_attr(target_arch = "wasm32", allow(dead_code))]
 
+use std::path::Path;
+#[cfg(not(target_arch = "wasm32"))]
+use std::path::PathBuf;
+
+#[cfg(not(target_arch = "wasm32"))]
 use nats_backend::ProjectPaths;
 use serde::{Deserialize, Serialize};
 
@@ -22,6 +27,7 @@ pub struct MessageSchemaConfig {
 }
 
 impl MessageSchemaConfig {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load() -> Self {
         let path = Self::path();
         if path.exists() {
@@ -44,6 +50,12 @@ impl MessageSchemaConfig {
         Self::default()
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub fn load() -> Self {
+        Self::default()
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn save(&self) {
         let path = Self::path();
         if let Some(parent) = path.parent()
@@ -64,6 +76,10 @@ impl MessageSchemaConfig {
         }
     }
 
+    #[cfg(target_arch = "wasm32")]
+    pub fn save(&self) {}
+
+    #[cfg(not(target_arch = "wasm32"))]
     fn path() -> PathBuf {
         ProjectPaths::resolve().config_file("message-schemas.json")
     }

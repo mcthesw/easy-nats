@@ -15,6 +15,9 @@ use super::{
 impl eframe::App for EasyNatsApp {
     fn logic(&mut self, ctx: &egui::Context, _frame: &mut eframe::Frame) {
         self.handle_events(ctx);
+        if let Some(delay) = self.backend.next_wakeup() {
+            ctx.request_repaint_after(delay);
+        }
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
@@ -85,6 +88,7 @@ impl eframe::App for EasyNatsApp {
                     log_buffer: &self.log_buffer,
                     schema_manager: &self.schema_manager,
                     connections: &connections,
+                    runtime_mode: self.runtime_mode,
                 },
             );
 
@@ -150,6 +154,19 @@ impl eframe::App for EasyNatsApp {
                     bucket_name,
                 } => {
                     self.obj_store_bucket_delete_confirm = Some((connection_id, bucket_name));
+                }
+                TabAction::UploadObject {
+                    connection_id,
+                    bucket_name,
+                } => {
+                    self.request_object_upload(connection_id, bucket_name);
+                }
+                TabAction::DownloadObject {
+                    connection_id,
+                    bucket_name,
+                    object_name,
+                } => {
+                    self.request_object_download(connection_id, bucket_name, object_name);
                 }
                 TabAction::CloseOtherTabs { keep_tab_id } => {
                     self.close_other_tabs(keep_tab_id);

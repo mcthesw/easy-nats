@@ -1,4 +1,5 @@
 //! In-memory tracing layer that captures log events into a ring buffer for the UI.
+#![cfg_attr(target_arch = "wasm32", allow(dead_code))]
 
 use std::collections::VecDeque;
 use std::sync::{Arc, Mutex};
