@@ -1,125 +1,633 @@
 :root {
-  color: #16181b;
-  background: #f5f3ee;
+  color-scheme: light;
+  --page: #f4f2ed;
+  --surface: #faf9f6;
+  --text: #202226;
+  --muted: #686c73;
+  --line: #d4d0c8;
+  --guide: #c7c2b9;
+  --accent: #1687c5;
+  --code: #ebe8e1;
+  --shadow: rgb(24 27 31 / 14%);
+  color: var(--text);
+  background: var(--page);
   font-family:
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
     sans-serif;
   font-synthesis: none;
 }
 
+:root[data-theme="egui-dark"] {
+  color-scheme: dark;
+  --page: #1b1b1b;
+  --surface: #242424;
+  --text: #e8e8e8;
+  --muted: #b7b7b7;
+  --line: #454545;
+  --guide: #3a3a3a;
+  --accent: #4aa8dc;
+  --code: #151515;
+  --shadow: rgb(0 0 0 / 38%);
+}
+
+:root[data-theme="catppuccin-latte"] {
+  color-scheme: light;
+  --page: #eff1f5;
+  --surface: #e6e9ef;
+  --text: #4c4f69;
+  --muted: #6c6f85;
+  --line: #bcc0cc;
+  --guide: #ccd0da;
+  --accent: #1e66f5;
+  --code: #dce0e8;
+  --shadow: rgb(76 79 105 / 18%);
+}
+
+:root[data-theme="catppuccin-frappe"] {
+  color-scheme: dark;
+  --page: #303446;
+  --surface: #292c3c;
+  --text: #c6d0f5;
+  --muted: #a5adce;
+  --line: #51576d;
+  --guide: #414559;
+  --accent: #8caaee;
+  --code: #232634;
+  --shadow: rgb(0 0 0 / 34%);
+}
+
+:root[data-theme="catppuccin-macchiato"] {
+  color-scheme: dark;
+  --page: #24273a;
+  --surface: #1e2030;
+  --text: #cad3f5;
+  --muted: #a5adcb;
+  --line: #494d64;
+  --guide: #3d4157;
+  --accent: #8aadf4;
+  --code: #181926;
+  --shadow: rgb(0 0 0 / 36%);
+}
+
+:root[data-theme="catppuccin-mocha"] {
+  color-scheme: dark;
+  --page: #1e1e2e;
+  --surface: #181825;
+  --text: #cdd6f4;
+  --muted: #a6adc8;
+  --line: #45475a;
+  --guide: #313244;
+  --accent: #89b4fa;
+  --code: #11111b;
+  --shadow: rgb(0 0 0 / 40%);
+}
+
 * {
   box-sizing: border-box;
 }
 
-html,
-body {
+html {
   min-width: 320px;
   min-height: 100%;
-  margin: 0;
+  scroll-behavior: smooth;
 }
 
 body {
-  padding: 20px;
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  color: var(--text);
+  background: var(--page);
 }
 
-main {
-  width: min(1480px, 100%);
-  margin: 0 auto;
+button {
+  font: inherit;
 }
 
-header {
+a {
+  color: inherit;
+  text-underline-offset: 0.2em;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.site-header {
+  border-bottom: 1px dotted var(--line);
+}
+
+.header-inner,
+main,
+.site-footer {
+  width: min(1440px, calc(100% - 64px));
+  margin-inline: auto;
+  border-inline: 1px dotted var(--guide);
+}
+
+.header-inner {
   display: flex;
+  min-height: 64px;
+  padding-inline: 24px;
   align-items: center;
   justify-content: space-between;
-  min-height: 44px;
-  gap: 16px;
-  font-size: 14px;
+  gap: 24px;
 }
 
-header a {
-  color: inherit;
-  font-size: 18px;
+.brand {
+  font-size: 16px;
   font-weight: 700;
+  letter-spacing: -0.01em;
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-size: 13px;
+}
+
+.header-descriptor {
+  color: var(--muted);
+}
+
+.github-link {
+  padding-left: 20px;
+  border-left: 1px dotted var(--line);
+  color: var(--muted);
   text-decoration: none;
 }
 
-header span {
-  color: #60666d;
+.github-link:hover,
+.github-link:focus-visible {
+  color: var(--text);
 }
 
-.demo-label-short {
-  display: none;
+main {
+  padding: 68px 48px 0;
 }
 
-.demo-frame {
+.demo-section {
+  scroll-margin-top: 16px;
+}
+
+.demo-controls {
   position: relative;
-  height: min(820px, calc(100vh - 84px));
-  min-height: 600px;
-  overflow: hidden;
-  border: 1px solid #d8d5ce;
-  background: #1b1d23;
+  display: flex;
+  min-height: 36px;
+  margin-bottom: 12px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
 }
 
-#easy-nats-canvas {
+.preference-menu {
+  position: relative;
+}
+
+.preference-trigger {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  padding: 7px;
+  place-items: center;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--surface) 78%, transparent);
+  cursor: pointer;
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    background 120ms ease;
+}
+
+.preference-trigger:hover,
+.preference-trigger[aria-expanded="true"] {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--accent) 62%, var(--line));
+  background: var(--surface);
+}
+
+.preference-trigger svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.6;
+}
+
+.preference-trigger svg circle:not(:first-child) {
+  fill: currentColor;
+  stroke: none;
+}
+
+.preference-popover {
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 8px);
+  right: 0;
+  width: max-content;
+  min-width: 180px;
+  padding: 5px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  box-shadow: 0 12px 32px var(--shadow);
+  backdrop-filter: blur(12px);
+}
+
+.preference-popover button {
+  display: flex;
+  width: 100%;
+  padding: 8px 9px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  color: var(--muted);
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.preference-popover button:hover,
+.preference-popover button:focus-visible,
+.preference-popover button.selected {
+  color: var(--text);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+
+.preference-popover button svg {
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: var(--accent);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+}
+
+.section-heading {
+  margin-bottom: 22px;
+}
+
+.section-heading h2 {
+  margin: 0;
+  font-size: clamp(28px, 3vw, 40px);
+  font-weight: 600;
+  letter-spacing: -0.035em;
+}
+
+.demo-window {
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 20px 48px var(--shadow);
+}
+
+.window-bar {
+  position: relative;
+  display: grid;
+  height: 42px;
+  place-items: center;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface);
+}
+
+.traffic-lights {
+  position: absolute;
+  left: 15px;
+  display: flex;
+  gap: 7px;
+}
+
+.traffic-light {
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+}
+
+.traffic-light-close {
+  background: #ff5f57;
+}
+
+.traffic-light-minimize {
+  background: #febc2e;
+}
+
+.traffic-light-maximize {
+  background: #28c840;
+}
+
+.window-title {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.demo-surface {
+  position: relative;
+  aspect-ratio: 16 / 9;
+  min-height: 0;
+  background: #17191d;
+}
+
+.demo-canvas {
+  display: block;
   width: 100%;
   height: 100%;
 }
 
-#demo-preview {
+.demo-preview,
+.preview-caption {
   display: none;
 }
 
-#demo-status {
+.demo-status {
   position: absolute;
   inset: 0;
   display: grid;
   place-items: center;
   margin: 0;
-  color: #d7d9de;
-  font-size: 14px;
+  padding: 24px;
+  color: #d9dce2;
+  background: #17191d;
+  font-size: 13px;
+  text-align: center;
 }
 
-@media (max-width: 720px) {
-  body {
-    padding: 12px;
+.install-section {
+  padding-top: 96px;
+  scroll-margin-top: 16px;
+}
+
+.install-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  border-block: 1px dotted var(--line);
+}
+
+.install-platform {
+  min-width: 0;
+  padding: 28px 28px 32px;
+}
+
+.install-platform + .install-platform {
+  border-left: 1px dotted var(--line);
+}
+
+.install-platform h3 {
+  margin: 0 0 24px;
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.install-platform h4 {
+  margin: 22px 0 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.install-platform h4:first-of-type {
+  margin-top: 0;
+}
+
+.command-block {
+  position: relative;
+}
+
+.command-block button {
+  position: absolute;
+  z-index: 1;
+  top: 7px;
+  right: 7px;
+  display: grid;
+  width: 28px;
+  height: 28px;
+  padding: 6px;
+  place-items: center;
+  color: var(--muted);
+  border: 1px solid color-mix(in srgb, var(--line) 74%, transparent);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--surface) 84%, transparent);
+  opacity: 0.72;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+  transition:
+    color 120ms ease,
+    border-color 120ms ease,
+    opacity 120ms ease;
+}
+
+.command-block button:hover,
+.command-block button:focus-visible {
+  color: var(--text);
+  border-color: var(--accent);
+  opacity: 1;
+}
+
+.command-block button svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.command-block pre {
+  max-width: 100%;
+  margin: 0;
+  padding: 14px 48px 14px 14px;
+  overflow: hidden;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--code);
+  font: 11px/1.65 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono",
+    monospace;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.download-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.download-links a:hover,
+.download-links a:focus-visible {
+  color: var(--accent);
+}
+
+.linux-download-links {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.site-footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  margin-top: 88px;
+  padding: 28px 48px 36px;
+  color: var(--muted);
+  border-top: 1px dotted var(--line);
+  font-size: 12px;
+}
+
+.site-footer a {
+  text-decoration: none;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+
+@media (max-width: 1100px) {
+  main {
+    padding-inline: 24px;
   }
 
-  header {
-    position: relative;
-    min-height: 40px;
+  .install-platform {
+    padding-inline: 18px;
+  }
+}
+
+@media (max-width: 899px) {
+  .header-inner,
+  main,
+  .site-footer {
+    width: min(100% - 24px, 720px);
   }
 
-  .demo-label {
-    position: absolute;
-    right: 0;
+  .header-inner {
+    min-height: 56px;
+    padding-inline: 12px;
   }
 
-  .demo-label-long {
+  .github-link {
+    padding-left: 12px;
+  }
+
+  main {
+    padding: 42px 16px 0;
+  }
+
+  .demo-controls {
+    min-height: 34px;
+  }
+
+  .demo-surface {
+    aspect-ratio: auto;
+    background: var(--surface);
+  }
+
+  .demo-canvas {
     display: none;
   }
 
-  .demo-label-short {
-    display: inline;
-    font-size: 12px;
-  }
-
-  .demo-frame {
-    height: auto;
-    min-height: 0;
-  }
-
-  #easy-nats-canvas {
-    display: none;
-  }
-
-  #demo-preview {
-    position: static;
+  .demo-preview {
     display: block;
     width: 100%;
     height: auto;
   }
 
-  #demo-status {
+  .preview-caption {
+    display: block;
+    margin: 12px 2px 0;
+    color: var(--muted);
+    font-size: 12px;
+  }
+
+  .install-section {
+    padding-top: 72px;
+  }
+
+  .install-grid {
+    display: block;
+  }
+
+  .install-platform + .install-platform {
+    border-top: 1px dotted var(--line);
+    border-left: 0;
+  }
+
+  .site-footer {
+    margin-top: 64px;
+    padding: 24px 16px 28px;
+  }
+}
+
+@media (max-width: 620px) {
+  .header-meta {
+    gap: 10px;
+  }
+
+  .header-descriptor {
+    font-size: 11px;
+    text-align: right;
+  }
+
+  .github-link {
     display: none;
+  }
+
+  .window-bar {
+    height: 36px;
+  }
+
+  .traffic-lights {
+    left: 12px;
+  }
+
+  .traffic-light {
+    width: 9px;
+    height: 9px;
+  }
+
+  .install-platform {
+    padding-inline: 4px;
+  }
+
+  .command-block pre {
+    font-size: 10px;
+  }
+
+  .site-footer {
+    display: block;
+  }
+
+  .site-footer > span {
+    display: block;
+  }
+
+  .site-footer a {
+    display: inline-block;
+    margin-top: 8px;
   }
 }
