@@ -1,0 +1,17 @@
+{
+  "name": "easy-nats-website",
+  "private": true,
+  "version": "0.0.0",
+  "packageManager": "pnpm@11.1.2",
+  "type": "module",
+  "scripts": {
+    "build:wasm": "wasm-pack build ../crates/app --target web --out-dir ../../website/src/generated --out-name easy_nats --no-pack",
+    "dev": "pnpm build:wasm && vite",
+    "build": "pnpm build:wasm && vite build",
+    "preview": "vite preview"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vite": "^7.1.0"
+  }
+}
