@@ -1,14 +1,19 @@
+#[cfg(feature = "native")]
 use tokio::sync::mpsc;
 
+#[cfg(feature = "native")]
 use crate::command::BackendCommand;
+#[cfg(feature = "native")]
 use crate::event::BackendEvent;
 
 /// Handle to communicate with the async backend from the UI thread.
+#[cfg(feature = "native")]
 pub struct BackendHandle {
     cmd_tx: mpsc::UnboundedSender<BackendCommand>,
     evt_rx: mpsc::Receiver<BackendEvent>,
 }
 
+#[cfg(feature = "native")]
 impl BackendHandle {
     /// Spawn the Tokio runtime on a background thread and return a handle.
     ///
@@ -64,4 +69,17 @@ impl BackendHandle {
         }
         events
     }
+
+    /// Return the delay before the UI should poll this backend again.
+    ///
+    /// The native backend wakes the UI through its normal event flow and does
+    /// not require a scheduled poll.
+    pub fn next_wakeup(&self) -> Option<std::time::Duration> {
+        None
+    }
 }
+
+#[cfg(all(feature = "demo", not(feature = "native")))]
+mod demo;
+#[cfg(all(feature = "demo", not(feature = "native")))]
+pub use demo::BackendHandle;

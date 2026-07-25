@@ -6,7 +6,9 @@ pub mod connection;
 pub mod event;
 pub mod models;
 pub mod monitoring;
+#[cfg(feature = "native")]
 pub mod paths;
+#[cfg(feature = "native")]
 pub mod worker;
 
 pub use bridge::BackendHandle;
@@ -33,4 +35,5 @@ pub use monitoring::{
     ConnzMetrics, JetStreamMetrics, MetricsHealth, MetricsSection, MetricsSectionError,
     MetricsSnapshot, VarzMetrics,
 };
+#[cfg(feature = "native")]
 pub use paths::{MigrationOutcome, ProjectPaths, migrate_legacy_file, migrate_legacy_on_startup};

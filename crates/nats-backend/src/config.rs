@@ -1,8 +1,10 @@
+#[cfg(feature = "native")]
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
 
 use crate::connection::ConnectionConfig;
+#[cfg(feature = "native")]
 use crate::paths::ProjectPaths;
 
 /// Persisted application configuration (connection profiles + settings).
@@ -15,6 +17,7 @@ pub struct AppConfig {
 
 impl AppConfig {
     /// Load config from the platform config directory.
+    #[cfg(feature = "native")]
     pub fn load() -> Self {
         let path = Self::config_path();
         if path.exists() {
@@ -37,6 +40,7 @@ impl AppConfig {
     }
 
     /// Save config to the platform config directory.
+    #[cfg(feature = "native")]
     pub fn save(&self) {
         let path = Self::config_path();
         if let Some(parent) = path.parent()
@@ -64,12 +68,17 @@ impl AppConfig {
         id
     }
 
+    #[cfg(feature = "native")]
     fn config_path() -> PathBuf {
         ProjectPaths::resolve().config_file("config.json")
     }
+
+    /// Demo builds deliberately keep connection data in memory.
+    #[cfg(all(feature = "demo", not(feature = "native")))]
+    pub fn save(&self) {}
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "native"))]
 mod tests {
     use super::*;
     use crate::connection::{AuthMethod, MonitoringConfig};

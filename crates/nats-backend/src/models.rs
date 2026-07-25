@@ -261,6 +261,7 @@ impl StorageKind {
         }
     }
 
+    #[cfg(feature = "native")]
     fn into_async_nats(self) -> async_nats::jetstream::stream::StorageType {
         match self {
             Self::File => async_nats::jetstream::stream::StorageType::File,
@@ -270,6 +271,7 @@ impl StorageKind {
 }
 
 impl StreamRetentionKind {
+    #[cfg(feature = "native")]
     fn into_async_nats(self) -> async_nats::jetstream::stream::RetentionPolicy {
         match self {
             Self::Limits => async_nats::jetstream::stream::RetentionPolicy::Limits,
@@ -289,6 +291,7 @@ impl ConsumerDeliverPolicyKind {
         }
     }
 
+    #[cfg(feature = "native")]
     fn from_async_nats(policy: async_nats::jetstream::consumer::DeliverPolicy) -> Self {
         match policy {
             async_nats::jetstream::consumer::DeliverPolicy::All => Self::All,
@@ -320,6 +323,7 @@ impl ConsumerDeliverPolicyKind {
         }
     }
 
+    #[cfg(feature = "native")]
     fn into_async_nats(self) -> Result<async_nats::jetstream::consumer::DeliverPolicy, String> {
         match self {
             Self::All => Ok(async_nats::jetstream::consumer::DeliverPolicy::All),
@@ -352,6 +356,7 @@ impl ConsumerAckPolicyKind {
         }
     }
 
+    #[cfg(feature = "native")]
     fn into_async_nats(self) -> async_nats::jetstream::consumer::AckPolicy {
         match self {
             Self::Explicit => async_nats::jetstream::consumer::AckPolicy::Explicit,
@@ -362,6 +367,7 @@ impl ConsumerAckPolicyKind {
 }
 
 impl StreamConfigInput {
+    #[cfg(feature = "native")]
     pub fn into_async_nats(self) -> async_nats::jetstream::stream::Config {
         let mut config = async_nats::jetstream::stream::Config {
             name: self.name,
@@ -388,6 +394,7 @@ impl StreamConfigInput {
 }
 
 impl ConsumerConfigInput {
+    #[cfg(feature = "native")]
     pub fn into_async_nats_pull(
         self,
     ) -> Result<async_nats::jetstream::consumer::pull::Config, String> {
@@ -412,6 +419,7 @@ impl ConsumerConfigInput {
 }
 
 impl KvBucketConfigInput {
+    #[cfg(feature = "native")]
     pub fn into_async_nats(self) -> async_nats::jetstream::kv::Config {
         let mut config = async_nats::jetstream::kv::Config {
             bucket: self.bucket,
@@ -437,6 +445,7 @@ impl KvBucketConfigInput {
 }
 
 impl ObjectStoreBucketConfigInput {
+    #[cfg(feature = "native")]
     pub fn into_async_nats(self) -> async_nats::jetstream::object_store::Config {
         let mut config = async_nats::jetstream::object_store::Config {
             bucket: self.bucket,
@@ -455,6 +464,7 @@ impl ObjectStoreBucketConfigInput {
 }
 
 impl KvBucketInfo {
+    #[cfg(feature = "native")]
     pub fn from_status(status: &async_nats::jetstream::kv::bucket::Status) -> Self {
         Self {
             bucket: status.bucket().to_string(),
@@ -473,6 +483,7 @@ impl KvBucketInfo {
 }
 
 impl KvEntryInfo {
+    #[cfg(feature = "native")]
     pub fn from_entry(entry: &async_nats::jetstream::kv::Entry) -> Self {
         Self {
             bucket: entry.bucket.clone(),
@@ -499,6 +510,7 @@ impl KvEntryInfo {
 }
 
 impl KvHistoryItem {
+    #[cfg(feature = "native")]
     pub fn from_entry(entry: &async_nats::jetstream::kv::Entry) -> Self {
         Self {
             key: entry.key.clone(),
@@ -512,6 +524,7 @@ impl KvHistoryItem {
 }
 
 impl ObjectStoreBucketInfo {
+    #[cfg(feature = "native")]
     pub fn from_stream_info(bucket: String, info: &async_nats::jetstream::stream::Info) -> Self {
         Self {
             bucket,
@@ -526,6 +539,7 @@ impl ObjectStoreBucketInfo {
 }
 
 impl ObjectStoreObjectInfo {
+    #[cfg(feature = "native")]
     pub fn from_info(info: &async_nats::jetstream::object_store::ObjectInfo) -> Self {
         Self {
             bucket: info.bucket.clone(),
@@ -540,6 +554,7 @@ impl ObjectStoreObjectInfo {
 }
 
 impl ServerInfoSnapshot {
+    #[cfg(feature = "native")]
     pub fn from_info(info: &async_nats::ServerInfo) -> Self {
         Self {
             server_id: info.server_id.clone(),
@@ -559,6 +574,7 @@ impl ServerInfoSnapshot {
 }
 
 impl JetStreamAccountLimitsSnapshot {
+    #[cfg(feature = "native")]
     pub fn from_limits(limits: async_nats::jetstream::account::Limits) -> Self {
         Self {
             max_memory: limits.max_memory,
@@ -574,6 +590,7 @@ impl JetStreamAccountLimitsSnapshot {
 }
 
 impl JetStreamAccountInfoSnapshot {
+    #[cfg(feature = "native")]
     pub fn from_account(account: async_nats::jetstream::account::Account) -> Self {
         Self {
             memory: account.memory,
@@ -589,6 +606,7 @@ impl JetStreamAccountInfoSnapshot {
 }
 
 impl StreamInfo {
+    #[cfg(feature = "native")]
     pub fn from_info(info: &async_nats::jetstream::stream::Info) -> Self {
         Self {
             name: info.config.name.clone(),
@@ -605,6 +623,7 @@ impl StreamInfo {
 }
 
 impl StreamMessageInfo {
+    #[cfg(feature = "native")]
     pub fn from_stream_message(msg: &async_nats::jetstream::message::StreamMessage) -> Self {
         let mut headers = Vec::new();
         for (name, values) in msg.headers.iter() {
@@ -626,6 +645,7 @@ impl StreamMessageInfo {
 }
 
 impl ConsumerInfo {
+    #[cfg(feature = "native")]
     pub fn from_info(info: &async_nats::jetstream::consumer::Info) -> Self {
         Self {
             name: info.name.clone(),
@@ -651,5 +671,5 @@ impl ConsumerInfo {
     }
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "native"))]
 mod tests;
