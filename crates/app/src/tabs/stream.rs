@@ -150,7 +150,7 @@ fn render_message_controls(
         ] {
             if ui.small_button(t(label_key)).clicked() {
                 state.start_time =
-                    system_time_to_rfc3339(SystemTime::now() - Duration::from_secs(secs));
+                    system_time_to_rfc3339(current_system_time() - Duration::from_secs(secs));
             }
         }
         if !state.start_time.is_empty() && ui.small_button(t("stream.time_clear")).clicked() {
@@ -189,6 +189,20 @@ fn render_message_controls(
 
     if state.fetching {
         ui.spinner();
+    }
+}
+
+fn current_system_time() -> SystemTime {
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        SystemTime::now()
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        let since_epoch = web_time::SystemTime::now()
+            .duration_since(web_time::UNIX_EPOCH)
+            .unwrap_or_default();
+        SystemTime::UNIX_EPOCH + since_epoch
     }
 }
 

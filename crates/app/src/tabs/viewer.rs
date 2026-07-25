@@ -211,7 +211,13 @@ fn render_tab_body(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut T
             );
         }
         TabKind::Settings => {
-            settings_ui(ui, viewer.settings, viewer.theme_id, viewer.actions);
+            settings_ui(
+                ui,
+                viewer.settings,
+                viewer.theme_id,
+                viewer.actions,
+                viewer.runtime_mode.supports_local_files(),
+            );
         }
         TabKind::LogViewer => {
             log_viewer_ui(ui, viewer.log_buffer);

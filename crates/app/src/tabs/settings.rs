@@ -11,6 +11,7 @@ pub fn settings_ui(
     settings: &mut AppSettings,
     theme_id: &mut ThemeId,
     actions: &mut Vec<TabAction>,
+    supports_local_files: bool,
 ) {
     ui.heading(t("settings.title"));
     ui.separator();
@@ -85,14 +86,16 @@ pub fn settings_ui(
         settings.save();
     }
 
-    ui.add_space(12.0);
-    ui.separator();
-    ui.label(egui::RichText::new(t("settings.section_message_schemas")).strong());
-    ui.add_space(4.0);
-    ui.horizontal(|ui| {
-        ui.label(t("settings.message_schemas_hint"));
-        if ui.button(t("settings.open_message_schemas")).clicked() {
-            actions.push(TabAction::OpenMessageSchemas);
-        }
-    });
+    if supports_local_files {
+        ui.add_space(12.0);
+        ui.separator();
+        ui.label(egui::RichText::new(t("settings.section_message_schemas")).strong());
+        ui.add_space(4.0);
+        ui.horizontal(|ui| {
+            ui.label(t("settings.message_schemas_hint"));
+            if ui.button(t("settings.open_message_schemas")).clicked() {
+                actions.push(TabAction::OpenMessageSchemas);
+            }
+        });
+    }
 }

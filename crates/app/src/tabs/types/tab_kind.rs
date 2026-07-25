@@ -79,7 +79,7 @@ pub enum TabKind {
 }
 
 impl TabKind {
-    pub fn title(&self) -> String {
+    pub fn title(&self, show_connection: bool) -> String {
         match self {
             TabKind::Welcome => t("common.tab_welcome").to_string(),
             TabKind::Publisher {
@@ -87,57 +87,61 @@ impl TabKind {
                 guard,
                 ..
             } => {
-                if let Some(id) = guard.display_id() {
-                    format!(
-                        "{} #{} ({})",
-                        t("common.tab_publisher"),
-                        id,
-                        connection_name
-                    )
+                let title = if let Some(id) = guard.display_id() {
+                    format!("{} #{}", t("common.tab_publisher"), id)
                 } else {
-                    format!("{} ({})", t("common.tab_publisher"), connection_name)
-                }
+                    t("common.tab_publisher").to_string()
+                };
+                title_with_connection(title, connection_name, show_connection)
             }
             TabKind::Subscriber {
                 connection_name,
                 guard,
                 ..
             } => {
-                if let Some(id) = guard.display_id() {
-                    format!(
-                        "{} #{} ({})",
-                        t("common.tab_subscriber"),
-                        id,
-                        connection_name
-                    )
+                let title = if let Some(id) = guard.display_id() {
+                    format!("{} #{}", t("common.tab_subscriber"), id)
                 } else {
-                    format!("{} ({})", t("common.tab_subscriber"), connection_name)
-                }
+                    t("common.tab_subscriber").to_string()
+                };
+                title_with_connection(title, connection_name, show_connection)
             }
             TabKind::Stream {
                 connection_name,
                 stream_name,
                 ..
-            } => format!("{stream_name} ({connection_name})"),
+            } => title_with_connection(stream_name.clone(), connection_name, show_connection),
             TabKind::KvBucket {
                 connection_name,
                 bucket_name,
                 ..
-            } => format!("{bucket_name} ({connection_name})"),
+            } => title_with_connection(bucket_name.clone(), connection_name, show_connection),
             TabKind::ObjectStoreBucket {
                 connection_name,
                 bucket_name,
                 ..
-            } => format!("{bucket_name} ({connection_name})"),
+            } => title_with_connection(bucket_name.clone(), connection_name, show_connection),
             TabKind::ServerInfo {
                 connection_name, ..
-            } => format!("{} ({})", t("server_info.title"), connection_name),
+            } => title_with_connection(
+                t("server_info.title").to_string(),
+                connection_name,
+                show_connection,
+            ),
             TabKind::Metrics {
                 connection_name, ..
-            } => format!("{} ({})", t("common.tab_metrics"), connection_name),
+            } => title_with_connection(
+                t("common.tab_metrics").to_string(),
+                connection_name,
+                show_connection,
+            ),
             TabKind::Clients {
                 connection_name, ..
-            } => format!("{} ({})", t("common.tab_clients"), connection_name),
+            } => title_with_connection(
+                t("common.tab_clients").to_string(),
+                connection_name,
+                show_connection,
+            ),
             TabKind::SearchWorkspace { .. } => t("common.tab_search_workspace").to_string(),
             TabKind::MessageSchemas { .. } => t("common.tab_message_schemas").to_string(),
             TabKind::Settings => t("settings.title").to_string(),
@@ -223,13 +227,23 @@ pub struct AppTabViewer<'a> {
     pub log_buffer: &'a crate::log_layer::SharedLogBuffer,
     pub schema_manager: &'a MessageSchemaManager,
     pub connections: &'a [(u64, String)],
+    pub runtime_mode: crate::runtime::RuntimeMode,
+}
+
+fn title_with_connection(title: String, connection_name: &str, show_connection: bool) -> String {
+    if show_connection {
+        format!("{title} ({connection_name})")
+    } else {
+        title
+    }
 }
 
 impl TabViewer for AppTabViewer<'_> {
     type Tab = TabKind;
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
-        tab.title().into()
+        tab.title(self.runtime_mode.shows_connection_in_tab_title())
+            .into()
     }
 
     fn id(&mut self, tab: &mut Self::Tab) -> egui::Id {

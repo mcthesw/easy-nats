@@ -28,7 +28,7 @@ impl EasyNatsApp {
         let updates = requests
             .into_iter()
             .map(|request| {
-                let started = std::time::Instant::now();
+                let started = web_time::Instant::now();
                 let (results, stats) = self.build_search_workspace_results(
                     &request.key,
                     &request.selected_sources,
@@ -643,8 +643,8 @@ mod tests {
     /// Polls the backend event channel for a short period and returns true if
     /// a `GetKvEntry` error event is received.
     fn backend_emitted_get_kv_entry_error(app: &mut EasyNatsApp) -> bool {
-        let deadline = std::time::Instant::now() + Duration::from_millis(500);
-        while std::time::Instant::now() < deadline {
+        let deadline = web_time::Instant::now() + Duration::from_millis(500);
+        while web_time::Instant::now() < deadline {
             if let Some(event) = app.backend.try_recv()
                 && let BackendEvent::Error { operation, .. } = event
                 && operation == BackendOperation::GetKvEntry

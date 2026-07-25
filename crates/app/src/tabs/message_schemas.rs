@@ -54,14 +54,17 @@ fn render_source_editor(
                 .desired_width(280.0),
         );
         if ui.button(t("message_schema.browse")).clicked() {
-            let picked = match state.source_kind {
-                SchemaSourceKind::Protobuf => rfd::FileDialog::new().pick_folder(),
-                SchemaSourceKind::JsonSchema => rfd::FileDialog::new()
-                    .add_filter("JSON Schema", &["json"])
-                    .pick_file(),
-            };
-            if let Some(path) = picked {
-                state.source_path = path.to_string_lossy().to_string();
+            #[cfg(not(target_arch = "wasm32"))]
+            {
+                let picked = match state.source_kind {
+                    SchemaSourceKind::Protobuf => rfd::FileDialog::new().pick_folder(),
+                    SchemaSourceKind::JsonSchema => rfd::FileDialog::new()
+                        .add_filter("JSON Schema", &["json"])
+                        .pick_file(),
+                };
+                if let Some(path) = picked {
+                    state.source_path = path.to_string_lossy().to_string();
+                }
             }
         }
         let can_add = !state.source_path.trim().is_empty();

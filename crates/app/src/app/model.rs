@@ -6,6 +6,7 @@ use nats_backend::{
 };
 
 use crate::log_layer::SharedLogBuffer;
+use crate::runtime::RuntimeMode;
 use crate::schema::MessageSchemaManager;
 use crate::settings::AppSettings;
 use crate::tabs::TabKind;
@@ -86,9 +87,11 @@ pub struct EasyNatsApp {
     pub(crate) tab_id_alloc: TabIdAllocator,
     pub(crate) log_buffer: SharedLogBuffer,
     pub(crate) schema_manager: MessageSchemaManager,
+    pub(crate) runtime_mode: RuntimeMode,
 }
 
 impl EasyNatsApp {
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn new(settings: AppSettings, theme_id: ThemeId, log_buffer: SharedLogBuffer) -> Self {
         let schema_manager = MessageSchemaManager::load(settings.proto_schema_dir.as_deref());
         Self {
@@ -118,6 +121,7 @@ impl EasyNatsApp {
             tab_id_alloc: TabIdAllocator::default(),
             log_buffer,
             schema_manager,
+            runtime_mode: RuntimeMode::Native,
         }
     }
 

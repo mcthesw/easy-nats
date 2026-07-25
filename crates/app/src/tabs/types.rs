@@ -13,7 +13,7 @@ pub use subscriber_state::{
 pub use tab_kind::{AppTabViewer, TabKind};
 
 use std::collections::{HashMap, HashSet};
-use std::time::Instant;
+use web_time::Instant;
 
 use eframe::egui;
 use nats_backend::{
@@ -90,6 +90,15 @@ pub enum TabAction {
     ConfirmDeleteObjStoreBucket {
         connection_id: u64,
         bucket_name: String,
+    },
+    UploadObject {
+        connection_id: u64,
+        bucket_name: String,
+    },
+    DownloadObject {
+        connection_id: u64,
+        bucket_name: String,
+        object_name: String,
     },
     CloseOtherTabs {
         keep_tab_id: egui::Id,

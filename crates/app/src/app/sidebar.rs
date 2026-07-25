@@ -45,10 +45,11 @@ fn render_sidebar_header(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
         {
             app.open_new_editor();
         }
-        if ui
-            .small_button("📝")
-            .on_hover_text(t("message_schema.title"))
-            .clicked()
+        if app.runtime_mode.supports_local_files()
+            && ui
+                .small_button("📝")
+                .on_hover_text(t("message_schema.title"))
+                .clicked()
         {
             app.open_or_focus_message_schemas();
         }
@@ -257,6 +258,7 @@ fn render_streams_section(
 ) {
     egui::CollapsingHeader::new(t("sidebar.section_streams"))
         .id_salt(format!("streams_{id}"))
+        .default_open(app.runtime_mode.preloads_demo_resources())
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 if ui
@@ -320,6 +322,7 @@ fn render_kv_section(
 ) {
     egui::CollapsingHeader::new(t("sidebar.section_kv"))
         .id_salt(format!("kv_{id}"))
+        .default_open(app.runtime_mode.preloads_demo_resources())
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 if ui
@@ -371,6 +374,7 @@ fn render_obj_store_section(
 ) {
     egui::CollapsingHeader::new(t("sidebar.section_object_store"))
         .id_salt(format!("objstore_{id}"))
+        .default_open(app.runtime_mode.preloads_demo_resources())
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 if ui

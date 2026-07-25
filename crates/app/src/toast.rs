@@ -13,7 +13,7 @@ pub enum ToastLevel {
 struct Toast {
     level: ToastLevel,
     message: String,
-    created: std::time::Instant,
+    created: web_time::Instant,
 }
 
 /// Toast notification manager — renders overlay messages.
@@ -36,7 +36,7 @@ impl Toasts {
         self.items.push(Toast {
             level,
             message: message.into(),
-            created: std::time::Instant::now(),
+            created: web_time::Instant::now(),
         });
     }
 
@@ -109,12 +109,12 @@ mod tests {
                 Toast {
                     level: ToastLevel::Info,
                     message: "expired".to_string(),
-                    created: std::time::Instant::now() - std::time::Duration::from_secs(5),
+                    created: web_time::Instant::now() - std::time::Duration::from_secs(5),
                 },
                 Toast {
                     level: ToastLevel::Success,
                     message: "fresh".to_string(),
-                    created: std::time::Instant::now(),
+                    created: web_time::Instant::now(),
                 },
             ],
             duration: std::time::Duration::from_secs(4),
