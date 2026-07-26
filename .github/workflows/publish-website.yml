@@ -11,21 +11,18 @@ concurrency:
 permissions:
   contents: write
 
-env:
-  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
-
 jobs:
   publish:
     name: Build and publish
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
         with:
           version: 11.1.2
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
           cache: pnpm
@@ -46,13 +43,17 @@ jobs:
         working-directory: website
         run: pnpm install --frozen-lockfile
 
+      - name: Build WASM
+        working-directory: website
+        run: pnpm build:wasm
+
       - name: Check website
         working-directory: website
         run: pnpm typecheck
 
       - name: Build website
         working-directory: website
-        run: pnpm build
+        run: pnpm exec vite build
 
       - name: Publish website branch
         uses: peaceiris/actions-gh-pages@v4
