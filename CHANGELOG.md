@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.1.31](https://github.com/mcthesw/easy-nats/compare/v0.1.30...v0.1.31) (2026-07-30)
+
+
+### Features
+
+* **app:** add browser demo runtime ([5a5f8f0](https://github.com/mcthesw/easy-nats/commit/5a5f8f029ddd790c08af2ef60e1123c1e8e2c017))
+* **app:** expose web demo preferences ([ec28f2a](https://github.com/mcthesw/easy-nats/commit/ec28f2a4152eec7f6bc44a61a2a132eed9f30006))
+* **backend:** add in-memory demo backend ([4551d65](https://github.com/mcthesw/easy-nats/commit/4551d659d75d39cc2643ebf4fa1f75c9fafa2a40))
+* **web:** add interactive demo website ([4ae1f4c](https://github.com/mcthesw/easy-nats/commit/4ae1f4c32ddfc139eb67efb03b52cdad9531169a))
+* **web:** build minimal public website ([60e1ac4](https://github.com/mcthesw/easy-nats/commit/60e1ac47fa5034c06a807aded6805b57698d2f75))
+
+
+### Bug Fixes
+
+* **ci:** generate WASM before website checks ([0876673](https://github.com/mcthesw/easy-nats/commit/087667343fdfbbb2fc3fe6f044879c494dd0e236))
+* resize macOS app icon ([22e30a9](https://github.com/mcthesw/easy-nats/commit/22e30a96e95c7e11d0c894c73cc18911c43f35db))
+
 ## [0.1.30](https://github.com/mcthesw/easy-nats/compare/v0.1.29...v0.1.30) (2026-07-22)
 
 
