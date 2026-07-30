@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.32](https://github.com/mcthesw/easy-nats/compare/v0.1.31...v0.1.32) (2026-07-30)
+
+
+### Bug Fixes
+
+* macos icon ([fc37795](https://github.com/mcthesw/easy-nats/commit/fc37795c1fd5b99fd94e61153197102424b89055))
+
 ## [0.1.31](https://github.com/mcthesw/easy-nats/compare/v0.1.30...v0.1.31) (2026-07-30)
 
 
