@@ -28,6 +28,8 @@ pub fn run_native() {
     let viewport = eframe::egui::ViewportBuilder::default()
         .with_inner_size([1400.0, 900.0])
         .with_min_inner_size([900.0, 600.0]);
+    #[cfg(target_os = "macos")]
+    let viewport = viewport.with_icon(eframe::egui::viewport::IconData::default());
     #[cfg(not(target_os = "macos"))]
     let viewport = viewport.with_icon(load_app_icon());
 
