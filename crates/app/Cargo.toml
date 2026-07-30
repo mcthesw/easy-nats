@@ -49,6 +49,8 @@ web-time = "1"
 nats-backend = { path = "../nats-backend", features = ["native"] }
 mimalloc = "0.1"
 tracing-appender = "0.2"
+
+[target.'cfg(all(not(target_arch = "wasm32"), not(target_os = "macos")))'.dependencies]
 image = { version = "0.25", default-features = false, features = ["png"] }
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
@@ -69,7 +71,10 @@ winresource = "0.1"
 product-name = "Easy NATS"
 identifier = "io.github.mcthesw.easy-nats"
 category = "DeveloperTool"
-icons = ["../../packaging/icon.png"]
+icons = [
+    "../../packaging/macos/easy-nats.icns",
+    "../../packaging/icon.png",
+]
 long-description = """
 Easy NATS is a cross-platform desktop client for NATS. It provides a tabbed UI \
 for managing connections, publishing and subscribing to subjects, browsing \

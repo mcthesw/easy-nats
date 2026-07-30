@@ -11,7 +11,10 @@ Requires Node.js (for @resvg/resvg-js SVG rasterisation).
 Generates:
     assets/icons/easy-nats-256.png  – 256px viewport icon (compiled into binary)
     assets/icons/easy-nats.ico      – Windows multi-size ICO (16/32/48/64/128/256)
-    packaging/icon.png              – 512px PNG for Linux/macOS packaging
+    packaging/icon.png              – 512px PNG for Linux packaging
+    packaging/macos/easy-nats.icns  – padded macOS application icon
+
+The ICNS output requires macOS and its system `iconutil` command.
 """
 
 from __future__ import annotations
@@ -31,10 +34,26 @@ SVG = ROOT / "assets" / "icons" / "easy-nats.svg"
 # Sizes needed for ICO (Windows best practices).
 ICO_SIZES = [16, 32, 48, 64, 128, 256]
 
-# All PNG renders: (width, destination relative to ROOT).
+# All unpadded PNG renders: (width, destination relative to ROOT).
 PNG_TARGETS: list[tuple[int, str]] = [
     (512, "packaging/icon.png"),
     (256, "assets/icons/easy-nats-256.png"),
+]
+
+MACOS_CANVAS_SIZE = 1024
+MACOS_ICON_SIZE = 854
+MACOS_ICON_OFFSET = (85, 85)
+MACOS_ICONSET_FILES: list[tuple[str, int]] = [
+    ("icon_16x16.png", 16),
+    ("icon_16x16@2x.png", 32),
+    ("icon_32x32.png", 32),
+    ("icon_32x32@2x.png", 64),
+    ("icon_128x128.png", 128),
+    ("icon_128x128@2x.png", 256),
+    ("icon_256x256.png", 256),
+    ("icon_256x256@2x.png", 512),
+    ("icon_512x512.png", 512),
+    ("icon_512x512@2x.png", 1024),
 ]
 
 
@@ -77,6 +96,41 @@ def build_ico(src_png: Path, dest_ico: Path, sizes: list[int]) -> None:
     img.save(dest_ico, format="ICO", sizes=[(s, s) for s in sizes])
 
 
+def require_iconutil() -> str:
+    """Return the macOS iconutil path or stop before changing generated files."""
+    iconutil = shutil.which("iconutil")
+    if sys.platform != "darwin" or iconutil is None:
+        sys.exit(
+            "Cannot regenerate packaging/macos/easy-nats.icns: "
+            "macOS and its iconutil command are required."
+        )
+    return iconutil
+
+
+def build_macos_icon(node_modules: Path, tmp: Path, iconutil: str) -> None:
+    """Build the padded macOS iconset and compile it with iconutil."""
+    rendered_icon = tmp / "easy-nats-macos-854.png"
+    render_svg(SVG, rendered_icon, MACOS_ICON_SIZE, node_modules)
+
+    with Image.open(rendered_icon) as source:
+        canvas = Image.new("RGBA", (MACOS_CANVAS_SIZE, MACOS_CANVAS_SIZE), (0, 0, 0, 0))
+        canvas.alpha_composite(source.convert("RGBA"), MACOS_ICON_OFFSET)
+
+    iconset = tmp / "easy-nats.iconset"
+    iconset.mkdir()
+    for filename, size in MACOS_ICONSET_FILES:
+        icon = canvas.resize((size, size), Image.Resampling.LANCZOS)
+        icon.save(iconset / filename, format="PNG")
+
+    destination = ROOT / "packaging" / "macos" / "easy-nats.icns"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [iconutil, "-c", "icns", str(iconset), "-o", str(destination)],
+        check=True,
+    )
+    print(f"  {destination.relative_to(ROOT)}  (macOS ICNS, 85px transparent margin)")
+
+
 def _js_str(p: Path) -> str:
     """Return a JS string literal with forward slashes (safe on all OS)."""
     return "'" + p.as_posix().replace("'", "\\'") + "'"
@@ -86,6 +140,7 @@ def main() -> None:
     if not SVG.exists():
         sys.exit(f"SVG not found: {SVG}")
 
+    iconutil = require_iconutil()
     tmp = Path(tempfile.gettempdir()) / "easy-nats-icon-build"
     tmp.mkdir(exist_ok=True)
     node_modules = _ensure_resvg_js(tmp)
@@ -97,13 +152,13 @@ def main() -> None:
         render_svg(SVG, dest, width, node_modules)
         print(f"  {rel}  ({width}×{width})")
 
-    # Also render all ICO sizes into temp dir, then assemble ICO.
-    largest_tmp = tmp / "icon-256.png"
-    if not largest_tmp.exists():
-        render_svg(SVG, largest_tmp, 256, node_modules)
+    # Assemble the Windows ICO from the freshly rendered, unpadded 256px icon.
     ico_dest = ROOT / "assets" / "icons" / "easy-nats.ico"
-    build_ico(largest_tmp, ico_dest, ICO_SIZES)
+    build_ico(ROOT / "assets" / "icons" / "easy-nats-256.png", ico_dest, ICO_SIZES)
     print(f"  assets/icons/easy-nats.ico  ({', '.join(f'{s}px' for s in ICO_SIZES)})")
+
+    with tempfile.TemporaryDirectory(prefix="easy-nats-macos-icon-") as icon_tmp:
+        build_macos_icon(node_modules, Path(icon_tmp), iconutil)
 
     print("Done.")
 
