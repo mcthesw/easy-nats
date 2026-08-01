@@ -1,17 +1,45 @@
 # Easy NATS
 
-Manage [NATS](https://nats.io/) messaging, JetStream data, object storage, and server metrics in one workspace.
+**A fast, native desktop workspace for [NATS](https://nats.io/).** It starts
+quickly, stays responsive under live traffic, and keeps search, publishers,
+subscribers, resources, and payload inspection in one workspace. Built in Rust,
+without an Electron runtime.
 
-![main-menu](assets/imgs/main-menu.png)
+[Try the interactive preview](https://easy-nats.sworld.club) · [Download Easy NATS](https://github.com/mcthesw/easy-nats/releases)
 
-## Features
+![Easy NATS with multiple windows, live metrics, a publisher, and a subscriber](assets/imgs/main-hero.png)
 
-- **Connections and Messaging** — Save multiple server profiles, publish with headers or request-reply, and subscribe to live subjects with wildcard support.
-- **Streams, KV, and Object Store** — Browse stream messages, inspect KV revision history, and upload, download, or delete object store files.
-- **Metrics Dashboard** — Track connection health, summary stats, and live plots for message rate, traffic, and JetStream usage.
-- **Message Inspection** — Auto-detect JSON, text, and binary payloads with pretty JSON, hex dump, Base64, and manual format override.
-- **Dockable Workspace** — Arrange publishers, subscribers, resources, and detail panes in a flexible multi-tab layout.
-- **Themes** — Choose from egui dark, egui light, Catppuccin Latte, Frappé, Macchiato, and Mocha.
+## A workspace for real NATS work
+
+### Search everything
+
+Search across the open workspace, including retained Stream messages, KV keys
+and values, and live Subscriber messages from multiple connections. Every result
+keeps its source and opens back at the original message or value instead of
+leaving you to hunt for it again.
+
+![Search Stream messages, KV entries, and Subscriber traffic as you type](assets/demos/search-everything.gif)
+
+### Work in parallel
+
+Keep publishers, subscribers, resource browsers, message details, and server
+metrics open together. Dock them into a focused layout or float a window when
+you need to compare live traffic with the data you are editing.
+
+![Publish, subscribe, inspect messages, and watch metrics in parallel](assets/demos/work-in-parallel.gif)
+
+### Inspect real payloads
+
+Read JSON, plain text, binary, Base64, and hex without leaving the app. Start
+with automatic detection, choose a format when you need control, and decode
+structured messages with JSON Schema or Protobuf definitions.
+
+![Inspect a real payload with automatic JSON detection and a hex dump](assets/demos/inspect-real-payloads.gif)
+
+Easy NATS also keeps the surrounding work close: saved server connections,
+request-reply with headers and wildcards, JetStream Streams and consumers, KV
+history, Object Store file operations, and live connection and JetStream
+metrics.
 
 ## Install
 
