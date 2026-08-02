@@ -77,26 +77,40 @@ pub(super) struct DemoState {
 
 impl DemoState {
     fn new() -> Self {
-        let stream = fixtures::stream();
-        let consumer = fixtures::consumer();
-        let kv_bucket = fixtures::kv_bucket();
+        let streams = fixtures::streams();
+        let stream_messages = fixtures::stream_messages();
+        let consumers = fixtures::consumers();
+        let kv_buckets = fixtures::kv_buckets();
+        let kv_entries = fixtures::kv_entries();
         let object_bucket = fixtures::object_bucket();
         Self {
             events: VecDeque::new(),
             subscriptions: HashMap::new(),
-            streams: [(stream.name.clone(), stream)].into(),
-            stream_messages: [("DEMO_EVENTS".into(), fixtures::stream_messages())].into(),
-            consumers: [(
-                "DEMO_EVENTS".into(),
-                [(consumer.name.clone(), consumer)].into(),
-            )]
-            .into(),
-            kv_buckets: [(kv_bucket.bucket.clone(), kv_bucket)].into(),
-            kv_entries: [(
-                "demo_config".into(),
-                fixtures::kv_entries().into_iter().collect(),
-            )]
-            .into(),
+            streams: streams
+                .into_iter()
+                .map(|stream| (stream.name.clone(), stream))
+                .collect(),
+            stream_messages: stream_messages.into_iter().collect(),
+            consumers: consumers
+                .into_iter()
+                .map(|(stream, items)| {
+                    (
+                        stream,
+                        items
+                            .into_iter()
+                            .map(|consumer| (consumer.name.clone(), consumer))
+                            .collect(),
+                    )
+                })
+                .collect(),
+            kv_buckets: kv_buckets
+                .into_iter()
+                .map(|bucket| (bucket.bucket.clone(), bucket))
+                .collect(),
+            kv_entries: kv_entries
+                .into_iter()
+                .map(|(bucket, entries)| (bucket, entries.into_iter().collect()))
+                .collect(),
             object_buckets: [(object_bucket.bucket.clone(), object_bucket)].into(),
             objects: [(
                 "demo_assets".into(),
@@ -106,7 +120,7 @@ impl DemoState {
                     .collect(),
             )]
             .into(),
-            revision: 3,
+            revision: fixtures::KV_REVISION,
             synthetic_count: 0,
             next_synthetic: Instant::now() + Duration::from_millis(250),
         }

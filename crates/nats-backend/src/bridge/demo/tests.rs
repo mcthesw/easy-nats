@@ -8,14 +8,11 @@ use crate::{
 
 #[test]
 fn subject_matching_supports_nats_wildcards() {
-    assert!(subject_matches(
-        "demo.events.>",
-        "demo.events.orders.created"
-    ));
-    assert!(subject_matches("demo.*.created", "demo.orders.created"));
-    assert!(!subject_matches("demo.*.created", "demo.orders.updated"));
-    assert!(!subject_matches("demo.events.>", "demo.events"));
-    assert!(!subject_matches("demo.events", "demo.events.created"));
+    assert!(subject_matches("orders.>", "orders.created"));
+    assert!(subject_matches("orders.*.created", "orders.api.created"));
+    assert!(!subject_matches("orders.*.created", "orders.api.updated"));
+    assert!(!subject_matches("orders.>", "orders"));
+    assert!(!subject_matches("orders", "orders.created"));
 }
 
 #[test]
@@ -24,14 +21,14 @@ fn publish_is_delivered_to_matching_demo_subscriber() {
     backend.send(BackendCommand::Subscribe {
         connection_id: 1,
         backend_id: 42,
-        subject: "demo.events.>".into(),
+        subject: "orders.>".into(),
         cancel: TaskCancellation::new(CancellationToken::new()),
     });
     let _ = backend.drain_events();
 
     backend.send(BackendCommand::Publish {
         connection_id: 1,
-        subject: "demo.events.manual".into(),
+        subject: "orders.manual".into(),
         payload: br#"{"hello":"world"}"#.to_vec(),
         headers: None,
     });
@@ -43,7 +40,7 @@ fn publish_is_delivered_to_matching_demo_subscriber() {
             backend_id: 42,
             messages,
             ..
-        } if messages.first().is_some_and(|message| message.subject == "demo.events.manual")
+        } if messages.first().is_some_and(|message| message.subject == "orders.manual")
     )));
     assert!(events.iter().any(|event| matches!(
         event,
@@ -61,7 +58,7 @@ fn request_reply_and_resource_fixtures_are_available() {
         connection_id: 1,
         backend_id: 7,
         request_id: 9,
-        subject: "demo.service.echo".into(),
+        subject: "orders.lookup".into(),
         payload: b"hello".to_vec(),
         headers: None,
         timeout_ms: 1_000,
@@ -82,12 +79,19 @@ fn request_reply_and_resource_fixtures_are_available() {
     assert!(events.iter().any(|event| matches!(
         event,
         BackendEvent::StreamsListed { streams, .. }
-            if streams.iter().any(|stream| stream.name == "DEMO_EVENTS")
+            if streams.len() == 3
+                && streams.iter().any(|stream| stream.name == "ORDERS")
+                && streams.iter().any(|stream| stream.name == "AUDIT_LOG")
+                && streams.iter().any(|stream| stream.name == "TELEMETRY")
     )));
     assert!(events.iter().any(|event| matches!(
         event,
         BackendEvent::KvBucketsListed { buckets, .. }
-            if buckets.iter().any(|bucket| bucket.bucket == "demo_config")
+            if buckets.len() == 2
+                && buckets.iter().any(|bucket| bucket.bucket == "app_config")
+                && buckets
+                    .iter()
+                    .any(|bucket| bucket.bucket == "service_registry")
     )));
     assert!(events.iter().any(|event| matches!(
         event,
@@ -101,13 +105,13 @@ fn kv_mutation_is_visible_without_persistence() {
     let mut backend = BackendHandle::spawn();
     backend.send(BackendCommand::PutKvEntry {
         connection_id: 1,
-        bucket: "demo_config".into(),
+        bucket: "app_config".into(),
         key: "feature.search".into(),
         value: b"enabled".to_vec(),
     });
     backend.send(BackendCommand::GetKvEntry {
         connection_id: 1,
-        bucket: "demo_config".into(),
+        bucket: "app_config".into(),
         key: "feature.search".into(),
     });
 
@@ -170,7 +174,7 @@ fn stream_start_time_takes_precedence_over_sequence() {
     let mut backend = BackendHandle::spawn();
     backend.send(BackendCommand::GetStreamMessages {
         connection_id: 1,
-        stream: "DEMO_EVENTS".into(),
+        stream: "ORDERS".into(),
         start_sequence: Some(8),
         subject_filter: None,
         start_time: Some("2026-07-25T09:00:00Z".into()),
@@ -210,16 +214,17 @@ fn client_pages_apply_state_and_sort_before_pagination() {
     assert!(events.iter().any(|event| matches!(
         event,
         BackendEvent::ClientStatusPageLoaded { page, .. }
-            if page.total == 3
+            if page.total == 6
                 && page.clients.len() == 2
-                && page.clients[0].client_id == 103
+                && page.clients[0].client_id == 106
     )));
     assert!(events.iter().any(|event| matches!(
         event,
         BackendEvent::ClientStatusPageLoaded { page, .. }
             if page.query.state == ClientConnectionState::Closed
-                && page.total == 0
-                && page.clients.is_empty()
+                && page.total == 1
+                && page.clients.len() == 1
+                && page.clients[0].client_id == 106
     )));
 }
 
