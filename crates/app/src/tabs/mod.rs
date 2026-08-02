@@ -41,3 +41,6 @@ pub use types::{
     SearchWorkspaceResult, SearchWorkspaceState, ServerInfoState, StreamState, SubscriberState,
     TabAction, TabKind,
 };
+
+#[cfg(target_arch = "wasm32")]
+pub(crate) use types::{SearchField, SearchResultKey};
