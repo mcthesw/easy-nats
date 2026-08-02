@@ -107,18 +107,35 @@ impl DemoState {
         }
         self.next_synthetic = now + SYNTHETIC_INTERVAL;
         self.synthetic_count += 1;
-        let subjects = [
-            "demo.events.orders",
-            "demo.events.system",
-            "demo.events.audit",
-        ];
-        let subject = subjects[(self.synthetic_count as usize - 1) % subjects.len()];
-        let payload = format!(
-            r#"{{"sequence":{},"source":"demo-generator","status":"ok"}}"#,
-            self.synthetic_count
-        )
-        .into_bytes();
-        self.publish_message(DEMO_CONNECTION_ID, subject.into(), payload, None);
+        let sequence = self.synthetic_count;
+        let (subject, payload) = match (sequence as usize - 1) % 3 {
+            0 => (
+                "orders.created",
+                format!(
+                    r#"{{"order_id":"ord-live-{sequence:04}","customer":"demo","total":{}.00,"status":"created"}}"#,
+                    100 + sequence * 7
+                ),
+            ),
+            1 => (
+                "audit.order.created",
+                format!(
+                    r#"{{"order_id":"ord-live-{sequence:04}","actor":"demo-generator","action":"created"}}"#
+                ),
+            ),
+            _ => (
+                "telemetry.orders-api.latency",
+                format!(
+                    r#"{{"service":"orders-api","metric":"latency_ms","value":{},"status":"ok"}}"#,
+                    35 + sequence % 20
+                ),
+            ),
+        };
+        self.publish_message(
+            DEMO_CONNECTION_ID,
+            subject.into(),
+            payload.into_bytes(),
+            None,
+        );
     }
 
     fn publish_message(
