@@ -272,6 +272,12 @@ fn setup_fonts(ctx: &eframe::egui::Context) {
     proportional.insert(0, "LXGWNeoXiHei".to_owned());
     proportional.insert(0, "Inter".to_owned());
 
+    fonts
+        .families
+        .entry(FontFamily::Monospace)
+        .or_default()
+        .push("LXGWNeoXiHei".to_owned());
+
     ctx.set_fonts(fonts);
 }
 
@@ -322,5 +328,18 @@ fn install_tracing(
             tracing_subscriber::registry().with(mem_layer).init();
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn setup_fonts_supports_cjk_in_monospace() {
+        let ctx = eframe::egui::Context::default();
+        super::setup_fonts(&ctx);
+        let _ = ctx.run_ui(eframe::egui::RawInput::default(), |_| {});
+        assert!(ctx.fonts_mut(|fonts| {
+            fonts.has_glyphs(&eframe::egui::FontId::monospace(13.0), "中文")
+        }));
     }
 }
