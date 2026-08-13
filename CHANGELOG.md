@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.1.33](https://github.com/mcthesw/easy-nats/compare/v0.1.32...v0.1.33) (2026-08-13)
+
+
+### Features
+
+* **demo:** expand live demo fixtures ([9062b2b](https://github.com/mcthesw/easy-nats/commit/9062b2bebd0231e19c5ac1261e4e34352f1713b6))
+* **web:** preload searchable demo workspace ([37c381a](https://github.com/mcthesw/easy-nats/commit/37c381a9ace54c54272dec8c86634e18b2572d06))
+
+
+### Bug Fixes
+
+* **kv:** render CJK in monospace editors ([139db88](https://github.com/mcthesw/easy-nats/commit/139db88e2106d8467c16b7acf8eff3a8e4506570))
+
+
+### Documentation
+
+* refresh README product story ([1d3d92e](https://github.com/mcthesw/easy-nats/commit/1d3d92ef0b9601fbea1f19094721777f8bbbc45e))
+* simplify readme ([5801e7a](https://github.com/mcthesw/easy-nats/commit/5801e7a0b8cb296e68d19e9f8e4ee8fb6ee93644))
+
 ## [0.1.32](https://github.com/mcthesw/easy-nats/compare/v0.1.31...v0.1.32) (2026-07-30)
 
 
