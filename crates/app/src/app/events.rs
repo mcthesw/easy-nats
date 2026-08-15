@@ -3,7 +3,7 @@ use nats_backend::{BackendCommand, BackendEvent, ConnectionStatusKind};
 
 use crate::toast::ToastLevel;
 
-use super::model::EasyNatsApp;
+use super::{editors::ConnectionTestState, model::EasyNatsApp};
 
 impl EasyNatsApp {
     pub(crate) fn handle_events(&mut self, ctx: &egui::Context) {
@@ -58,6 +58,16 @@ impl EasyNatsApp {
                         _ => {}
                     }
                     self.conn_statuses.insert(connection_id, status);
+                }
+                BackendEvent::ConnectionTestResult {
+                    connection_id,
+                    result,
+                } => {
+                    tracing::info!(connection_id, ?result, "Connection test finished");
+                    self.editor.test_state = match result {
+                        Ok(()) => ConnectionTestState::Succeeded,
+                        Err(message) => ConnectionTestState::Failed(message),
+                    };
                 }
                 BackendEvent::OperationSucceeded {
                     connection_id,

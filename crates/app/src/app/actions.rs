@@ -137,30 +137,12 @@ impl EasyNatsApp {
             tls_enabled: cfg.tls_enabled,
             tls_first: cfg.tls_first,
             delete_confirm: None,
+            test_state: super::editors::ConnectionTestState::Idle,
         };
     }
 
     pub(crate) fn save_editor(&mut self) {
-        let auth = match self.editor.auth_kind {
-            super::editors::AuthKindSelection::None => AuthMethod::None,
-            super::editors::AuthKindSelection::Token => AuthMethod::Token {
-                token: self.editor.token.clone(),
-            },
-            super::editors::AuthKindSelection::UserPassword => AuthMethod::UserPassword {
-                username: self.editor.username.clone(),
-                password: self.editor.password.clone(),
-            },
-            super::editors::AuthKindSelection::NKey => AuthMethod::NKey {
-                seed: self.editor.nkey_seed.clone(),
-            },
-            super::editors::AuthKindSelection::CredentialsFile => AuthMethod::CredentialsFile {
-                path: self.editor.creds_path.clone(),
-            },
-            super::editors::AuthKindSelection::TlsClientCert => AuthMethod::TlsClientCert {
-                cert_path: self.editor.cert_path.clone(),
-                key_path: self.editor.key_path.clone(),
-            },
-        };
+        let auth = self.editor.auth_method();
 
         if let Some(id) = self.editor.editing_id {
             if let Some(c) = self.config.connections.iter_mut().find(|c| c.id == id) {
@@ -185,6 +167,20 @@ impl EasyNatsApp {
         }
         self.config.save();
         self.editor.visible = false;
+    }
+
+    pub(crate) fn test_editor_connection(&mut self) {
+        let config = ConnectionConfig {
+            id: self.editor.editing_id.unwrap_or(0),
+            name: self.editor.name.clone(),
+            urls: vec![self.editor.url.clone()],
+            auth: self.editor.auth_method(),
+            tls_enabled: self.editor.tls_enabled,
+            tls_first: self.editor.tls_first,
+            monitoring: None,
+        };
+        self.editor.test_state = super::editors::ConnectionTestState::Pending;
+        self.backend.send(BackendCommand::TestConnection { config });
     }
 
     pub(crate) fn delete_connection(&mut self, id: u64) {
