@@ -111,8 +111,8 @@ empty_value:
   en: "<empty>"
   zh: "<空>"
 select_key_hint:
-  en: "Select a key from the list, or click New Entry to open a create dialog."
-  zh: "从列表中选择一个键，或点击“新建条目”打开创建弹窗。"
+  en: "Select a key from the list, or click ＋ above to create a new entry."
+  zh: "从列表中选择一个键，或点击上方 ＋ 新建条目。"
 back_to_detail:
   en: "← Back"
   zh: "← 返回"
