@@ -9,6 +9,17 @@ pub enum ToastLevel {
     Error,
 }
 
+impl ToastLevel {
+    /// How long a toast of this level stays visible. Errors linger longer
+    /// so the failure reason can actually be read.
+    fn duration(self) -> std::time::Duration {
+        match self {
+            ToastLevel::Info | ToastLevel::Success => std::time::Duration::from_secs(4),
+            ToastLevel::Error => std::time::Duration::from_secs(10),
+        }
+    }
+}
+
 /// A single toast notification.
 struct Toast {
     level: ToastLevel,
@@ -17,18 +28,9 @@ struct Toast {
 }
 
 /// Toast notification manager — renders overlay messages.
+#[derive(Default)]
 pub struct Toasts {
     items: Vec<Toast>,
-    duration: std::time::Duration,
-}
-
-impl Default for Toasts {
-    fn default() -> Self {
-        Self {
-            items: Vec::new(),
-            duration: std::time::Duration::from_secs(4),
-        }
-    }
 }
 
 impl Toasts {
@@ -41,7 +43,7 @@ impl Toasts {
     }
 
     fn prune_expired(&mut self) {
-        self.items.retain(|t| t.created.elapsed() < self.duration);
+        self.items.retain(|t| t.created.elapsed() < t.level.duration());
     }
 
     /// Render toasts as overlay in the top-right corner. Call once per frame.
@@ -102,27 +104,52 @@ impl Toasts {
 mod tests {
     use super::{Toast, ToastLevel, Toasts};
 
+    fn toast(level: ToastLevel, message: &str, age_secs: u64) -> Toast {
+        Toast {
+            level,
+            message: message.to_string(),
+            created: web_time::Instant::now() - std::time::Duration::from_secs(age_secs),
+        }
+    }
+
     #[test]
     fn prune_discards_expired_toasts() {
         let mut toasts = Toasts {
             items: vec![
-                Toast {
-                    level: ToastLevel::Info,
-                    message: "expired".to_string(),
-                    created: web_time::Instant::now() - std::time::Duration::from_secs(5),
-                },
-                Toast {
-                    level: ToastLevel::Success,
-                    message: "fresh".to_string(),
-                    created: web_time::Instant::now(),
-                },
+                toast(ToastLevel::Info, "expired", 5),
+                toast(ToastLevel::Success, "fresh", 0),
             ],
-            duration: std::time::Duration::from_secs(4),
         };
 
         toasts.prune_expired();
 
         assert_eq!(toasts.items.len(), 1);
         assert_eq!(toasts.items[0].message, "fresh");
+    }
+
+    #[test]
+    fn error_toasts_outlive_info_toasts() {
+        let mut toasts = Toasts {
+            items: vec![
+                toast(ToastLevel::Error, "error", 5),
+                toast(ToastLevel::Info, "info", 5),
+            ],
+        };
+
+        toasts.prune_expired();
+
+        assert_eq!(toasts.items.len(), 1);
+        assert_eq!(toasts.items[0].message, "error");
+    }
+
+    #[test]
+    fn error_toasts_expire_after_their_longer_duration() {
+        let mut toasts = Toasts {
+            items: vec![toast(ToastLevel::Error, "error", 11)],
+        };
+
+        toasts.prune_expired();
+
+        assert!(toasts.items.is_empty());
     }
 }
