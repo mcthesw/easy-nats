@@ -144,7 +144,7 @@ fn render_key_list(
         {
             refresh_kv_keys(connection_id, bucket_name, state, backend, guard);
         }
-        if ui.button("+").on_hover_text(t("kv.new_entry")).clicked() {
+        if ui.button("＋").on_hover_text(t("kv.new_entry")).clicked() {
             actions.push(TabAction::OpenKvEntryCreate {
                 connection_id,
                 bucket_name: bucket_name.to_string(),
