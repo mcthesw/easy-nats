@@ -228,6 +228,7 @@ pub struct AppTabViewer<'a> {
     pub schema_manager: &'a MessageSchemaManager,
     pub connections: &'a [(u64, String)],
     pub runtime_mode: crate::runtime::RuntimeMode,
+    pub show_connection_in_title: bool,
 }
 
 fn title_with_connection(title: String, connection_name: &str, show_connection: bool) -> String {
@@ -242,8 +243,7 @@ impl TabViewer for AppTabViewer<'_> {
     type Tab = TabKind;
 
     fn title(&mut self, tab: &mut Self::Tab) -> egui::WidgetText {
-        tab.title(self.runtime_mode.shows_connection_in_tab_title())
-            .into()
+        tab.title(self.show_connection_in_title).into()
     }
 
     fn id(&mut self, tab: &mut Self::Tab) -> egui::Id {
