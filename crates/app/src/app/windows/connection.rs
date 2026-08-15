@@ -107,7 +107,7 @@ fn render_auth_fields(editor: &mut ConnectionEditor, ui: &mut egui::Ui) {
         AuthKindSelection::None => {}
         AuthKindSelection::Token => {
             ui.label(t("connection.field_token"));
-            ui.text_edit_singleline(&mut editor.token);
+            ui.add(egui::TextEdit::singleline(&mut editor.token).password(true));
             ui.end_row();
         }
         AuthKindSelection::UserPassword => {
