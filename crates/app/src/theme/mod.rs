@@ -30,6 +30,12 @@ pub fn apply_theme(ctx: &egui::Context, theme_id: ThemeId) {
         | ThemeId::CatppuccinMacchiato
         | ThemeId::CatppuccinMocha => catppuccin::apply_theme(ctx, theme_id),
     }
+
+    // Fade disabled widgets more strongly than the egui default so that
+    // enabled and disabled states are easy to tell apart in every theme.
+    ctx.all_styles_mut(|style| {
+        style.visuals.disabled_alpha = 0.35;
+    });
 }
 
 #[cfg(test)]
@@ -57,5 +63,23 @@ mod tests {
 
         assert_eq!(ctx.theme(), Theme::Light);
         assert!(!ctx.global_style().visuals.dark_mode);
+    }
+
+    #[test]
+    fn every_theme_fades_disabled_widgets() {
+        let ctx = Context::default();
+
+        for theme in crate::theme::theme_catalog() {
+            apply_theme(&ctx, theme.id);
+
+            for egui_theme in [Theme::Dark, Theme::Light] {
+                let visuals = &ctx.style_of(egui_theme).visuals;
+                assert_eq!(
+                    visuals.disabled_alpha, 0.35,
+                    "theme {:?} must fade disabled widgets",
+                    theme.id
+                );
+            }
+        }
     }
 }
