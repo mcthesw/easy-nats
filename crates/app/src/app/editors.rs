@@ -1,6 +1,7 @@
 use crate::i18n::t;
 use nats_backend::{
-    ConsumerAckPolicyKind, ConsumerDeliverPolicyKind, ConsumerInfo, KvBucketInfo, StorageKind,
+    AuthMethod, ConsumerAckPolicyKind, ConsumerDeliverPolicyKind, ConsumerInfo, KvBucketInfo,
+    StorageKind,
 };
 
 use crate::schema::PayloadInputFormat;
@@ -23,6 +24,41 @@ pub(crate) struct ConnectionEditor {
     pub(crate) tls_enabled: bool,
     pub(crate) tls_first: bool,
     pub(crate) delete_confirm: Option<u64>,
+    pub(crate) test_state: ConnectionTestState,
+}
+
+impl ConnectionEditor {
+    pub(crate) fn auth_method(&self) -> AuthMethod {
+        match self.auth_kind {
+            AuthKindSelection::None => AuthMethod::None,
+            AuthKindSelection::Token => AuthMethod::Token {
+                token: self.token.clone(),
+            },
+            AuthKindSelection::UserPassword => AuthMethod::UserPassword {
+                username: self.username.clone(),
+                password: self.password.clone(),
+            },
+            AuthKindSelection::NKey => AuthMethod::NKey {
+                seed: self.nkey_seed.clone(),
+            },
+            AuthKindSelection::CredentialsFile => AuthMethod::CredentialsFile {
+                path: self.creds_path.clone(),
+            },
+            AuthKindSelection::TlsClientCert => AuthMethod::TlsClientCert {
+                cert_path: self.cert_path.clone(),
+                key_path: self.key_path.clone(),
+            },
+        }
+    }
+}
+
+#[derive(Default)]
+pub(crate) enum ConnectionTestState {
+    #[default]
+    Idle,
+    Pending,
+    Succeeded,
+    Failed(String),
 }
 
 #[derive(Default, Debug, Clone, Copy, PartialEq)]

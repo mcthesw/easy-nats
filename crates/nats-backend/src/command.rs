@@ -15,6 +15,9 @@ pub enum BackendCommand {
     Disconnect {
         id: u64,
     },
+    TestConnection {
+        config: ConnectionConfig,
+    },
     // Core Pub/Sub
     Publish {
         connection_id: u64,

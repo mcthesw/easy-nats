@@ -19,7 +19,7 @@ pub(crate) async fn handle_connect(
         })
         .await;
 
-    match do_connect(&config, evt_tx).await {
+    match do_connect(&config, Some(evt_tx)).await {
         Ok(client) => {
             state.clients.insert(id, client);
             let _ = evt_tx
@@ -77,12 +77,29 @@ pub(crate) async fn handle_disconnect(
         .await;
 }
 
+pub(crate) async fn handle_test_connection(
+    config: ConnectionConfig,
+    evt_tx: &mpsc::Sender<BackendEvent>,
+) {
+    let connection_id = config.id;
+    let result = match do_connect(&config, None).await {
+        Ok(_) => Ok(()),
+        Err(e) => Err(e.to_string()),
+    };
+    let _ = evt_tx
+        .send(BackendEvent::ConnectionTestResult {
+            connection_id,
+            result,
+        })
+        .await;
+}
+
 async fn do_connect(
     config: &ConnectionConfig,
-    evt_tx: &mpsc::Sender<BackendEvent>,
+    evt_tx: Option<&mpsc::Sender<BackendEvent>>,
 ) -> Result<Client, Box<dyn std::error::Error + Send + Sync>> {
     let id = config.id;
-    let event_tx = evt_tx.clone();
+    let event_tx = evt_tx.cloned();
 
     let mut opts = match &config.auth {
         AuthMethod::None => async_nats::ConnectOptions::new(),
@@ -110,6 +127,9 @@ async fn do_connect(
     opts = opts.name(&config.name).event_callback(move |event| {
         let tx = event_tx.clone();
         async move {
+            let Some(tx) = tx else {
+                return;
+            };
             let status = match event {
                 async_nats::Event::Connected => ConnectionStatusKind::Connected,
                 async_nats::Event::Disconnected => ConnectionStatusKind::Disconnected,

@@ -33,6 +33,9 @@ pub async fn run_worker(
             BackendCommand::Disconnect { id } => {
                 connection::handle_disconnect(&mut state, id, &evt_tx).await;
             }
+            BackendCommand::TestConnection { config } => {
+                connection::handle_test_connection(config, &evt_tx).await;
+            }
             BackendCommand::Publish {
                 connection_id,
                 subject,

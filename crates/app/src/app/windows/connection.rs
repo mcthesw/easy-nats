@@ -3,7 +3,7 @@ use eframe::egui;
 use crate::i18n::t;
 
 use super::super::{
-    editors::{AuthKindSelection, ConnectionEditor},
+    editors::{AuthKindSelection, ConnectionEditor, ConnectionTestState},
     model::EasyNatsApp,
 };
 
@@ -14,6 +14,7 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
 
 fn render_connection_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     let mut save_requested = false;
+    let mut test_requested = false;
     if app.editor.visible {
         let title = if app.editor.editing_id.is_some() {
             t("connection.connection_edit")
@@ -34,14 +35,61 @@ fn render_connection_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     {
                         save_requested = true;
                     }
+                    let testing = matches!(app.editor.test_state, ConnectionTestState::Pending);
+                    if ui
+                        .add_enabled(valid && !testing, egui::Button::new(t("connection.test")))
+                        .clicked()
+                    {
+                        test_requested = true;
+                    }
                     if ui.button(t("common.cancel")).clicked() {
                         app.editor.visible = false;
+                    }
+                });
+                // A status line is always rendered so a result never resizes
+                // the window; long errors truncate, full text on hover.
+                ui.horizontal(|ui| match &app.editor.test_state {
+                    ConnectionTestState::Idle => {
+                        // Blank-but-full-height placeholder: an empty string
+                        // layouts shorter than a real line and would let the
+                        // window shrink a few px.
+                        ui.label(" ");
+                    }
+                    ConnectionTestState::Pending => {
+                        ui.spinner();
+                    }
+                    ConnectionTestState::Succeeded => {
+                        // Muted green tuned for the active theme: pure GREEN is
+                        // unreadable on light backgrounds.
+                        let success = if ui.visuals().dark_mode {
+                            egui::Color32::from_rgb(129, 199, 132)
+                        } else {
+                            egui::Color32::from_rgb(46, 125, 50)
+                        };
+                        ui.colored_label(success, t("connection.test_success"));
+                    }
+                    ConnectionTestState::Failed(message) => {
+                        ui.add(
+                            egui::Label::new(
+                                egui::RichText::new(format!(
+                                    "{}: {}",
+                                    t("connection.test_failed"),
+                                    message
+                                ))
+                                .color(ui.visuals().error_fg_color),
+                            )
+                            .truncate(),
+                        )
+                        .on_hover_text(message);
                     }
                 });
             });
     }
     if save_requested {
         app.save_editor();
+    }
+    if test_requested {
+        app.test_editor_connection();
     }
 }
 
