@@ -74,7 +74,8 @@ pub fn stream_ui(
             stream_name,
         )))
         .resizable(true)
-        .default_size(150.0)
+        .default_size(240.0)
+        .size_range(120.0..=f32::INFINITY)
         .show(ui, |ui| {
             egui::ScrollArea::vertical()
                 .id_salt(("stream_bottom_scroll", connection_id, stream_name))
