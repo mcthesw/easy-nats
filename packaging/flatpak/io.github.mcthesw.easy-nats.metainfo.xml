@@ -23,6 +23,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.1.34" date="2026-08-16">
+      <description>
+        <p>Adds a Test Connection button with inline results to the connection editor, masks token input, and polishes empty states, tab titles, timestamps, stream panel sizing, error toast duration, and disabled-widget contrast.</p>
+      </description>
+    </release>
     <release version="0.1.33" date="2026-08-14">
       <description>
         <p>Expands the interactive demo with searchable sample data and fixes CJK rendering in KV editors and JSON previews.</p>
