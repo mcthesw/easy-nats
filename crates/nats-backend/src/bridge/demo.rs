@@ -144,9 +144,9 @@ impl DemoState {
         match command {
             BackendCommand::Connect { config } => self.connect(config.id),
             BackendCommand::Disconnect { id } => self.disconnect(id),
-            BackendCommand::TestConnection { config } => {
+            BackendCommand::TestConnection { request_id, .. } => {
                 self.push(BackendEvent::ConnectionTestResult {
-                    connection_id: config.id,
+                    request_id,
                     result: Ok(()),
                 });
             }

@@ -50,13 +50,40 @@ impl ConnectionEditor {
             },
         }
     }
+
+    pub(crate) fn start_test(&mut self, request_id: u64) {
+        self.test_state = ConnectionTestState::Pending { request_id };
+    }
+
+    pub(crate) fn invalidate_test(&mut self) {
+        self.test_state = ConnectionTestState::Idle;
+    }
+
+    pub(crate) fn complete_test(&mut self, request_id: u64, result: Result<(), String>) -> bool {
+        if !matches!(
+            &self.test_state,
+            ConnectionTestState::Pending {
+                request_id: pending
+            } if *pending == request_id
+        ) {
+            return false;
+        }
+
+        self.test_state = match result {
+            Ok(()) => ConnectionTestState::Succeeded,
+            Err(message) => ConnectionTestState::Failed(message),
+        };
+        true
+    }
 }
 
-#[derive(Default)]
+#[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) enum ConnectionTestState {
     #[default]
     Idle,
-    Pending,
+    Pending {
+        request_id: u64,
+    },
     Succeeded,
     Failed(String),
 }
@@ -436,5 +463,32 @@ impl Default for ObjStoreBucketCreateEditor {
             num_replicas: "1".to_string(),
             description: String::new(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ConnectionEditor, ConnectionTestState};
+
+    #[test]
+    fn connection_test_ignores_stale_results() {
+        let mut editor = ConnectionEditor::default();
+        editor.start_test(2);
+
+        assert!(!editor.complete_test(1, Ok(())));
+        assert_eq!(
+            editor.test_state,
+            ConnectionTestState::Pending { request_id: 2 }
+        );
+    }
+
+    #[test]
+    fn invalidated_connection_test_ignores_its_result() {
+        let mut editor = ConnectionEditor::default();
+        editor.start_test(1);
+        editor.invalidate_test();
+
+        assert!(!editor.complete_test(1, Ok(())));
+        assert_eq!(editor.test_state, ConnectionTestState::Idle);
     }
 }

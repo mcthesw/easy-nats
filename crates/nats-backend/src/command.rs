@@ -16,6 +16,7 @@ pub enum BackendCommand {
         id: u64,
     },
     TestConnection {
+        request_id: u64,
         config: ConnectionConfig,
     },
     // Core Pub/Sub

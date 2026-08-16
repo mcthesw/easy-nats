@@ -43,7 +43,8 @@ impl Toasts {
     }
 
     fn prune_expired(&mut self) {
-        self.items.retain(|t| t.created.elapsed() < t.level.duration());
+        self.items
+            .retain(|t| t.created.elapsed() < t.level.duration());
     }
 
     /// Render toasts as overlay in the top-right corner. Call once per frame.
