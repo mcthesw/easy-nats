@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.1.34](https://github.com/mcthesw/easy-nats/compare/v0.1.33...v0.1.34) (2026-08-16)
+
+
+### Features
+
+* **connection:** add Test Connection button to the editor ([4f49342](https://github.com/mcthesw/easy-nats/commit/4f49342a2033094e0e6e283c8305556e1fa0214e))
+
+
+### Bug Fixes
+
+* address connection test review findings ([09e6952](https://github.com/mcthesw/easy-nats/commit/09e69525995d009908d4159743bdd41e9d434ba5))
+* **backend:** format KV/object-store timestamps as RFC3339 ([3d3873d](https://github.com/mcthesw/easy-nats/commit/3d3873d2c39f9bb6a85e03a386c6a91ea0a6ca92))
+* **connection:** mask token field as password ([6c277b9](https://github.com/mcthesw/easy-nats/commit/6c277b994a34935a44969885f3a5e5f4413601b2))
+* **flatpak:** add 0.1.34 release description ([432b278](https://github.com/mcthesw/easy-nats/commit/432b27819bdf9947cb5798e2d9c7b518d6445114))
+* **kv:** align empty-state hint with the full-width ＋ button ([de613d4](https://github.com/mcthesw/easy-nats/commit/de613d42000ccf4dd05c713650ca58ad940ef854))
+* **stream:** enlarge bottom panel default size with a sane size range ([0d25797](https://github.com/mcthesw/easy-nats/commit/0d25797ff8b0ad9b30bee1fd90009c046daeaa91))
+* **theme:** fade disabled widgets in every theme for clearer contrast ([c573436](https://github.com/mcthesw/easy-nats/commit/c573436667274701f8a8ae68f9109165e675c1a5))
+* **ui:** append connection name to tab titles only when multiple connections are connected ([3cdedcd](https://github.com/mcthesw/easy-nats/commit/3cdedcd454b88455a38b532552f38a87e576afe9))
+* **ui:** keep error toasts visible longer ([2bf0ec1](https://github.com/mcthesw/easy-nats/commit/2bf0ec1c29f1f80d9a3d79c905acae67845aac5f))
+
 ## [0.1.33](https://github.com/mcthesw/easy-nats/compare/v0.1.32...v0.1.33) (2026-08-13)
 
 
