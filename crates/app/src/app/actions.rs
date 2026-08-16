@@ -166,6 +166,7 @@ impl EasyNatsApp {
             });
         }
         self.config.save();
+        self.editor.invalidate_test();
         self.editor.visible = false;
     }
 
@@ -179,8 +180,11 @@ impl EasyNatsApp {
             tls_first: self.editor.tls_first,
             monitoring: None,
         };
-        self.editor.test_state = super::editors::ConnectionTestState::Pending;
-        self.backend.send(BackendCommand::TestConnection { config });
+        let request_id = self.next_connection_test_request_id;
+        self.next_connection_test_request_id = request_id.wrapping_add(1).max(1);
+        self.editor.start_test(request_id);
+        self.backend
+            .send(BackendCommand::TestConnection { request_id, config });
     }
 
     pub(crate) fn delete_connection(&mut self, id: u64) {

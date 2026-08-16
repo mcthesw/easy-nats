@@ -118,7 +118,7 @@ pub enum BackendEvent {
         status: ConnectionStatusKind,
     },
     ConnectionTestResult {
-        connection_id: u64,
+        request_id: u64,
         result: Result<(), String>,
     },
     // Core Pub/Sub

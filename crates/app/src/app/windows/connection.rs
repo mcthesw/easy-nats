@@ -24,7 +24,9 @@ fn render_connection_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
         egui::Window::new(title)
             .resizable(false)
             .show(ui.ctx(), |ui| {
-                render_editor_grid(&mut app.editor, ui);
+                if render_editor_grid(&mut app.editor, ui) {
+                    app.editor.invalidate_test();
+                }
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     let valid =
@@ -35,7 +37,8 @@ fn render_connection_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     {
                         save_requested = true;
                     }
-                    let testing = matches!(app.editor.test_state, ConnectionTestState::Pending);
+                    let testing =
+                        matches!(app.editor.test_state, ConnectionTestState::Pending { .. });
                     if ui
                         .add_enabled(valid && !testing, egui::Button::new(t("connection.test")))
                         .clicked()
@@ -43,6 +46,7 @@ fn render_connection_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                         test_requested = true;
                     }
                     if ui.button(t("common.cancel")).clicked() {
+                        app.editor.invalidate_test();
                         app.editor.visible = false;
                     }
                 });
@@ -55,7 +59,7 @@ fn render_connection_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                         // window shrink a few px.
                         ui.label(" ");
                     }
-                    ConnectionTestState::Pending => {
+                    ConnectionTestState::Pending { .. } => {
                         ui.spinner();
                     }
                     ConnectionTestState::Succeeded => {
@@ -93,7 +97,8 @@ fn render_connection_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     }
 }
 
-fn render_editor_grid(editor: &mut ConnectionEditor, ui: &mut egui::Ui) {
+fn render_editor_grid(editor: &mut ConnectionEditor, ui: &mut egui::Ui) -> bool {
+    let mut connection_changed = false;
     egui::Grid::new("conn_editor_grid")
         .num_columns(2)
         .spacing([8.0, 4.0])
@@ -103,7 +108,7 @@ fn render_editor_grid(editor: &mut ConnectionEditor, ui: &mut egui::Ui) {
             ui.end_row();
 
             ui.label(t("connection.field_url"));
-            ui.text_edit_singleline(&mut editor.url);
+            connection_changed |= ui.text_edit_singleline(&mut editor.url).changed();
             ui.end_row();
 
             ui.label(t("connection.field_metrics_endpoint"));
@@ -114,6 +119,7 @@ fn render_editor_grid(editor: &mut ConnectionEditor, ui: &mut egui::Ui) {
             ui.end_row();
 
             ui.label(t("connection.field_auth"));
+            let previous_auth_kind = editor.auth_kind;
             egui::ComboBox::from_id_salt("auth_kind")
                 .selected_text(editor.auth_kind.label())
                 .show_ui(ui, |ui| {
@@ -121,11 +127,13 @@ fn render_editor_grid(editor: &mut ConnectionEditor, ui: &mut egui::Ui) {
                         ui.selectable_value(&mut editor.auth_kind, kind, kind.label());
                     }
                 });
+            connection_changed |= editor.auth_kind != previous_auth_kind;
             ui.end_row();
 
-            render_auth_fields(editor, ui);
+            connection_changed |= render_auth_fields(editor, ui);
 
             ui.label(t("connection.field_tls_mode"));
+            let previous_tls_mode = (editor.tls_enabled, editor.tls_first);
             let mut mode = if editor.tls_first {
                 2
             } else if editor.tls_enabled {
@@ -146,43 +154,56 @@ fn render_editor_grid(editor: &mut ConnectionEditor, ui: &mut egui::Ui) {
                 });
             editor.tls_enabled = mode != 0;
             editor.tls_first = mode == 2;
+            connection_changed |= (editor.tls_enabled, editor.tls_first) != previous_tls_mode;
             ui.end_row();
         });
+    connection_changed
 }
 
-fn render_auth_fields(editor: &mut ConnectionEditor, ui: &mut egui::Ui) {
+fn render_auth_fields(editor: &mut ConnectionEditor, ui: &mut egui::Ui) -> bool {
     match editor.auth_kind {
-        AuthKindSelection::None => {}
+        AuthKindSelection::None => false,
         AuthKindSelection::Token => {
             ui.label(t("connection.field_token"));
-            ui.add(egui::TextEdit::singleline(&mut editor.token).password(true));
+            let changed = ui
+                .add(egui::TextEdit::singleline(&mut editor.token).password(true))
+                .changed();
             ui.end_row();
+            changed
         }
         AuthKindSelection::UserPassword => {
             ui.label(t("connection.field_username"));
-            ui.text_edit_singleline(&mut editor.username);
+            let mut changed = ui.text_edit_singleline(&mut editor.username).changed();
             ui.end_row();
             ui.label(t("connection.field_password"));
-            ui.add(egui::TextEdit::singleline(&mut editor.password).password(true));
+            changed |= ui
+                .add(egui::TextEdit::singleline(&mut editor.password).password(true))
+                .changed();
             ui.end_row();
+            changed
         }
         AuthKindSelection::NKey => {
             ui.label(t("connection.field_nkey_seed"));
-            ui.add(egui::TextEdit::singleline(&mut editor.nkey_seed).password(true));
+            let changed = ui
+                .add(egui::TextEdit::singleline(&mut editor.nkey_seed).password(true))
+                .changed();
             ui.end_row();
+            changed
         }
         AuthKindSelection::CredentialsFile => {
             ui.label(t("connection.field_creds_file"));
-            ui.text_edit_singleline(&mut editor.creds_path);
+            let changed = ui.text_edit_singleline(&mut editor.creds_path).changed();
             ui.end_row();
+            changed
         }
         AuthKindSelection::TlsClientCert => {
             ui.label(t("connection.field_cert_path"));
-            ui.text_edit_singleline(&mut editor.cert_path);
+            let mut changed = ui.text_edit_singleline(&mut editor.cert_path).changed();
             ui.end_row();
             ui.label(t("connection.field_key_path"));
-            ui.text_edit_singleline(&mut editor.key_path);
+            changed |= ui.text_edit_singleline(&mut editor.key_path).changed();
             ui.end_row();
+            changed
         }
     }
 }

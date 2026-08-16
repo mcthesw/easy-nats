@@ -53,6 +53,7 @@ impl EasyNatsApp {
             user_wants_connected: HashSet::from([DEMO_CONNECTION_ID]),
             selected_conn: Some(DEMO_CONNECTION_ID),
             editor: ConnectionEditor::default(),
+            next_connection_test_request_id: 1,
             stream_editor: StreamCreateEditor::default(),
             stream_publish_editor: StreamPublishEditor::default(),
             consumer_editor: ConsumerCreateEditor::default(),

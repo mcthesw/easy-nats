@@ -1,6 +1,5 @@
 use eframe::egui;
 use egui_dock::DockArea;
-use nats_backend::ConnectionStatusKind;
 
 use crate::tabs::{AppTabViewer, TabAction, TabKind};
 
@@ -38,15 +37,22 @@ impl eframe::App for EasyNatsApp {
             .iter()
             .map(|connection| (connection.id, connection.name.clone()))
             .collect();
-        // Only disambiguate tabs by connection when it can actually be ambiguous;
-        // with a single connected connection the suffix just bloats the tab bar.
-        let connected_count = self
-            .conn_statuses
-            .values()
-            .filter(|status| matches!(status, ConnectionStatusKind::Connected))
-            .count();
+        // Only disambiguate tabs when open tabs span multiple connections.
+        // A temporarily disconnected, reconnecting connection keeps its tabs.
+        let mut first_tab_connection = None;
+        let tabs_span_multiple_connections = self
+            .dock_state
+            .iter_all_tabs()
+            .filter_map(|(_, tab)| tab.connection_id())
+            .any(|connection_id| match first_tab_connection {
+                Some(first) => connection_id != first,
+                None => {
+                    first_tab_connection = Some(connection_id);
+                    false
+                }
+            });
         let show_connection_in_title =
-            self.runtime_mode.shows_connection_in_tab_title() && connected_count > 1;
+            self.runtime_mode.shows_connection_in_tab_title() && tabs_span_multiple_connections;
         let mut tab_actions = Vec::new();
         let prev_style = ui.ctx().global_style();
         let mut dock_egui_style = (*prev_style).clone();

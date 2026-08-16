@@ -482,6 +482,13 @@ impl KvBucketInfo {
     }
 }
 
+#[cfg(feature = "native")]
+fn format_rfc3339(value: time::OffsetDateTime) -> String {
+    value
+        .format(&time::format_description::well_known::Rfc3339)
+        .unwrap_or_else(|_| value.to_string())
+}
+
 impl KvEntryInfo {
     #[cfg(feature = "native")]
     pub fn from_entry(entry: &async_nats::jetstream::kv::Entry) -> Self {
@@ -491,12 +498,7 @@ impl KvEntryInfo {
             value: entry.value.to_vec(),
             revision: Some(entry.revision),
             delta: Some(entry.delta),
-            created: Some(
-                entry
-                    .created
-                    .format(&time::format_description::well_known::Rfc3339)
-                    .unwrap_or_else(|_| entry.created.to_string()),
-            ),
+            created: Some(format_rfc3339(entry.created)),
             operation: Some(format!("{:?}", entry.operation)),
         }
     }
@@ -522,10 +524,7 @@ impl KvHistoryItem {
             value: entry.value.to_vec(),
             revision: entry.revision,
             delta: entry.delta,
-            created: entry
-                .created
-                .format(&time::format_description::well_known::Rfc3339)
-                .unwrap_or_else(|_| entry.created.to_string()),
+            created: format_rfc3339(entry.created),
             operation: format!("{:?}", entry.operation),
         }
     }
@@ -555,10 +554,7 @@ impl ObjectStoreObjectInfo {
             description: info.description.clone().unwrap_or_default(),
             size: info.size,
             chunks: info.chunks,
-            modified: info.modified.map(|time| {
-                time.format(&time::format_description::well_known::Rfc3339)
-                    .unwrap_or_else(|_| time.to_string())
-            }),
+            modified: info.modified.map(format_rfc3339),
             digest: info.digest.clone(),
         }
     }

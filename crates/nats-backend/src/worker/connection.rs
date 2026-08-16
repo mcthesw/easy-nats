@@ -78,19 +78,16 @@ pub(crate) async fn handle_disconnect(
 }
 
 pub(crate) async fn handle_test_connection(
+    request_id: u64,
     config: ConnectionConfig,
     evt_tx: &mpsc::Sender<BackendEvent>,
 ) {
-    let connection_id = config.id;
     let result = match do_connect(&config, None).await {
         Ok(_) => Ok(()),
         Err(e) => Err(e.to_string()),
     };
     let _ = evt_tx
-        .send(BackendEvent::ConnectionTestResult {
-            connection_id,
-            result,
-        })
+        .send(BackendEvent::ConnectionTestResult { request_id, result })
         .await;
 }
 
@@ -99,7 +96,6 @@ async fn do_connect(
     evt_tx: Option<&mpsc::Sender<BackendEvent>>,
 ) -> Result<Client, Box<dyn std::error::Error + Send + Sync>> {
     let id = config.id;
-    let event_tx = evt_tx.cloned();
 
     let mut opts = match &config.auth {
         AuthMethod::None => async_nats::ConnectOptions::new(),
@@ -124,29 +120,30 @@ async fn do_connect(
         opts = opts.require_tls(true);
     }
 
-    opts = opts.name(&config.name).event_callback(move |event| {
-        let tx = event_tx.clone();
-        async move {
-            let Some(tx) = tx else {
-                return;
-            };
-            let status = match event {
-                async_nats::Event::Connected => ConnectionStatusKind::Connected,
-                async_nats::Event::Disconnected => ConnectionStatusKind::Disconnected,
-                async_nats::Event::ClientError(e) => ConnectionStatusKind::Error(e.to_string()),
-                other => {
-                    tracing::debug!(connection_id = id, %other, "NATS event");
-                    return;
-                }
-            };
-            let _ = tx
-                .send(BackendEvent::ConnectionStatus {
-                    connection_id: id,
-                    status,
-                })
-                .await;
-        }
-    });
+    opts = opts.name(&config.name);
+
+    if let Some(event_tx) = evt_tx.cloned() {
+        opts = opts.event_callback(move |event| {
+            let tx = event_tx.clone();
+            async move {
+                let status = match event {
+                    async_nats::Event::Connected => ConnectionStatusKind::Connected,
+                    async_nats::Event::Disconnected => ConnectionStatusKind::Disconnected,
+                    async_nats::Event::ClientError(e) => ConnectionStatusKind::Error(e.to_string()),
+                    other => {
+                        tracing::debug!(connection_id = id, %other, "NATS event");
+                        return;
+                    }
+                };
+                let _ = tx
+                    .send(BackendEvent::ConnectionStatus {
+                        connection_id: id,
+                        status,
+                    })
+                    .await;
+            }
+        });
+    }
 
     let addrs: Vec<async_nats::ServerAddr> = config
         .urls
