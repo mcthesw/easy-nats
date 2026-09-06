@@ -42,7 +42,6 @@ they show their shortcuts and explain when they are unavailable.
 | --- | --- | --- |
 | Search workspace | Ctrl+Shift+F | Cmd+Shift+F |
 | New connection | Ctrl+N | Cmd+N |
-| Open publisher / subscriber | Ctrl+P / Ctrl+Shift+S | Cmd+P / Cmd+Shift+S |
 | Close current tab | Ctrl+W | Cmd+W |
 | Recent tabs in the focused split (release Control to switch) | Ctrl+Tab / Ctrl+Shift+Tab | Control+Tab / Control+Shift+Tab |
 | Submit the current form | Ctrl+Enter | Cmd+Enter |
