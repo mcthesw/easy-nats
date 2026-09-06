@@ -48,7 +48,7 @@ struct State {
     palette: bool,
     focus_first: Option<Id>,
     focus_tab: Option<Id>,
-    focus_next: bool,
+    current_tab: Option<Id>,
     restore_focus: Option<Id>,
     cancel: Option<Id>,
     connections: std::collections::HashSet<u64>,
@@ -313,8 +313,11 @@ impl Form {
                 .map(|f| f.restore)
         });
         state(&ctx, |s| {
-            if ((window && restore.is_none()) || s.focus_next) && !s.palette {
-                s.focus_next = false;
+            let focus_tab = s.focus_tab.is_some() && s.focus_tab == s.current_tab;
+            if ((window && restore.is_none()) || focus_tab) && !s.palette {
+                if focus_tab {
+                    s.focus_tab = None;
+                }
                 s.focus_first = Some(id);
                 if window {
                     s.active_window = Some(id);
@@ -357,13 +360,33 @@ pub(crate) fn restore_focus(ctx: &Context, id: Id) {
 pub(crate) fn request_tab_focus(ctx: &Context, id: Id) {
     state(ctx, |s| s.focus_tab = Some(id));
 }
-pub(crate) fn enter_tab(ctx: &Context, id: Id) {
-    state(ctx, |s| {
-        if s.focus_tab == Some(id) {
-            s.focus_next = true;
-            s.focus_tab = None;
-        }
-    });
+/// Limits deferred form focus to the target tab's render scope, including early returns.
+#[must_use]
+pub(crate) struct TabFocusScope {
+    ctx: Context,
+    id: Id,
+    previous: Option<Id>,
+}
+
+pub(crate) fn enter_tab(ctx: &Context, id: Id) -> TabFocusScope {
+    let previous = state(ctx, |s| s.current_tab.replace(id));
+    TabFocusScope {
+        ctx: ctx.clone(),
+        id,
+        previous,
+    }
+}
+
+impl Drop for TabFocusScope {
+    fn drop(&mut self) {
+        state(&self.ctx, |s| {
+            // A tab without a form must not pass its request to another split or frame.
+            if s.focus_tab == Some(self.id) {
+                s.focus_tab = None;
+            }
+            s.current_tab = self.previous;
+        });
+    }
 }
 pub(crate) fn set_connections(ctx: &Context, connections: impl Iterator<Item = u64>) {
     state(ctx, |s| s.connections = connections.collect());
