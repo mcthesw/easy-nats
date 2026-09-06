@@ -59,8 +59,6 @@ impl Command {
             Self::SwitchTab => egui::KeyboardShortcut::new(Modifiers::CTRL, Key::Tab),
             Self::Search => keyboard::shortcut(Key::F, true),
             Self::Connection => keyboard::shortcut(Key::N, false),
-            Self::Publisher => keyboard::shortcut(Key::P, false),
-            Self::Subscriber => keyboard::shortcut(Key::S, true),
             Self::Close => keyboard::shortcut(Key::W, false),
             _ => return None,
         })

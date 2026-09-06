@@ -262,20 +262,12 @@ fn render_pubsub_section(ui: &mut egui::Ui, id: u64, action: &mut Option<Sidebar
         .show(ui, |ui| {
             if ui
                 .selectable_label(false, t("sidebar.open_publisher"))
-                .on_hover_text(
-                    ui.ctx()
-                        .format_shortcut(&crate::keyboard::shortcut(egui::Key::P, false)),
-                )
                 .clicked()
             {
                 *action = Some(SidebarAction::OpenPublisher(id));
             }
             if ui
                 .selectable_label(false, t("sidebar.open_subscriber"))
-                .on_hover_text(
-                    ui.ctx()
-                        .format_shortcut(&crate::keyboard::shortcut(egui::Key::S, true)),
-                )
                 .clicked()
             {
                 *action = Some(SidebarAction::OpenSubscriber(id));
