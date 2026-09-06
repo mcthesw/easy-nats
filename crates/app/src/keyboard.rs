@@ -99,9 +99,6 @@ pub(crate) fn ime_blocked(ctx: &Context) -> bool {
 }
 
 pub(crate) fn begin_frame(ctx: &Context) {
-    if let Some(id) = state(ctx, |s| s.restore_focus.take()) {
-        ctx.memory_mut(|m| m.request_focus(id));
-    }
     let events = ctx.input(|i| i.events.clone());
     let focus = ctx.memory(|m| m.focused());
     let focused_layer = focus
@@ -218,6 +215,22 @@ pub(crate) fn begin_frame(ctx: &Context) {
 }
 
 pub(crate) fn end_frame(ctx: &Context) {
+    // Restore after widgets have rendered. A just-closed modal can otherwise
+    // make the target TextEdit surrender a focus request made at frame start.
+    if !palette_open(ctx)
+        && let Some(id) = state(ctx, |s| s.restore_focus)
+    {
+        if let Some(response) = ctx.read_response(id) {
+            if response.enabled() && ctx.memory(|m| m.allows_interaction(response.layer_id)) {
+                response.request_focus();
+                state(ctx, |s| s.restore_focus = None);
+            }
+            ctx.request_repaint();
+        } else {
+            state(ctx, |s| s.restore_focus = None);
+        }
+    }
+
     let focus = ctx.memory(|m| m.focused());
     let restore = state(ctx, |s| {
         s.pending = None;

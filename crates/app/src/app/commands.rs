@@ -439,4 +439,48 @@ mod tests {
         assert!(entry.matches("pub 发布"));
         assert!(!entry.matches("delete"));
     }
+    #[test]
+    fn closing_palette_restores_the_original_text_field() {
+        let ctx = Context::default();
+        let mut app = app();
+        let mut value = String::new();
+        let mut frame = |events| {
+            let _ = ctx.run_ui(
+                egui::RawInput {
+                    events,
+                    ..Default::default()
+                },
+                |ui| {
+                    keyboard::begin_frame(&ctx);
+                    {
+                        let _form = keyboard::Form::new(ui, "palette_origin", false);
+                        keyboard::text_edit(
+                            ui,
+                            egui::TextEdit::multiline(&mut value).id(Id::new("origin")),
+                            true,
+                        );
+                        keyboard::primary_button(ui, true, "Save");
+                    }
+                    keyboard::end_frame(&ctx);
+                    app.render_command_palette(&ctx);
+                },
+            );
+        };
+        frame(vec![]);
+        ctx.memory_mut(|m| m.request_focus(Id::new("origin")));
+        frame(vec![]);
+        open_palette(&ctx);
+        frame(vec![]);
+        frame(vec![]);
+        frame(vec![egui::Event::Key {
+            key: Key::Escape,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }]);
+        frame(vec![]);
+        frame(vec![]);
+        assert_eq!(ctx.memory(|m| m.focused()), Some(Id::new("origin")));
+    }
 }

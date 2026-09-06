@@ -31,6 +31,29 @@ Read JSON, MsgPack, Protobuf without leaving the app.
 
 ![Inspect a real payload with automatic JSON detection and a hex dump](assets/demos/inspect-real-payloads.gif)
 
+## Keyboard controls
+
+Open **Commands** with **Ctrl+Shift+P** (macOS: **Cmd+Shift+P**) or the ⌘ button
+beside Connections. Search in English or Chinese, use ↑/↓ to select, and press
+Enter to run. Commands show their shortcuts and explain when they are unavailable.
+
+| Action | Windows / Linux | macOS |
+| --- | --- | --- |
+| Search workspace | Ctrl+Shift+F | Cmd+Shift+F |
+| New connection | Ctrl+N | Cmd+N |
+| Open publisher / subscriber | Ctrl+P / Ctrl+Shift+S | Cmd+P / Cmd+Shift+S |
+| Close current tab | Ctrl+W | Cmd+W |
+| Next / previous tab in the focused split | Ctrl+Tab / Ctrl+Shift+Tab | Control+Tab / Control+Shift+Tab |
+| Submit the current form | Ctrl+Enter | Cmd+Enter |
+| Publisher request | Ctrl+Shift+Enter | Cmd+Shift+Enter |
+
+Tab and Shift+Tab move between controls. Subject history uses ↑/↓ to select a
+candidate; Enter accepts it without submitting. A subsequent Enter submits a
+single-line form. Enter in a multiline editor inserts a newline. Esc closes the
+innermost candidate list, command panel, or editor; it does not close a tab.
+Deletion and purge are excluded from generic form submission. Closing an editor
+or tab keeps the existing behavior: unsubmitted drafts are discarded.
+
 ## Install
 
 Pre-built binaries are available on the [Releases](https://github.com/mcthesw/easy-nats/releases) page.
