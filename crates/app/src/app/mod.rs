@@ -1,4 +1,5 @@
 mod actions;
+mod commands;
 #[cfg(target_arch = "wasm32")]
 mod demo;
 mod editors;

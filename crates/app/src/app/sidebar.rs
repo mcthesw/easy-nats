@@ -36,11 +36,32 @@ pub(crate) fn render_sidebar(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
 }
 
 fn render_sidebar_header(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
-    ui.heading(t("sidebar.connections_heading"));
+    ui.horizontal(|ui| {
+        ui.heading(t("sidebar.connections_heading"));
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            if ui
+                .small_button("⌘")
+                .on_hover_text(format!(
+                    "{} ({})",
+                    t("keyboard.commands"),
+                    ui.ctx()
+                        .format_shortcut(&crate::keyboard::shortcut(egui::Key::P, true))
+                ))
+                .clicked()
+            {
+                super::commands::open_palette(ui.ctx());
+            }
+        });
+    });
     ui.horizontal(|ui| {
         if ui
             .small_button("＋")
-            .on_hover_text(t("sidebar.connection_new"))
+            .on_hover_text(format!(
+                "{} ({})",
+                t("sidebar.connection_new"),
+                ui.ctx()
+                    .format_shortcut(&crate::keyboard::shortcut(egui::Key::N, false))
+            ))
             .clicked()
         {
             app.open_new_editor();
@@ -55,7 +76,12 @@ fn render_sidebar_header(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
         }
         if ui
             .small_button("🔍")
-            .on_hover_text(t("search_workspace.title"))
+            .on_hover_text(format!(
+                "{} ({})",
+                t("search_workspace.title"),
+                ui.ctx()
+                    .format_shortcut(&crate::keyboard::shortcut(egui::Key::F, true))
+            ))
             .clicked()
         {
             app.open_or_focus_search_workspace();
@@ -236,12 +262,20 @@ fn render_pubsub_section(ui: &mut egui::Ui, id: u64, action: &mut Option<Sidebar
         .show(ui, |ui| {
             if ui
                 .selectable_label(false, t("sidebar.open_publisher"))
+                .on_hover_text(
+                    ui.ctx()
+                        .format_shortcut(&crate::keyboard::shortcut(egui::Key::P, false)),
+                )
                 .clicked()
             {
                 *action = Some(SidebarAction::OpenPublisher(id));
             }
             if ui
                 .selectable_label(false, t("sidebar.open_subscriber"))
+                .on_hover_text(
+                    ui.ctx()
+                        .format_shortcut(&crate::keyboard::shortcut(egui::Key::S, true)),
+                )
                 .clicked()
             {
                 *action = Some(SidebarAction::OpenSubscriber(id));

@@ -1,0 +1,14 @@
+commands: {en: "Commands", zh: "命令"}
+search_commands: {en: "Search commands…", zh: "搜索命令…"}
+no_commands: {en: "No matching commands", zh: "没有匹配的命令"}
+palette_help: {en: "↑ ↓ Navigate    Enter Run    Esc Close", zh: "↑ ↓ 选择    Enter 执行    Esc 关闭"}
+publisher: {en: "Open Publisher", zh: "打开发布页"}
+subscriber: {en: "Open Subscriber", zh: "打开订阅页"}
+close_tab: {en: "Close Current Tab", zh: "关闭当前标签"}
+next_tab: {en: "Next Tab", zh: "下一标签"}
+previous_tab: {en: "Previous Tab", zh: "上一标签"}
+finish_window: {en: "Finish or cancel the active window first", zh: "请先完成或取消活动窗口"}
+connection_required: {en: "Select a connected server", zh: "请选择已连接的服务器"}
+no_closable_tab: {en: "No closable tab is active", zh: "当前没有可关闭的标签"}
+no_active_tab: {en: "No active tab", zh: "没有活动标签"}
+form_invalid: {en: "Complete the required fields or wait for the current operation", zh: "请填写必填字段，或等待当前操作完成"}
