@@ -15,6 +15,7 @@ struct Switcher {
     restore: Option<Id>,
     navigate: i8,
     confirm: bool,
+    scroll_to_selected: bool,
 }
 
 fn state(ctx: &Context) -> Switcher {
@@ -160,6 +161,7 @@ impl EasyNatsApp {
             keyboard::restore_focus(ctx, id);
         }
         self.record_tab_visit(ctx);
+        ctx.request_repaint();
     }
 
     // Consume navigation before the underlying dock or text fields see it.
@@ -209,6 +211,7 @@ impl EasyNatsApp {
         }
         let results = self.filtered_tabs(&s);
         if next || previous || down || up {
+            s.scroll_to_selected = true;
             let index = results
                 .iter()
                 .position(|(i, _)| *i == s.selected)
@@ -255,9 +258,14 @@ impl EasyNatsApp {
         }
         let mut chosen = None;
         let id = Id::new("tab_switcher.modal");
-        let modal = egui::Modal::new(id).area(egui::Modal::default_area(id).fade_in(false));
+        let modal = egui::Modal::new(id).area(
+            egui::Modal::default_area(id)
+                .fade_in(false)
+                .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 40.0)),
+        );
         let response = modal.show(ctx, |ui| {
             ui.set_width((ctx.content_rect().width() - 64.0).clamp(280.0, 600.0));
+            ui.visuals_mut().weak_text_alpha = 0.85;
             ui.strong(t(if s.held_ctrl {
                 "keyboard.recent_tabs"
             } else {
@@ -280,6 +288,7 @@ impl EasyNatsApp {
                     search.request_focus();
                 }
                 if search.changed() {
+                    s.scroll_to_selected = true;
                     s.selected = self.filtered_tabs(&s).first().map_or(0, |(i, _)| *i);
                 }
             }
@@ -288,6 +297,7 @@ impl EasyNatsApp {
                 s.selected = results.first().map_or(0, |(i, _)| *i);
             }
             if s.navigate != 0 && !results.is_empty() {
+                s.scroll_to_selected = true;
                 let index = results
                     .iter()
                     .position(|(i, _)| *i == s.selected)
@@ -312,11 +322,12 @@ impl EasyNatsApp {
                         let selected = index == s.selected;
                         let row = ui.add(
                             egui::Button::new(&label)
+                                .truncate()
                                 .selected(selected)
                                 .frame(selected)
                                 .min_size(egui::vec2(ui.available_width(), 30.0)),
                         );
-                        if selected {
+                        if selected && (s.just_opened || s.scroll_to_selected) {
                             row.scroll_to_me(Some(egui::Align::Center));
                         }
                         if row.clicked() {
@@ -336,6 +347,7 @@ impl EasyNatsApp {
             self.finish_tab_switcher(ctx, &s, chosen);
         } else {
             s.just_opened = ctx.will_discard();
+            s.scroll_to_selected = false;
             save(ctx, s);
         }
     }
