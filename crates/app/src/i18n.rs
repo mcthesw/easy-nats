@@ -59,6 +59,10 @@ static CURRENT_LANG: AtomicU8 = AtomicU8::new(0);
 /// Initialise the i18n system. Must be called once before any `t()` calls.
 pub fn init(lang: Language) {
     let yaml_sources: &[(&str, &str)] = &[
+        (
+            "keyboard",
+            include_str!("../../../assets/i18n/keyboard.yaml"),
+        ),
         ("common", include_str!("../../../assets/i18n/common.yaml")),
         ("sidebar", include_str!("../../../assets/i18n/sidebar.yaml")),
         (

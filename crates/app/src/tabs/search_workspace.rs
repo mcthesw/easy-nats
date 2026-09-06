@@ -145,12 +145,19 @@ fn render_toolbar(
 ) {
     let before = (state.query.clone(), state.primary, state.secondary);
     ui.horizontal_wrapped(|ui| {
-        ui.add(
+        let search_input = ui.add(
             egui::TextEdit::singleline(&mut state.query)
                 .id_salt("search_workspace_query")
                 .hint_text(t("search_workspace.query_placeholder"))
                 .desired_width((ui.available_width() - 190.0).clamp(160.0, 420.0)),
         );
+        if ui
+            .ctx()
+            .data_mut(|d| d.remove_temp::<bool>(egui::Id::new("keyboard.focus_search")))
+            .unwrap_or(false)
+        {
+            search_input.request_focus();
+        }
         egui::ComboBox::from_id_salt("search_workspace_fields")
             .width(116.0)
             .selected_text(t("common.search_fields"))

@@ -203,6 +203,8 @@ impl EasyNatsApp {
             .find_tab_from(|existing| same_tab(existing, &tab))
         {
             let _ = self.dock_state.set_active_tab(path);
+            self.dock_state
+                .set_focused_node_and_surface(path.node_path());
             return;
         }
 
@@ -272,6 +274,8 @@ impl EasyNatsApp {
             .find_tab_from(|existing| same_tab(existing, &tab))
         {
             let _ = self.dock_state.set_active_tab(path);
+            self.dock_state
+                .set_focused_node_and_surface(path.node_path());
         } else {
             self.dock_state.push_to_focused_leaf(tab);
         }
@@ -639,6 +643,8 @@ impl EasyNatsApp {
                 .find_tab_from(|tab| matches_pubsub_tab(tab, connection_id, tab_kind))
         {
             let _ = self.dock_state.set_active_tab(path);
+            self.dock_state
+                .set_focused_node_and_surface(path.node_path());
             return;
         }
 

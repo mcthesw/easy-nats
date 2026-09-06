@@ -33,6 +33,7 @@ impl eframe::App for EasyNatsApp {
                 matches!(status, nats_backend::ConnectionStatusKind::Connected).then_some(*id)
             }),
         );
+        self.handle_shortcuts(ui.ctx());
         windows::render_windows(self, ui);
         sidebar::render_sidebar(self, ui);
 
@@ -273,6 +274,7 @@ impl eframe::App for EasyNatsApp {
         }
 
         crate::keyboard::end_frame(ui.ctx());
+        self.render_command_palette(ui.ctx());
         self.toasts.show(ui.ctx());
     }
 }
