@@ -384,8 +384,16 @@ impl EasyNatsApp {
             p.open = false;
             keyboard::set_palette_open(ctx, false);
             let switching_tabs = matches!(&chosen, Some(Entry::Workspace(Command::SwitchTab)));
-            if !switching_tabs && let Some(id) = p.restore {
-                keyboard::restore_focus(ctx, id);
+            if let Some(id) = p.restore {
+                match &chosen {
+                    None | Some(Entry::Form(_)) => keyboard::restore_focus(ctx, id),
+                    Some(Entry::Workspace(Command::Connection)) => {
+                        // The new editor captures its return focus on the next frame.
+                        // A deferred restoration would override its initial field focus.
+                        ctx.memory_mut(|m| m.request_focus(id));
+                    }
+                    Some(Entry::Workspace(_)) => {}
+                }
             }
             if let Some(entry) = chosen {
                 match entry {
@@ -505,5 +513,94 @@ mod tests {
         frame(vec![]);
         frame(vec![]);
         assert_eq!(ctx.memory(|m| m.focused()), Some(Id::new("origin")));
+    }
+    #[test]
+    fn palette_navigation_keeps_focus_in_destination_split() {
+        let ctx = Context::default();
+        let mut app = app();
+        let [left, _] = app.dock_state.main_surface_mut().split_right(
+            egui_dock::NodeIndex::root(),
+            0.5,
+            vec![TabKind::SearchWorkspace {
+                state: Default::default(),
+            }],
+        );
+        app.dock_state
+            .set_focused_node_and_surface(egui_dock::NodePath::new(
+                egui_dock::SurfaceIndex::main(),
+                left,
+            ));
+        let mut origin = String::new();
+        let mut frame = |events| {
+            let _ = ctx.run_ui(
+                egui::RawInput {
+                    screen_rect: Some(egui::Rect::from_min_size(
+                        egui::Pos2::ZERO,
+                        egui::vec2(1200.0, 700.0),
+                    )),
+                    events,
+                    ..Default::default()
+                },
+                |ui| {
+                    keyboard::begin_frame(&ctx);
+                    ui.columns(2, |columns| {
+                        {
+                            let ui = &mut columns[0];
+                            let _form = keyboard::Form::new(ui, "origin_form", false);
+                            keyboard::text_edit(
+                                ui,
+                                egui::TextEdit::singleline(&mut origin).id(Id::new("origin")),
+                                false,
+                            );
+                        }
+                        let (_, TabKind::SearchWorkspace { state }) = app
+                            .dock_state
+                            .iter_all_tabs_mut()
+                            .find(|(_, tab)| matches!(tab, TabKind::SearchWorkspace { .. }))
+                            .unwrap()
+                        else {
+                            unreachable!()
+                        };
+                        crate::tabs::search_workspace_ui(
+                            &mut columns[1],
+                            state,
+                            &[],
+                            &mut Vec::new(),
+                        );
+                    });
+                    keyboard::end_frame(&ctx);
+                    app.render_command_palette(&ctx);
+                },
+            );
+        };
+        frame(vec![]);
+        ctx.memory_mut(|m| m.request_focus(Id::new("origin")));
+        frame(vec![]);
+        open_palette(&ctx);
+        let mut p = palette(&ctx);
+        p.query = "search workspace".into();
+        save_palette(&ctx, p);
+        frame(vec![]);
+        frame(vec![]);
+        frame(vec![egui::Event::Key {
+            key: Key::Enter,
+            physical_key: None,
+            pressed: true,
+            repeat: false,
+            modifiers: Modifiers::NONE,
+        }]);
+        frame(vec![]);
+        frame(vec![]);
+        frame(vec![egui::Event::Text("destination".into())]);
+        let (_, TabKind::SearchWorkspace { state }) = app
+            .dock_state
+            .iter_all_tabs()
+            .find(|(_, tab)| matches!(tab, TabKind::SearchWorkspace { .. }))
+            .unwrap()
+        else {
+            unreachable!()
+        };
+        assert_eq!(state.query, "destination");
+        assert!(origin.is_empty());
     }
 }

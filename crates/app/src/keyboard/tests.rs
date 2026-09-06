@@ -470,3 +470,39 @@ fn successful_window_submission_restores_its_opener() {
     frame(false, vec![]);
     assert_eq!(frame(false, vec![]), Some(Id::new("opener")));
 }
+
+#[test]
+fn formless_tab_does_not_focus_a_neighbor_or_later_form() {
+    let ctx = Context::default();
+    let mut anchor = String::new();
+    let mut neighbor = String::new();
+    let target = Id::new("formless_tab");
+    let mut frame = |show_neighbor: bool| {
+        let _ = ctx.run_ui(egui::RawInput::default(), |ui| {
+            begin_frame(&ctx);
+            {
+                let _tab = enter_tab(&ctx, target);
+                ui.add(egui::TextEdit::singleline(&mut anchor).id(Id::new("anchor")));
+            }
+            if show_neighbor {
+                let _tab = enter_tab(&ctx, Id::new("neighbor_tab"));
+                let _form = Form::new(ui, "neighbor_form", false);
+                text_edit(
+                    ui,
+                    egui::TextEdit::singleline(&mut neighbor).id(Id::new("neighbor")),
+                    false,
+                );
+            }
+            end_frame(&ctx);
+        });
+    };
+    frame(true);
+    ctx.memory_mut(|m| m.request_focus(Id::new("anchor")));
+    request_tab_focus(&ctx, target);
+    frame(true);
+    assert_eq!(ctx.memory(|m| m.focused()), Some(Id::new("anchor")));
+    request_tab_focus(&ctx, target);
+    frame(false);
+    frame(true);
+    assert_eq!(ctx.memory(|m| m.focused()), Some(Id::new("anchor")));
+}

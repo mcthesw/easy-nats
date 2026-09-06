@@ -13,7 +13,7 @@ use super::types::{AppTabViewer, TabAction, TabKind};
 
 pub(crate) fn render_tab(viewer: &mut AppTabViewer<'_>, ui: &mut egui::Ui, tab: &mut TabKind) {
     ui.push_id(tab_scope_id(tab), |ui| {
-        crate::keyboard::enter_tab(ui.ctx(), tab.tab_id());
+        let _focus_scope = crate::keyboard::enter_tab(ui.ctx(), tab.tab_id());
         render_tab_body(viewer, ui, tab);
     });
 }
