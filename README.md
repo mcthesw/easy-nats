@@ -43,7 +43,7 @@ Enter to run. Commands show their shortcuts and explain when they are unavailabl
 | New connection | Ctrl+N | Cmd+N |
 | Open publisher / subscriber | Ctrl+P / Ctrl+Shift+S | Cmd+P / Cmd+Shift+S |
 | Close current tab | Ctrl+W | Cmd+W |
-| Next / previous tab in the focused split | Ctrl+Tab / Ctrl+Shift+Tab | Control+Tab / Control+Shift+Tab |
+| Recent tabs in the focused split (release Control to switch) | Ctrl+Tab / Ctrl+Shift+Tab | Control+Tab / Control+Shift+Tab |
 | Submit the current form | Ctrl+Enter | Cmd+Enter |
 | Publisher request | Ctrl+Shift+Enter | Cmd+Shift+Enter |
 
@@ -109,3 +109,8 @@ The binary is output to `target/release/easy-nats` (or `easy-nats.exe` on Window
 ## License
 
 [MIT](LICENSE)
+
+The command palette includes **Switch to Tab…**, which searches open tabs across all
+splits by tab name, connection, and subject. Ctrl+Tab opens the current split’s
+recently used tabs; keep Control held to cycle, release it to switch, or press
+Escape to cancel. A quick Ctrl+Tab returns to the last used tab.

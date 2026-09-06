@@ -6,6 +6,7 @@ use crate::{i18n::t, keyboard, tabs::TabKind};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Command {
+    SwitchTab,
     Search,
     Connection,
     Publisher,
@@ -18,7 +19,8 @@ enum Command {
     Previous,
 }
 impl Command {
-    const ALL: [Self; 10] = [
+    const ALL: [Self; 11] = [
+        Self::SwitchTab,
         Self::Search,
         Self::Connection,
         Self::Publisher,
@@ -32,6 +34,7 @@ impl Command {
     ];
     fn label(self) -> &'static str {
         t(match self {
+            Self::SwitchTab => "keyboard.switch_tab",
             Self::Search => "search_workspace.title",
             Self::Connection => "sidebar.connection_new",
             Self::Publisher => "keyboard.publisher",
@@ -46,6 +49,7 @@ impl Command {
     }
     fn keywords(self) -> &'static str {
         match self {
+            Self::SwitchTab => "switch tabs recent 切换 标签 最近",
             Self::Search => "search workspace 搜索 工作区",
             Self::Connection => "new connection 新建连接",
             Self::Publisher => "publisher publish 发布",
@@ -65,14 +69,6 @@ impl Command {
             Self::Publisher => keyboard::shortcut(Key::P, false),
             Self::Subscriber => keyboard::shortcut(Key::S, true),
             Self::Close => keyboard::shortcut(Key::W, false),
-            Self::Next | Self::Previous => egui::KeyboardShortcut::new(
-                Modifiers {
-                    ctrl: true,
-                    shift: self == Self::Previous,
-                    ..Modifiers::NONE
-                },
-                Key::Tab,
-            ),
             _ => return None,
         })
     }
@@ -148,7 +144,7 @@ impl EasyNatsApp {
             .and_then(TabKind::connection_id)
             .or(self.selected_conn)
     }
-    fn command_leaf(&self) -> Option<egui_dock::NodePath> {
+    pub(super) fn command_leaf(&self) -> Option<egui_dock::NodePath> {
         self.dock_state.focused_leaf().or_else(|| {
             let node = self
                 .dock_state
@@ -163,7 +159,7 @@ impl EasyNatsApp {
                 .map(|_| path)
         })
     }
-    fn active_command_tab(&self) -> Option<&TabKind> {
+    pub(super) fn active_command_tab(&self) -> Option<&TabKind> {
         let path = self.command_leaf()?;
         let egui_dock::Node::Leaf(leaf) = &self.dock_state[path.surface][path.node] else {
             return None;
@@ -192,7 +188,9 @@ impl EasyNatsApp {
             {
                 return Some(t("keyboard.no_closable_tab"));
             }
-            Command::Next | Command::Previous if self.active_command_tab().is_none() => {
+            Command::SwitchTab | Command::Next | Command::Previous
+                if self.active_command_tab().is_none() =>
+            {
                 return Some(t("keyboard.no_active_tab"));
             }
             _ => {}
@@ -204,6 +202,7 @@ impl EasyNatsApp {
             return;
         }
         match command {
+            Command::SwitchTab => self.open_tab_switcher(ctx, false, false),
             Command::Search => {
                 self.open_or_focus_search_workspace();
                 ctx.data_mut(|d| d.insert_temp(Id::new("keyboard.focus_search"), true));
@@ -250,6 +249,10 @@ impl EasyNatsApp {
         }
     }
     pub(crate) fn handle_shortcuts(&mut self, ctx: &Context) {
+        self.record_tab_visit(ctx);
+        if self.handle_tab_switcher_input(ctx) {
+            return;
+        }
         if !self.runtime_mode.supports_local_files() || keyboard::ime_blocked(ctx) {
             return;
         }
@@ -257,6 +260,12 @@ impl EasyNatsApp {
             open_palette(ctx);
         }
         if keyboard::palette_open(ctx) || egui::Popup::is_any_open(ctx) {
+            return;
+        }
+        let next = keyboard::take_key(ctx, Modifiers::CTRL, Key::Tab);
+        let previous = keyboard::take_key(ctx, Modifiers::CTRL | Modifiers::SHIFT, Key::Tab);
+        if next || previous {
+            self.open_tab_switcher(ctx, true, previous);
             return;
         }
         for command in Command::ALL {
@@ -369,12 +378,18 @@ impl EasyNatsApp {
         if escape || response.backdrop_response.clicked() || chosen.is_some() {
             p.open = false;
             keyboard::set_palette_open(ctx, false);
-            if let Some(id) = p.restore {
+            let switching_tabs = matches!(&chosen, Some(Entry::Workspace(Command::SwitchTab)));
+            if !switching_tabs && let Some(id) = p.restore {
                 keyboard::restore_focus(ctx, id);
             }
             if let Some(entry) = chosen {
                 match entry {
-                    Entry::Workspace(command) => self.execute_command(ctx, command),
+                    Entry::Workspace(command) => {
+                        self.execute_command(ctx, command);
+                        if switching_tabs {
+                            self.inherit_switcher_focus(ctx, p.restore);
+                        }
+                    }
                     Entry::Form(action) => keyboard::queue_action(ctx, &action),
                 }
             }

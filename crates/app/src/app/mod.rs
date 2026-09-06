@@ -15,6 +15,7 @@ mod search_workspace;
 mod server_info_results;
 mod sidebar;
 mod stream_results;
+mod tab_switcher;
 mod ui;
 mod util;
 mod windows;
