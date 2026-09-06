@@ -12,3 +12,11 @@ connection_required: {en: "Select a connected server", zh: "请选择已连接�
 no_closable_tab: {en: "No closable tab is active", zh: "当前没有可关闭的标签"}
 no_active_tab: {en: "No active tab", zh: "没有活动标签"}
 form_invalid: {en: "Complete the required fields or wait for the current operation", zh: "请填写必填字段，或等待当前操作完成"}
+switch_tab: {en: "Switch to Tab…", zh: "切换到标签…"}
+recent_tabs: {en: "Recent Tabs", zh: "最近使用的标签"}
+current_split: {en: "Current split · Most recent first", zh: "当前分栏 · 按最近使用排序"}
+all_splits: {en: "All splits · Most recent first", zh: "所有分栏 · 按最近使用排序"}
+search_tabs: {en: "Search by tab, connection or subject…", zh: "搜索标签、连接或 Subject…"}
+no_tabs: {en: "No matching tabs", zh: "没有匹配的标签"}
+switcher_hold_help: {en: "Tab / Shift+Tab Select    Release Ctrl to switch    Esc Cancel", zh: "Tab / Shift+Tab 选择    松开 Ctrl 切换    Esc 取消"}
+switcher_help: {en: "↑ ↓ Select    Enter Switch    Esc Cancel", zh: "↑ ↓ 选择    Enter 切换    Esc 取消"}

@@ -274,7 +274,9 @@ impl eframe::App for EasyNatsApp {
         }
 
         crate::keyboard::end_frame(ui.ctx());
+        self.record_tab_visit(ui.ctx());
         self.render_command_palette(ui.ctx());
+        self.render_tab_switcher(ui.ctx());
         self.toasts.show(ui.ctx());
     }
 }
