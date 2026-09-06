@@ -82,6 +82,7 @@ fn render_subscription_controls(
     actions: &mut Vec<TabAction>,
     topic_suggestions: &[&str],
 ) {
+    let _form = crate::keyboard::Form::connected(ui, "subscription", false, connection_id);
     // Add new subscription input
     let mut do_subscribe = false;
     ui.horizontal(|ui| {
@@ -96,13 +97,7 @@ fn render_subscription_controls(
         let input_id = input_resp.id;
 
         let can_add = !state.subject_input.trim().is_empty();
-        let enter_pressed =
-            input_resp.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
-        if ui
-            .add_enabled(can_add, egui::Button::new(t("subscriber.add")))
-            .clicked()
-            || (enter_pressed && can_add)
-        {
+        if crate::keyboard::primary_button(ui, can_add, t("subscriber.add")) {
             do_subscribe = true;
             ui.memory_mut(|mem| mem.request_focus(input_id));
         }

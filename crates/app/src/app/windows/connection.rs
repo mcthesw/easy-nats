@@ -24,6 +24,7 @@ fn render_connection_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
         egui::Window::new(title)
             .resizable(false)
             .show(ui.ctx(), |ui| {
+                let _form = crate::keyboard::Form::new(ui, "connection_1", true);
                 if render_editor_grid(&mut app.editor, ui) {
                     app.editor.invalidate_test();
                 }
@@ -31,10 +32,7 @@ fn render_connection_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                 ui.horizontal(|ui| {
                     let valid =
                         !app.editor.name.trim().is_empty() && !app.editor.url.trim().is_empty();
-                    if ui
-                        .add_enabled(valid, egui::Button::new(t("common.save")))
-                        .clicked()
-                    {
+                    if crate::keyboard::primary_button(ui, valid, t("common.save")) {
                         save_requested = true;
                     }
                     let testing =
@@ -45,7 +43,7 @@ fn render_connection_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     {
                         test_requested = true;
                     }
-                    if ui.button(t("common.cancel")).clicked() {
+                    if crate::keyboard::cancel_button(ui) {
                         app.editor.invalidate_test();
                         app.editor.visible = false;
                     }
@@ -104,29 +102,33 @@ fn render_editor_grid(editor: &mut ConnectionEditor, ui: &mut egui::Ui) -> bool 
         .spacing([8.0, 4.0])
         .show(ui, |ui| {
             ui.label(t("connection.field_name"));
-            ui.text_edit_singleline(&mut editor.name);
+            crate::keyboard::singleline(ui, &mut editor.name);
             ui.end_row();
 
             ui.label(t("connection.field_url"));
-            connection_changed |= ui.text_edit_singleline(&mut editor.url).changed();
+            connection_changed |= crate::keyboard::singleline(ui, &mut editor.url).changed();
             ui.end_row();
 
             ui.label(t("connection.field_metrics_endpoint"));
-            ui.add(
+            crate::keyboard::text_edit(
+                ui,
                 egui::TextEdit::singleline(&mut editor.metrics_endpoint)
                     .hint_text(t("connection.metrics_endpoint_hint")),
+                false,
             );
             ui.end_row();
 
             ui.label(t("connection.field_auth"));
             let previous_auth_kind = editor.auth_kind;
-            egui::ComboBox::from_id_salt("auth_kind")
-                .selected_text(editor.auth_kind.label())
-                .show_ui(ui, |ui| {
+            crate::keyboard::combo_box(
+                ui,
+                egui::ComboBox::from_id_salt("auth_kind").selected_text(editor.auth_kind.label()),
+                |ui| {
                     for kind in AuthKindSelection::ALL {
                         ui.selectable_value(&mut editor.auth_kind, kind, kind.label());
                     }
-                });
+                },
+            );
             connection_changed |= editor.auth_kind != previous_auth_kind;
             ui.end_row();
 
@@ -141,17 +143,19 @@ fn render_editor_grid(editor: &mut ConnectionEditor, ui: &mut egui::Ui) -> bool 
             } else {
                 0
             };
-            egui::ComboBox::from_id_salt("tls_mode")
-                .selected_text(match mode {
+            crate::keyboard::combo_box(
+                ui,
+                egui::ComboBox::from_id_salt("tls_mode").selected_text(match mode {
                     1 => t("connection.tls_mode_required"),
                     2 => t("connection.tls_mode_first"),
                     _ => t("connection.tls_mode_off"),
-                })
-                .show_ui(ui, |ui| {
+                }),
+                |ui| {
                     ui.selectable_value(&mut mode, 0, t("connection.tls_mode_off"));
                     ui.selectable_value(&mut mode, 1, t("connection.tls_mode_required"));
                     ui.selectable_value(&mut mode, 2, t("connection.tls_mode_first"));
-                });
+                },
+            );
             editor.tls_enabled = mode != 0;
             editor.tls_first = mode == 2;
             connection_changed |= (editor.tls_enabled, editor.tls_first) != previous_tls_mode;
@@ -165,43 +169,52 @@ fn render_auth_fields(editor: &mut ConnectionEditor, ui: &mut egui::Ui) -> bool 
         AuthKindSelection::None => false,
         AuthKindSelection::Token => {
             ui.label(t("connection.field_token"));
-            let changed = ui
-                .add(egui::TextEdit::singleline(&mut editor.token).password(true))
-                .changed();
+            let changed = crate::keyboard::text_edit(
+                ui,
+                egui::TextEdit::singleline(&mut editor.token).password(true),
+                false,
+            )
+            .changed();
             ui.end_row();
             changed
         }
         AuthKindSelection::UserPassword => {
             ui.label(t("connection.field_username"));
-            let mut changed = ui.text_edit_singleline(&mut editor.username).changed();
+            let mut changed = crate::keyboard::singleline(ui, &mut editor.username).changed();
             ui.end_row();
             ui.label(t("connection.field_password"));
-            changed |= ui
-                .add(egui::TextEdit::singleline(&mut editor.password).password(true))
-                .changed();
+            changed |= crate::keyboard::text_edit(
+                ui,
+                egui::TextEdit::singleline(&mut editor.password).password(true),
+                false,
+            )
+            .changed();
             ui.end_row();
             changed
         }
         AuthKindSelection::NKey => {
             ui.label(t("connection.field_nkey_seed"));
-            let changed = ui
-                .add(egui::TextEdit::singleline(&mut editor.nkey_seed).password(true))
-                .changed();
+            let changed = crate::keyboard::text_edit(
+                ui,
+                egui::TextEdit::singleline(&mut editor.nkey_seed).password(true),
+                false,
+            )
+            .changed();
             ui.end_row();
             changed
         }
         AuthKindSelection::CredentialsFile => {
             ui.label(t("connection.field_creds_file"));
-            let changed = ui.text_edit_singleline(&mut editor.creds_path).changed();
+            let changed = crate::keyboard::singleline(ui, &mut editor.creds_path).changed();
             ui.end_row();
             changed
         }
         AuthKindSelection::TlsClientCert => {
             ui.label(t("connection.field_cert_path"));
-            let mut changed = ui.text_edit_singleline(&mut editor.cert_path).changed();
+            let mut changed = crate::keyboard::singleline(ui, &mut editor.cert_path).changed();
             ui.end_row();
             ui.label(t("connection.field_key_path"));
-            changed |= ui.text_edit_singleline(&mut editor.key_path).changed();
+            changed |= crate::keyboard::singleline(ui, &mut editor.key_path).changed();
             ui.end_row();
             changed
         }
@@ -212,9 +225,11 @@ fn render_delete_confirmation(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     let mut do_delete = None;
     if let Some(id) = app.editor.delete_confirm {
         let conn_name = app.conn_name(id);
-        egui::Window::new(t("connection.connection_delete_confirm_title"))
-            .resizable(false)
-            .show(ui.ctx(), |ui| {
+        egui::Modal::new(egui::Id::new("connection.connection_delete_confirm_title")).show(
+            ui.ctx(),
+            |ui| {
+                ui.heading(t("connection.connection_delete_confirm_title"));
+                let _form = crate::keyboard::Form::new(ui, "connection_2", true);
                 ui.label(format!(
                     "{} \"{}\"?",
                     t("connection.connection_delete_prompt"),
@@ -224,11 +239,12 @@ fn render_delete_confirmation(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     if ui.button(t("common.delete")).clicked() {
                         do_delete = Some(id);
                     }
-                    if ui.button(t("common.cancel")).clicked() {
+                    if crate::keyboard::cancel_button(ui) {
                         app.editor.delete_confirm = None;
                     }
                 });
-            });
+            },
+        );
     }
     if let Some(id) = do_delete {
         app.delete_connection(id);

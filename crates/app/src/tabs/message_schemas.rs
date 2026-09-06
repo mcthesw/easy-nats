@@ -34,24 +34,32 @@ fn render_source_editor(
     state: &mut MessageSchemasState,
     actions: &mut Vec<TabAction>,
 ) {
+    let _form = crate::keyboard::Form::new(ui, "render_source_editor", false);
     ui.label(egui::RichText::new(t("message_schema.sources")).strong());
     ui.horizontal_wrapped(|ui| {
-        ui.add(
+        crate::keyboard::text_edit(
+            ui,
             egui::TextEdit::singleline(&mut state.source_name)
                 .hint_text(t("message_schema.source_name"))
                 .desired_width(150.0),
+            false,
         );
-        egui::ComboBox::from_id_salt("schema_source_kind")
-            .selected_text(t(state.source_kind.label_key()))
-            .show_ui(ui, |ui| {
+        crate::keyboard::combo_box(
+            ui,
+            egui::ComboBox::from_id_salt("schema_source_kind")
+                .selected_text(t(state.source_kind.label_key())),
+            |ui| {
                 for kind in SchemaSourceKind::ALL {
                     ui.selectable_value(&mut state.source_kind, kind, t(kind.label_key()));
                 }
-            });
-        ui.add(
+            },
+        );
+        crate::keyboard::text_edit(
+            ui,
             egui::TextEdit::singleline(&mut state.source_path)
                 .hint_text(t("message_schema.source_path"))
                 .desired_width(280.0),
+            false,
         );
         if ui.button(t("message_schema.browse")).clicked() {
             #[cfg(not(target_arch = "wasm32"))]
@@ -68,10 +76,7 @@ fn render_source_editor(
             }
         }
         let can_add = !state.source_path.trim().is_empty();
-        if ui
-            .add_enabled(can_add, egui::Button::new(t("message_schema.add_source")))
-            .clicked()
-        {
+        if crate::keyboard::primary_button(ui, can_add, t("message_schema.add_source")) {
             let name = if state.source_name.trim().is_empty() {
                 fallback_name(&state.source_path)
             } else {
@@ -154,6 +159,7 @@ fn render_binding_editor(
     connections: &[(u64, String)],
     actions: &mut Vec<TabAction>,
 ) {
+    let _form = crate::keyboard::Form::new(ui, "render_binding_editor", false);
     ui.label(egui::RichText::new(t("message_schema.bindings")).strong());
     if manager.config().sources.is_empty() {
         ui.weak(t("message_schema.add_source_first"));
@@ -165,15 +171,19 @@ fn render_binding_editor(
     }
 
     ui.horizontal_wrapped(|ui| {
-        ui.add(
+        crate::keyboard::text_edit(
+            ui,
             egui::TextEdit::singleline(&mut state.binding_name)
                 .hint_text(t("message_schema.binding_name"))
                 .desired_width(140.0),
+            false,
         );
-        egui::ComboBox::from_id_salt("schema_binding_connection")
-            .width(155.0)
-            .selected_text(connection_label(state.binding_connection_id, connections))
-            .show_ui(ui, |ui| {
+        crate::keyboard::combo_box(
+            ui,
+            egui::ComboBox::from_id_salt("schema_binding_connection")
+                .width(155.0)
+                .selected_text(connection_label(state.binding_connection_id, connections)),
+            |ui| {
                 ui.selectable_value(
                     &mut state.binding_connection_id,
                     None,
@@ -186,23 +196,29 @@ fn render_binding_editor(
                         format!("{name} #{id}"),
                     );
                 }
-            });
-        ui.add(
+            },
+        );
+        crate::keyboard::text_edit(
+            ui,
             egui::TextEdit::singleline(&mut state.binding_subject_pattern)
                 .hint_text(t("message_schema.subject_pattern"))
                 .desired_width(170.0),
+            false,
         );
         render_source_selector(ui, state, manager);
         render_entry_selector(ui, state, manager);
-        egui::ComboBox::from_id_salt("schema_binding_policy")
-            .width(95.0)
-            .selected_text(t(state.binding_policy.label_key()))
-            .show_ui(ui, |ui| {
+        crate::keyboard::combo_box(
+            ui,
+            egui::ComboBox::from_id_salt("schema_binding_policy")
+                .width(95.0)
+                .selected_text(t(state.binding_policy.label_key())),
+            |ui| {
                 for policy in ValidationPolicy::ALL {
                     ui.selectable_value(&mut state.binding_policy, policy, t(policy.label_key()));
                 }
-            });
-        if ui.button(t("message_schema.add_binding")).clicked() {
+            },
+        );
+        if crate::keyboard::primary_button(ui, true, t("message_schema.add_binding")) {
             match build_binding_selector(state, manager) {
                 Ok((source_id, selector)) => {
                     if let Err(error) = SubjectPattern::parse(&state.binding_subject_pattern) {
@@ -253,10 +269,12 @@ fn render_source_selector(
         })
         .map(|source| source.name.clone())
         .unwrap_or_else(|| t("message_schema.select_source").to_string());
-    egui::ComboBox::from_id_salt("schema_binding_source")
-        .width(170.0)
-        .selected_text(selected_text)
-        .show_ui(ui, |ui| {
+    crate::keyboard::combo_box(
+        ui,
+        egui::ComboBox::from_id_salt("schema_binding_source")
+            .width(170.0)
+            .selected_text(selected_text),
+        |ui| {
             for source in &manager.config().sources {
                 if ui
                     .selectable_value(&mut state.binding_source_id, Some(source.id), &source.name)
@@ -265,7 +283,8 @@ fn render_source_selector(
                     state.binding_schema_entry.clear();
                 }
             }
-        });
+        },
+    );
 }
 
 fn render_entry_selector(
@@ -282,18 +301,21 @@ fn render_entry_selector(
     {
         state.binding_schema_entry = first.clone();
     }
-    egui::ComboBox::from_id_salt("schema_binding_entry")
-        .width(230.0)
-        .selected_text(if state.binding_schema_entry.is_empty() {
-            t("message_schema.select_schema").to_string()
-        } else {
-            state.binding_schema_entry.clone()
-        })
-        .show_ui(ui, |ui| {
+    crate::keyboard::combo_box(
+        ui,
+        egui::ComboBox::from_id_salt("schema_binding_entry")
+            .width(230.0)
+            .selected_text(if state.binding_schema_entry.is_empty() {
+                t("message_schema.select_schema").to_string()
+            } else {
+                state.binding_schema_entry.clone()
+            }),
+        |ui| {
             for entry in entries {
                 ui.selectable_value(&mut state.binding_schema_entry, entry.clone(), entry);
             }
-        });
+        },
+    );
 }
 
 fn render_bindings(

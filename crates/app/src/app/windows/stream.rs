@@ -17,22 +17,30 @@ fn render_create(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
         egui::Window::new(t("stream.create_title"))
             .resizable(false)
             .show(ui.ctx(), |ui| {
+                let _form = crate::keyboard::Form::connected(
+                    ui,
+                    "stream_1",
+                    true,
+                    app.stream_editor.connection_id,
+                );
                 egui::Grid::new("stream_create_grid")
                     .num_columns(2)
                     .spacing([8.0, 4.0])
                     .show(ui, |ui| {
                         ui.label(t("stream.name"));
-                        ui.text_edit_singleline(&mut app.stream_editor.name);
+                        crate::keyboard::singleline(ui, &mut app.stream_editor.name);
                         ui.end_row();
 
                         ui.label(t("stream.subjects"));
-                        ui.text_edit_singleline(&mut app.stream_editor.subjects);
+                        crate::keyboard::singleline(ui, &mut app.stream_editor.subjects);
                         ui.end_row();
 
                         ui.label(t("stream.storage"));
-                        egui::ComboBox::from_id_salt("stream_storage")
-                            .selected_text(app.stream_editor.storage.label())
-                            .show_ui(ui, |ui| {
+                        crate::keyboard::combo_box(
+                            ui,
+                            egui::ComboBox::from_id_salt("stream_storage")
+                                .selected_text(app.stream_editor.storage.label()),
+                            |ui| {
                                 ui.selectable_value(
                                     &mut app.stream_editor.storage,
                                     super::super::editors::StorageSelection::File,
@@ -43,13 +51,16 @@ fn render_create(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                                     super::super::editors::StorageSelection::Memory,
                                     "Memory",
                                 );
-                            });
+                            },
+                        );
                         ui.end_row();
 
                         ui.label(t("stream.retention"));
-                        egui::ComboBox::from_id_salt("stream_retention")
-                            .selected_text(app.stream_editor.retention.label())
-                            .show_ui(ui, |ui| {
+                        crate::keyboard::combo_box(
+                            ui,
+                            egui::ComboBox::from_id_salt("stream_retention")
+                                .selected_text(app.stream_editor.retention.label()),
+                            |ui| {
                                 ui.selectable_value(
                                     &mut app.stream_editor.retention,
                                     super::super::editors::RetentionSelection::Limits,
@@ -65,39 +76,37 @@ fn render_create(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                                     super::super::editors::RetentionSelection::WorkQueue,
                                     "WorkQueue",
                                 );
-                            });
+                            },
+                        );
                         ui.end_row();
 
                         ui.label(t("stream.max_msgs"));
-                        ui.text_edit_singleline(&mut app.stream_editor.max_messages);
+                        crate::keyboard::singleline(ui, &mut app.stream_editor.max_messages);
                         ui.end_row();
 
                         ui.label(t("stream.max_bytes"));
-                        ui.text_edit_singleline(&mut app.stream_editor.max_bytes);
+                        crate::keyboard::singleline(ui, &mut app.stream_editor.max_bytes);
                         ui.end_row();
 
                         ui.label(t("stream.max_age"));
-                        ui.text_edit_singleline(&mut app.stream_editor.max_age_secs);
+                        crate::keyboard::singleline(ui, &mut app.stream_editor.max_age_secs);
                         ui.end_row();
 
                         ui.label(t("stream.replicas"));
-                        ui.text_edit_singleline(&mut app.stream_editor.num_replicas);
+                        crate::keyboard::singleline(ui, &mut app.stream_editor.num_replicas);
                         ui.end_row();
 
                         ui.label(t("stream.description"));
-                        ui.text_edit_singleline(&mut app.stream_editor.description);
+                        crate::keyboard::singleline(ui, &mut app.stream_editor.description);
                         ui.end_row();
                     });
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     let valid = !app.stream_editor.name.trim().is_empty();
-                    if ui
-                        .add_enabled(valid, egui::Button::new(t("common.save")))
-                        .clicked()
-                    {
+                    if crate::keyboard::primary_button(ui, valid, t("common.save")) {
                         save_requested = true;
                     }
-                    if ui.button(t("common.cancel")).clicked() {
+                    if crate::keyboard::cancel_button(ui) {
                         app.stream_editor.visible = false;
                     }
                 });
@@ -119,6 +128,12 @@ fn render_publish(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
         egui::Window::new(title)
             .resizable(true)
             .show(ui.ctx(), |ui| {
+                let _form = crate::keyboard::Form::connected(
+                    ui,
+                    "stream_2",
+                    true,
+                    app.stream_publish_editor.connection_id,
+                );
                 egui::Grid::new("stream_publish_grid")
                     .num_columns(2)
                     .spacing([8.0, 4.0])
@@ -128,7 +143,7 @@ fn render_publish(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                         ui.end_row();
 
                         ui.label(t("publisher.subject"));
-                        ui.text_edit_singleline(&mut app.stream_publish_editor.subject);
+                        crate::keyboard::singleline(ui, &mut app.stream_publish_editor.subject);
                         ui.end_row();
                     });
 
@@ -142,15 +157,19 @@ fn render_publish(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                             app.stream_publish_editor.headers.iter_mut().enumerate()
                         {
                             ui.horizontal(|ui| {
-                                ui.add(
+                                crate::keyboard::text_edit(
+                                    ui,
                                     egui::TextEdit::singleline(key)
                                         .hint_text(t("publisher.header_key"))
                                         .desired_width(140.0),
+                                    false,
                                 );
-                                ui.add(
+                                crate::keyboard::text_edit(
+                                    ui,
                                     egui::TextEdit::singleline(val)
                                         .hint_text(t("publisher.header_value"))
                                         .desired_width(240.0),
+                                    false,
                                 );
                                 if ui.small_button("✕").clicked() {
                                     remove_idx = Some(idx);
@@ -214,11 +233,14 @@ fn render_publish(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     .id_salt("stream_publish_payload")
                     .max_height(220.0)
                     .show(ui, |ui| {
-                        ui.add(
+                        crate::keyboard::text_edit(
+                            ui,
                             egui::TextEdit::multiline(&mut app.stream_publish_editor.payload)
                                 .desired_width(f32::INFINITY)
                                 .desired_rows(8)
-                                .code_editor(),
+                                .code_editor()
+                                .lock_focus(false),
+                            true,
                         );
                     });
 
@@ -228,13 +250,10 @@ fn render_publish(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                         && outgoing_preview
                             .as_ref()
                             .is_none_or(|outgoing| outgoing.can_send);
-                    if ui
-                        .add_enabled(valid, egui::Button::new(t("publisher.publish")))
-                        .clicked()
-                    {
+                    if crate::keyboard::primary_button(ui, valid, t("publisher.publish")) {
                         publish_requested = true;
                     }
-                    if ui.button(t("common.cancel")).clicked() {
+                    if crate::keyboard::cancel_button(ui) {
                         app.stream_publish_editor.visible = false;
                     }
                 });

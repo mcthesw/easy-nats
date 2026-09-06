@@ -356,6 +356,7 @@ fn render_detail_panel(
     schema_manager: &MessageSchemaManager,
     syntax_palette: SyntaxPalette,
 ) {
+    let _form = crate::keyboard::Form::connected(ui, "render_detail_panel", false, connection_id);
     if state.selected_key.is_none() {
         ui.centered_and_justified(|ui| {
             ui.label(t("kv.select_key_hint"));
@@ -371,6 +372,73 @@ fn render_detail_panel(
         return;
     }
 
+    // Metadata
+    egui::Grid::new(("kv_detail_grid", connection_id, bucket_name))
+        .num_columns(2)
+        .spacing([8.0, 4.0])
+        .show(ui, |ui| {
+            ui.label(t("kv.key"));
+            crate::keyboard::singleline(ui, &mut state.entry_key);
+            ui.end_row();
+
+            ui.label(t("kv.revision"));
+            ui.label(
+                state
+                    .entry_revision
+                    .map(|rev| rev.to_string())
+                    .unwrap_or_else(|| t("kv.none").to_string()),
+            );
+            ui.end_row();
+
+            ui.label(t("kv.operation"));
+            ui.label(state.entry_operation.as_deref().unwrap_or(t("kv.none")));
+            ui.end_row();
+
+            ui.label(t("kv.created"));
+            ui.label(state.entry_created.as_deref().unwrap_or(t("kv.none")));
+            ui.end_row();
+        });
+
+    ui.separator();
+
+    // Value editor
+    ui.horizontal(|ui| {
+        ui.label(t("kv.value_editor"));
+        ui.label(t("common.payload_input_format"));
+        payload_input_format_selector(ui, "kv_value_input_fmt", &mut state.editor_input_format);
+        ui.label(t("common.payload_preview_format"));
+        format::format_selector(ui, "kv_value_fmt", &mut state.editor_format);
+        if ui.small_button(t("kv.format_json")).clicked()
+            && let Ok(val) = serde_json::from_str::<serde_json::Value>(&state.entry_value)
+            && let Ok(pretty) = serde_json::to_string_pretty(&val)
+        {
+            state.entry_value = pretty;
+        }
+        render_generate_json_button(
+            ui,
+            &schema_manager.payload_template(
+                connection_id,
+                &kv_subject(bucket_name, &normalized_entry_key(&state.entry_key)),
+            ),
+            &mut state.entry_value,
+        );
+    });
+    egui::ScrollArea::vertical()
+        .id_salt(("kv_value_editor", connection_id, bucket_name))
+        .max_height((ui.available_height() * 0.5).max(80.0))
+        .show(ui, |ui| {
+            crate::keyboard::text_edit(
+                ui,
+                egui::TextEdit::multiline(&mut state.entry_value)
+                    .desired_width(f32::INFINITY)
+                    .desired_rows(6)
+                    .code_editor()
+                    .lock_focus(false),
+                true,
+            );
+        });
+
+    ui.add_space(4.0);
     // Action toolbar
     let entry_key = normalized_entry_key(&state.entry_key);
     let can_save = !entry_key.is_empty();
@@ -386,16 +454,14 @@ fn render_detail_panel(
         None
     };
     ui.horizontal(|ui| {
-        if ui
-            .add_enabled(
-                can_save
-                    && outgoing_preview
-                        .as_ref()
-                        .is_none_or(|outgoing| outgoing.can_send),
-                egui::Button::new(t("common.save")),
-            )
-            .clicked()
-        {
+        if crate::keyboard::primary_button(
+            ui,
+            can_save
+                && outgoing_preview
+                    .as_ref()
+                    .is_none_or(|outgoing| outgoing.can_send),
+            t("common.save"),
+        ) {
             let payload = outgoing_preview
                 .as_ref()
                 .map(|outgoing| outgoing.payload.clone())
@@ -446,67 +512,6 @@ fn render_detail_panel(
 
     ui.separator();
 
-    // Metadata
-    egui::Grid::new(("kv_detail_grid", connection_id, bucket_name))
-        .num_columns(2)
-        .spacing([8.0, 4.0])
-        .show(ui, |ui| {
-            ui.label(t("kv.key"));
-            ui.text_edit_singleline(&mut state.entry_key);
-            ui.end_row();
-
-            ui.label(t("kv.revision"));
-            ui.label(
-                state
-                    .entry_revision
-                    .map(|rev| rev.to_string())
-                    .unwrap_or_else(|| t("kv.none").to_string()),
-            );
-            ui.end_row();
-
-            ui.label(t("kv.operation"));
-            ui.label(state.entry_operation.as_deref().unwrap_or(t("kv.none")));
-            ui.end_row();
-
-            ui.label(t("kv.created"));
-            ui.label(state.entry_created.as_deref().unwrap_or(t("kv.none")));
-            ui.end_row();
-        });
-
-    ui.separator();
-
-    // Value editor
-    ui.horizontal(|ui| {
-        ui.label(t("kv.value_editor"));
-        ui.label(t("common.payload_input_format"));
-        payload_input_format_selector(ui, "kv_value_input_fmt", &mut state.editor_input_format);
-        ui.label(t("common.payload_preview_format"));
-        format::format_selector(ui, "kv_value_fmt", &mut state.editor_format);
-        if ui.small_button(t("kv.format_json")).clicked()
-            && let Ok(val) = serde_json::from_str::<serde_json::Value>(&state.entry_value)
-            && let Ok(pretty) = serde_json::to_string_pretty(&val)
-        {
-            state.entry_value = pretty;
-        }
-        render_generate_json_button(
-            ui,
-            &schema_manager.payload_template(connection_id, &subject),
-            &mut state.entry_value,
-        );
-    });
-    egui::ScrollArea::vertical()
-        .id_salt(("kv_value_editor", connection_id, bucket_name))
-        .max_height((ui.available_height() * 0.5).max(80.0))
-        .show(ui, |ui| {
-            ui.add(
-                egui::TextEdit::multiline(&mut state.entry_value)
-                    .desired_width(f32::INFINITY)
-                    .desired_rows(6)
-                    .code_editor(),
-            );
-        });
-
-    ui.add_space(4.0);
     ui.label(t("kv.value_preview"));
     let preview_bytes = outgoing_preview
         .as_ref()

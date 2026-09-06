@@ -86,13 +86,16 @@ pub(crate) fn render_search_row(
                 .hint_text(placeholder)
                 .desired_width((ui.available_width() - 84.0).clamp(96.0, 260.0)),
         );
-        egui::ComboBox::from_id_salt(ui.id().with("search_fields"))
-            .width(76.0)
-            .selected_text(t("common.search_fields"))
-            .show_ui(ui, |ui| {
+        crate::keyboard::combo_box(
+            ui,
+            egui::ComboBox::from_id_salt(ui.id().with("search_fields"))
+                .width(76.0)
+                .selected_text(t("common.search_fields")),
+            |ui| {
                 ui.checkbox(&mut search.primary, primary_label);
                 ui.checkbox(&mut search.secondary, secondary_label);
-            });
+            },
+        );
     });
     search.query != before.0 || search.primary != before.1 || search.secondary != before.2
 }
@@ -170,13 +173,15 @@ pub(crate) fn payload_input_format_selector(
     format: &mut PayloadInputFormat,
 ) -> bool {
     let before = *format;
-    egui::ComboBox::from_id_salt(id_salt)
-        .selected_text(t(format.label_key()))
-        .show_ui(ui, |ui| {
+    crate::keyboard::combo_box(
+        ui,
+        egui::ComboBox::from_id_salt(id_salt).selected_text(t(format.label_key())),
+        |ui| {
             for choice in PayloadInputFormat::ALL {
                 ui.selectable_value(format, choice, t(choice.label_key()));
             }
-        });
+        },
+    );
     *format != before
 }
 
@@ -184,14 +189,17 @@ pub(crate) fn payload_input_format_selector(
 pub(crate) fn auto_refresh_ui(ui: &mut egui::Ui, id_salt: &str, ar: &mut AutoRefresh) {
     ui.checkbox(&mut ar.enabled, t("common.auto_refresh"));
     if ar.enabled {
-        egui::ComboBox::from_id_salt(id_salt)
-            .width(55.0)
-            .selected_text(format!("{}s", ar.interval_secs))
-            .show_ui(ui, |ui| {
+        crate::keyboard::combo_box(
+            ui,
+            egui::ComboBox::from_id_salt(id_salt)
+                .width(55.0)
+                .selected_text(format!("{}s", ar.interval_secs)),
+            |ui| {
                 for &secs in AutoRefresh::INTERVALS {
                     ui.selectable_value(&mut ar.interval_secs, secs, format!("{secs}s"));
                 }
-            });
+            },
+        );
         let elapsed = ar.last_refresh.elapsed().as_secs();
         ui.weak(format!("{elapsed}s ago"));
     }
@@ -205,90 +213,101 @@ pub(crate) fn topic_history_text_edit(
     topic_suggestions: &[&str],
 ) -> egui::Response {
     let popup_id = ui.id().with(id_salt);
-    let lock_tab_focus = !visible_topic_suggestions(topic_suggestions, value.trim()).is_empty();
-    let input_resp = ui.add(TextEdit::singleline(value).lock_focus(lock_tab_focus));
-    let prefix = value.trim();
-    let suggestions = visible_topic_suggestions(topic_suggestions, prefix);
-
-    if suggestions.is_empty() {
+    let input_id = popup_id.with("input");
+    let dismissed_id = popup_id.with("dismissed");
+    let had_focus = ui.memory(|m| m.has_focus(input_id));
+    let mut dismissed = ui
+        .ctx()
+        .data_mut(|d| *d.get_temp_mut_or_default::<bool>(dismissed_id));
+    // Consume navigation first, but apply completion only after TextEdit has
+    // processed this frame's text/paste events. Never accept a stale candidate.
+    let popup_open = Popup::is_id_open(ui.ctx(), popup_id);
+    let active = had_focus && !crate::keyboard::ime_blocked(ui.ctx());
+    let down =
+        active && crate::keyboard::take_key(ui.ctx(), egui::Modifiers::NONE, egui::Key::ArrowDown);
+    let up =
+        active && crate::keyboard::take_key(ui.ctx(), egui::Modifiers::NONE, egui::Key::ArrowUp);
+    let escape = active
+        && popup_open
+        && crate::keyboard::take_key(ui.ctx(), egui::Modifiers::NONE, egui::Key::Escape);
+    let enter =
+        active && crate::keyboard::take_key(ui.ctx(), egui::Modifiers::NONE, egui::Key::Enter);
+    let request = active
+        && crate::keyboard::take_key(
+            ui.ctx(),
+            crate::keyboard::shortcut(egui::Key::Enter, true).modifiers,
+            egui::Key::Enter,
+        );
+    let submit =
+        active && crate::keyboard::take_key(ui.ctx(), egui::Modifiers::COMMAND, egui::Key::Enter);
+    let input_resp = crate::keyboard::text_edit(
+        ui,
+        TextEdit::singleline(value).id(input_id).return_key(None),
+        false,
+    );
+    if input_resp.changed() || input_resp.gained_focus() {
+        dismissed = false;
         *selected_suggestion = None;
-        Popup::close_id(ui.ctx(), popup_id);
-        return input_resp;
     }
-
-    let popup_was_open = Popup::is_id_open(ui.ctx(), popup_id);
-    if input_resp.has_focus() {
-        Popup::open_id(ui.ctx(), popup_id);
-    }
-    if !input_resp.has_focus() && !popup_was_open {
-        *selected_suggestion = None;
-        return input_resp;
-    }
-
+    let suggestions = visible_topic_suggestions(topic_suggestions, value.trim());
     if selected_suggestion.is_some_and(|idx| idx >= suggestions.len()) {
         *selected_suggestion = None;
     }
-
-    let cycle_forward = ui.input(|i| {
-        i.key_pressed(egui::Key::ArrowDown) || i.key_pressed(egui::Key::Tab) && !i.modifiers.shift
-    });
-    let cycle_backward = ui.input(|i| {
-        i.key_pressed(egui::Key::ArrowUp) || i.key_pressed(egui::Key::Tab) && i.modifiers.shift
-    });
-    let accept_selection = ui.input(|i| i.key_pressed(egui::Key::Enter));
-    let clear_selection = ui.input(|i| i.key_pressed(egui::Key::Escape));
-
-    if cycle_forward {
+    if (up || down) && !suggestions.is_empty() {
+        dismissed = false;
         *selected_suggestion = Some(cycle_suggestion_index(
             *selected_suggestion,
             suggestions.len(),
-            true,
+            down,
         ));
-        ui.memory_mut(|mem| mem.request_focus(input_resp.id));
-    } else if cycle_backward {
-        *selected_suggestion = Some(cycle_suggestion_index(
-            *selected_suggestion,
-            suggestions.len(),
-            false,
-        ));
-        ui.memory_mut(|mem| mem.request_focus(input_resp.id));
-    } else if clear_selection {
+    }
+    if enter {
+        if !dismissed
+            && let Some(index) = *selected_suggestion
+            && let Some(suggestion) = suggestions.get(index)
+        {
+            *value = (*suggestion).to_owned();
+        } else {
+            crate::keyboard::queue_focused(ui.ctx(), false);
+        }
+    }
+    if request || submit {
+        crate::keyboard::queue_focused(ui.ctx(), request);
+    }
+    if escape || enter || request || submit {
+        dismissed = true;
         *selected_suggestion = None;
         Popup::close_id(ui.ctx(), popup_id);
     }
-
-    if accept_selection
-        && let Some(idx) = *selected_suggestion
-        && let Some(suggestion) = suggestions.get(idx)
+    if input_resp.has_focus()
+        && !dismissed
+        && !suggestions.is_empty()
+        && !crate::keyboard::palette_open(ui.ctx())
     {
-        *value = (*suggestion).to_string();
-        *selected_suggestion = None;
+        Popup::open_id(ui.ctx(), popup_id);
+    } else {
         Popup::close_id(ui.ctx(), popup_id);
-        ui.memory_mut(|mem| mem.request_focus(input_resp.id));
+        *selected_suggestion = None;
     }
-
     Popup::from_response(&input_resp)
         .id(popup_id)
         .open_memory(None)
         .close_behavior(PopupCloseBehavior::CloseOnClickOutside)
         .width(input_resp.rect.width())
         .show(|ui| {
-            ui.set_min_width(input_resp.rect.width());
             for (idx, suggestion) in suggestions.iter().enumerate() {
-                let selected = *selected_suggestion == Some(idx);
-                let response = ui.selectable_label(selected, *suggestion);
-                if response.hovered() {
-                    *selected_suggestion = Some(idx);
-                }
+                let response = ui.selectable_label(*selected_suggestion == Some(idx), *suggestion);
                 if response.clicked() {
                     *value = (*suggestion).to_string();
                     *selected_suggestion = None;
+                    dismissed = true;
                     Popup::close_id(ui.ctx(), popup_id);
-                    ui.memory_mut(|mem| mem.request_focus(input_resp.id));
+                    input_resp.request_focus();
                 }
             }
         });
-
+    ui.ctx()
+        .data_mut(|d| d.insert_temp(dismissed_id, dismissed));
     input_resp
 }
 

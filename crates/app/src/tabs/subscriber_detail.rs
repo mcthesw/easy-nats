@@ -153,6 +153,12 @@ fn render_reply_composer(
     schema_manager: &MessageSchemaManager,
     pending_reply: &mut Option<PendingReply>,
 ) {
+    let _form = crate::keyboard::Form::connected(
+        ui,
+        ("render_reply_composer", msg.id),
+        false,
+        connection_id,
+    );
     let Some(reply_to) = msg.reply.clone() else {
         return;
     };
@@ -204,11 +210,14 @@ fn render_reply_composer(
         .id_salt(("subscriber_reply_payload", msg.id))
         .max_height(140.0)
         .show(ui, |ui| {
-            ui.add(
+            crate::keyboard::text_edit(
+                ui,
                 egui::TextEdit::multiline(&mut draft.payload)
                     .desired_width(f32::INFINITY)
                     .desired_rows(4)
-                    .code_editor(),
+                    .code_editor()
+                    .lock_focus(false),
+                true,
             );
         });
     if let Some(status) = &outgoing_preview.status {
@@ -218,10 +227,7 @@ fn render_reply_composer(
     render_reply_headers(ui, msg.id, &mut draft.headers);
 
     let can_send = outgoing_preview.can_send && !reply_blocked;
-    if ui
-        .add_enabled(can_send, egui::Button::new(t("subscriber.send_reply")))
-        .clicked()
-    {
+    if crate::keyboard::primary_button(ui, can_send, t("subscriber.send_reply")) {
         *pending_reply = Some(PendingReply {
             message_id: msg.id,
             reply_to,
@@ -249,15 +255,19 @@ fn render_reply_headers(ui: &mut egui::Ui, message_id: u64, headers: &mut Vec<(S
             let mut remove_idx = None;
             for (idx, (key, value)) in headers.iter_mut().enumerate() {
                 ui.horizontal(|ui| {
-                    ui.add(
+                    crate::keyboard::text_edit(
+                        ui,
                         egui::TextEdit::singleline(key)
                             .hint_text(t("subscriber.header_key"))
                             .desired_width(120.0),
+                        false,
                     );
-                    ui.add(
+                    crate::keyboard::text_edit(
+                        ui,
                         egui::TextEdit::singleline(value)
                             .hint_text(t("subscriber.header_value"))
                             .desired_width(200.0),
+                        false,
                     );
                     if ui.small_button("x").clicked() {
                         remove_idx = Some(idx);

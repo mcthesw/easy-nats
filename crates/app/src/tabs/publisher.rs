@@ -21,6 +21,7 @@ pub fn publisher_ui(
     topic_suggestions: &[&str],
     syntax_palette: SyntaxPalette,
 ) {
+    let _form = crate::keyboard::Form::connected(ui, "publisher_ui", false, connection_id);
     ui.horizontal(|ui| {
         ui.label(t("publisher.subject"));
         topic_history_text_edit(
@@ -39,15 +40,19 @@ pub fn publisher_ui(
             let mut remove_idx = None;
             for (idx, (key, val)) in state.headers.iter_mut().enumerate() {
                 ui.horizontal(|ui| {
-                    ui.add(
+                    crate::keyboard::text_edit(
+                        ui,
                         egui::TextEdit::singleline(key)
                             .hint_text(t("publisher.header_key"))
                             .desired_width(120.0),
+                        false,
                     );
-                    ui.add(
+                    crate::keyboard::text_edit(
+                        ui,
                         egui::TextEdit::singleline(val)
                             .hint_text(t("publisher.header_value"))
                             .desired_width(200.0),
+                        false,
                     );
                     if ui.small_button("✕").clicked() {
                         remove_idx = Some(idx);
@@ -81,11 +86,14 @@ pub fn publisher_ui(
         .id_salt("publisher_payload")
         .max_height(200.0)
         .show(ui, |ui| {
-            ui.add(
+            crate::keyboard::text_edit(
+                ui,
                 egui::TextEdit::multiline(&mut state.payload)
                     .desired_width(f32::INFINITY)
                     .desired_rows(6)
-                    .code_editor(),
+                    .code_editor()
+                    .lock_focus(false),
+                true,
             );
         });
 
@@ -107,10 +115,7 @@ pub fn publisher_ui(
     };
     let can_submit = can_send && outgoing_preview.can_send;
     ui.horizontal(|ui| {
-        if ui
-            .add_enabled(can_submit, egui::Button::new(t("publisher.publish")))
-            .clicked()
-        {
+        if crate::keyboard::primary_button(ui, can_submit, t("publisher.publish")) {
             let outgoing = schema_manager.prepare_outgoing_with_input_format(
                 connection_id,
                 &subject,
@@ -132,15 +137,18 @@ pub fn publisher_ui(
 
         ui.separator();
         ui.label(t("publisher.timeout"));
-        ui.add(egui::TextEdit::singleline(&mut state.timeout_ms).desired_width(60.0));
+        crate::keyboard::text_edit(
+            ui,
+            egui::TextEdit::singleline(&mut state.timeout_ms).desired_width(60.0),
+            false,
+        );
 
-        if ui
-            .add_enabled(
-                can_submit && !state.is_request_waiting(),
-                egui::Button::new(t("publisher.request")),
-            )
-            .clicked()
-        {
+        if crate::keyboard::action_button(
+            ui,
+            can_submit && !state.is_request_waiting(),
+            t("publisher.request"),
+            true,
+        ) {
             let outgoing = schema_manager.prepare_outgoing_with_input_format(
                 connection_id,
                 &subject,
