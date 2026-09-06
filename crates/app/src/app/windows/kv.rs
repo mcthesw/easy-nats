@@ -17,23 +17,23 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
 fn render_bucket_delete_confirmation(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     let mut do_delete = None;
     if let Some((connection_id, bucket_name)) = app.kv_bucket_delete_confirm.clone() {
-        egui::Window::new(t("kv.delete_bucket_confirm_title"))
-            .resizable(false)
-            .show(ui.ctx(), |ui| {
-                ui.label(format!(
-                    "{} \"{}\"?",
-                    t("kv.delete_bucket_confirm_prompt"),
-                    bucket_name
-                ));
-                ui.horizontal(|ui| {
-                    if ui.button(t("common.delete")).clicked() {
-                        do_delete = Some((connection_id, bucket_name.clone()));
-                    }
-                    if ui.button(t("common.cancel")).clicked() {
-                        app.kv_bucket_delete_confirm = None;
-                    }
-                });
+        egui::Modal::new(egui::Id::new("kv.delete_bucket_confirm_title")).show(ui.ctx(), |ui| {
+            ui.heading(t("kv.delete_bucket_confirm_title"));
+            let _form = crate::keyboard::Form::new(ui, "kv_1", true);
+            ui.label(format!(
+                "{} \"{}\"?",
+                t("kv.delete_bucket_confirm_prompt"),
+                bucket_name
+            ));
+            ui.horizontal(|ui| {
+                if ui.button(t("common.delete")).clicked() {
+                    do_delete = Some((connection_id, bucket_name.clone()));
+                }
+                if crate::keyboard::cancel_button(ui) {
+                    app.kv_bucket_delete_confirm = None;
+                }
             });
+        });
     }
     if let Some((connection_id, bucket_name)) = do_delete {
         app.backend
@@ -51,34 +51,42 @@ fn render_bucket_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
         egui::Window::new(t("kv.create_bucket"))
             .resizable(false)
             .show(ui.ctx(), |ui| {
+                let _form = crate::keyboard::Form::connected(
+                    ui,
+                    "kv_2",
+                    true,
+                    app.kv_bucket_editor.connection_id,
+                );
                 egui::Grid::new("kv_bucket_create_grid")
                     .num_columns(2)
                     .spacing([8.0, 4.0])
                     .show(ui, |ui| {
                         ui.label(t("kv.bucket"));
-                        ui.text_edit_singleline(&mut app.kv_bucket_editor.bucket);
+                        crate::keyboard::singleline(ui, &mut app.kv_bucket_editor.bucket);
                         ui.end_row();
 
                         ui.label(t("kv.history_depth"));
-                        ui.text_edit_singleline(&mut app.kv_bucket_editor.history);
+                        crate::keyboard::singleline(ui, &mut app.kv_bucket_editor.history);
                         ui.end_row();
 
                         ui.label(t("kv.max_age"));
-                        ui.text_edit_singleline(&mut app.kv_bucket_editor.max_age_secs);
+                        crate::keyboard::singleline(ui, &mut app.kv_bucket_editor.max_age_secs);
                         ui.end_row();
 
                         ui.label(t("kv.max_value_size"));
-                        ui.text_edit_singleline(&mut app.kv_bucket_editor.max_value_size);
+                        crate::keyboard::singleline(ui, &mut app.kv_bucket_editor.max_value_size);
                         ui.end_row();
 
                         ui.label(t("kv.max_bytes"));
-                        ui.text_edit_singleline(&mut app.kv_bucket_editor.max_bytes);
+                        crate::keyboard::singleline(ui, &mut app.kv_bucket_editor.max_bytes);
                         ui.end_row();
 
                         ui.label(t("kv.storage"));
-                        egui::ComboBox::from_id_salt("kv_bucket_storage")
-                            .selected_text(app.kv_bucket_editor.storage.label())
-                            .show_ui(ui, |ui| {
+                        crate::keyboard::combo_box(
+                            ui,
+                            egui::ComboBox::from_id_salt("kv_bucket_storage")
+                                .selected_text(app.kv_bucket_editor.storage.label()),
+                            |ui| {
                                 ui.selectable_value(
                                     &mut app.kv_bucket_editor.storage,
                                     StorageSelection::File,
@@ -89,27 +97,25 @@ fn render_bucket_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                                     StorageSelection::Memory,
                                     "Memory",
                                 );
-                            });
+                            },
+                        );
                         ui.end_row();
 
                         ui.label(t("kv.replicas"));
-                        ui.text_edit_singleline(&mut app.kv_bucket_editor.num_replicas);
+                        crate::keyboard::singleline(ui, &mut app.kv_bucket_editor.num_replicas);
                         ui.end_row();
 
                         ui.label(t("kv.description"));
-                        ui.text_edit_singleline(&mut app.kv_bucket_editor.description);
+                        crate::keyboard::singleline(ui, &mut app.kv_bucket_editor.description);
                         ui.end_row();
                     });
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     let valid = !app.kv_bucket_editor.bucket.trim().is_empty();
-                    if ui
-                        .add_enabled(valid, egui::Button::new(t("common.save")))
-                        .clicked()
-                    {
+                    if crate::keyboard::primary_button(ui, valid, t("common.save")) {
                         save_requested = true;
                     }
-                    if ui.button(t("common.cancel")).clicked() {
+                    if crate::keyboard::cancel_button(ui) {
                         app.kv_bucket_editor.visible = false;
                     }
                 });
@@ -126,6 +132,12 @@ fn render_bucket_edit_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
         egui::Window::new(t("kv.edit_bucket"))
             .resizable(false)
             .show(ui.ctx(), |ui| {
+                let _form = crate::keyboard::Form::connected(
+                    ui,
+                    "kv_3",
+                    true,
+                    app.kv_bucket_edit_editor.connection_id,
+                );
                 egui::Grid::new("kv_bucket_edit_grid")
                     .num_columns(2)
                     .spacing([8.0, 4.0])
@@ -135,35 +147,44 @@ fn render_bucket_edit_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                         ui.end_row();
 
                         ui.label(t("kv.history_depth"));
-                        ui.text_edit_singleline(&mut app.kv_bucket_edit_editor.history);
+                        crate::keyboard::singleline(ui, &mut app.kv_bucket_edit_editor.history);
                         ui.end_row();
 
                         ui.label(t("kv.max_age"));
-                        ui.text_edit_singleline(&mut app.kv_bucket_edit_editor.max_age_secs);
+                        crate::keyboard::singleline(
+                            ui,
+                            &mut app.kv_bucket_edit_editor.max_age_secs,
+                        );
                         ui.end_row();
 
                         ui.label(t("kv.max_value_size"));
-                        ui.text_edit_singleline(&mut app.kv_bucket_edit_editor.max_value_size);
+                        crate::keyboard::singleline(
+                            ui,
+                            &mut app.kv_bucket_edit_editor.max_value_size,
+                        );
                         ui.end_row();
 
                         ui.label(t("kv.max_bytes"));
-                        ui.text_edit_singleline(&mut app.kv_bucket_edit_editor.max_bytes);
+                        crate::keyboard::singleline(ui, &mut app.kv_bucket_edit_editor.max_bytes);
                         ui.end_row();
 
                         ui.label(t("kv.replicas"));
-                        ui.text_edit_singleline(&mut app.kv_bucket_edit_editor.num_replicas);
+                        crate::keyboard::singleline(
+                            ui,
+                            &mut app.kv_bucket_edit_editor.num_replicas,
+                        );
                         ui.end_row();
 
                         ui.label(t("kv.description"));
-                        ui.text_edit_singleline(&mut app.kv_bucket_edit_editor.description);
+                        crate::keyboard::singleline(ui, &mut app.kv_bucket_edit_editor.description);
                         ui.end_row();
                     });
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button(t("common.save")).clicked() {
+                    if crate::keyboard::primary_button(ui, true, t("common.save")) {
                         save_requested = true;
                     }
-                    if ui.button(t("common.cancel")).clicked() {
+                    if crate::keyboard::cancel_button(ui) {
                         app.kv_bucket_edit_editor.visible = false;
                     }
                 });
@@ -185,6 +206,12 @@ fn render_entry_create_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
         egui::Window::new(title)
             .resizable(true)
             .show(ui.ctx(), |ui| {
+                let _form = crate::keyboard::Form::connected(
+                    ui,
+                    "kv_4",
+                    true,
+                    app.kv_entry_create_editor.connection_id,
+                );
                 egui::Grid::new("kv_entry_create_grid")
                     .num_columns(2)
                     .spacing([8.0, 4.0])
@@ -194,7 +221,7 @@ fn render_entry_create_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                         ui.end_row();
 
                         ui.label(t("kv.key"));
-                        ui.text_edit_singleline(&mut app.kv_entry_create_editor.key);
+                        crate::keyboard::singleline(ui, &mut app.kv_entry_create_editor.key);
                         ui.end_row();
                     });
 
@@ -248,11 +275,14 @@ fn render_entry_create_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     .id_salt("kv_entry_create_value")
                     .max_height(220.0)
                     .show(ui, |ui| {
-                        ui.add(
+                        crate::keyboard::text_edit(
+                            ui,
                             egui::TextEdit::multiline(&mut app.kv_entry_create_editor.value)
                                 .desired_width(f32::INFINITY)
                                 .desired_rows(8)
-                                .code_editor(),
+                                .code_editor()
+                                .lock_focus(false),
+                            true,
                         );
                     });
 
@@ -262,13 +292,10 @@ fn render_entry_create_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                         && outgoing_preview
                             .as_ref()
                             .is_none_or(|outgoing| outgoing.can_send);
-                    if ui
-                        .add_enabled(valid, egui::Button::new(t("common.save")))
-                        .clicked()
-                    {
+                    if crate::keyboard::primary_button(ui, valid, t("common.save")) {
                         save_requested = true;
                     }
-                    if ui.button(t("common.cancel")).clicked() {
+                    if crate::keyboard::cancel_button(ui) {
                         app.kv_entry_create_editor.visible = false;
                     }
                 });

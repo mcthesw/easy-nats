@@ -1,6 +1,7 @@
 mod app;
 mod format;
 mod i18n;
+mod keyboard;
 mod log_layer;
 mod proto;
 mod runtime;

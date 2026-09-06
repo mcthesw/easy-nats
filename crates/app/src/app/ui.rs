@@ -26,6 +26,13 @@ impl eframe::App for EasyNatsApp {
     }
 
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
+        crate::keyboard::begin_frame(ui.ctx());
+        crate::keyboard::set_connections(
+            ui.ctx(),
+            self.conn_statuses.iter().filter_map(|(id, status)| {
+                matches!(status, nats_backend::ConnectionStatusKind::Connected).then_some(*id)
+            }),
+        );
         windows::render_windows(self, ui);
         sidebar::render_sidebar(self, ui);
 
@@ -265,6 +272,7 @@ impl eframe::App for EasyNatsApp {
             }
         }
 
+        crate::keyboard::end_frame(ui.ctx());
         self.toasts.show(ui.ctx());
     }
 }

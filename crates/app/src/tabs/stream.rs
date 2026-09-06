@@ -118,6 +118,8 @@ fn render_message_controls(
     backend: &BackendHandle,
     actions: &mut Vec<TabAction>,
 ) {
+    let _form =
+        crate::keyboard::Form::connected(ui, "render_message_controls", false, connection_id);
     // WorkQueue retention warning
     if let Some(info) = &state.info
         && info.retention.to_lowercase().contains("work")
@@ -130,18 +132,32 @@ fn render_message_controls(
 
     ui.horizontal(|ui| {
         ui.label(t("stream.start_seq"));
-        ui.add(egui::TextEdit::singleline(&mut state.start_seq).desired_width(80.0));
+        crate::keyboard::text_edit(
+            ui,
+            egui::TextEdit::singleline(&mut state.start_seq).desired_width(80.0),
+            false,
+        );
         ui.label(t("stream.subject_filter"));
-        ui.add(egui::TextEdit::singleline(&mut state.subject_filter).desired_width(120.0));
+        crate::keyboard::text_edit(
+            ui,
+            egui::TextEdit::singleline(&mut state.subject_filter).desired_width(120.0),
+            false,
+        );
         ui.label(t("stream.batch_size"));
-        ui.add(egui::TextEdit::singleline(&mut state.batch_size).desired_width(60.0));
+        crate::keyboard::text_edit(
+            ui,
+            egui::TextEdit::singleline(&mut state.batch_size).desired_width(60.0),
+            false,
+        );
     });
     ui.horizontal_wrapped(|ui| {
         ui.label(t("stream.start_time"));
-        ui.add(
+        crate::keyboard::text_edit(
+            ui,
             egui::TextEdit::singleline(&mut state.start_time)
                 .desired_width(220.0)
                 .hint_text("2025-01-01T00:00:00Z"),
+            false,
         );
         for (label_key, secs) in [
             ("stream.time_1h", 3600u64),
@@ -166,10 +182,7 @@ fn render_message_controls(
                 subject: default_publish_subject(state),
             });
         }
-        if ui
-            .add_enabled(!state.fetching, egui::Button::new(t("stream.fetch")))
-            .clicked()
-        {
+        if crate::keyboard::primary_button(ui, !state.fetching, t("stream.fetch")) {
             let start_time = if state.start_time.trim().is_empty() {
                 None
             } else {
@@ -415,7 +428,7 @@ fn render_purge_controls(
         .show(ui, |ui| {
             ui.horizontal(|ui| {
                 ui.label(t("stream.purge_subject"));
-                ui.text_edit_singleline(&mut state.purge_subject);
+                crate::keyboard::singleline(ui, &mut state.purge_subject);
             });
             ui.horizontal(|ui| {
                 if ui.button(t("stream.purge_filtered")).clicked()

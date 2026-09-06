@@ -1,4 +1,4 @@
-mod common;
+pub(crate) mod common;
 pub(crate) mod guard;
 mod kv;
 pub(crate) mod log_viewer;

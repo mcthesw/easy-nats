@@ -13,9 +13,11 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
 fn render_bucket_delete_confirmation(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
     let mut do_delete = None;
     if let Some((connection_id, bucket_name)) = app.obj_store_bucket_delete_confirm.clone() {
-        egui::Window::new(t("obj_store.delete_bucket_confirm_title"))
-            .resizable(false)
-            .show(ui.ctx(), |ui| {
+        egui::Modal::new(egui::Id::new("obj_store.delete_bucket_confirm_title")).show(
+            ui.ctx(),
+            |ui| {
+                ui.heading(t("obj_store.delete_bucket_confirm_title"));
+                let _form = crate::keyboard::Form::new(ui, "obj_store_1", true);
                 ui.label(format!(
                     "{} \"{}\"?",
                     t("obj_store.delete_bucket_confirm_prompt"),
@@ -25,11 +27,12 @@ fn render_bucket_delete_confirmation(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                     if ui.button(t("common.delete")).clicked() {
                         do_delete = Some((connection_id, bucket_name.clone()));
                     }
-                    if ui.button(t("common.cancel")).clicked() {
+                    if crate::keyboard::cancel_button(ui) {
                         app.obj_store_bucket_delete_confirm = None;
                     }
                 });
-            });
+            },
+        );
     }
     if let Some((connection_id, bucket_name)) = do_delete {
         app.backend
@@ -47,22 +50,30 @@ fn render_bucket_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
         egui::Window::new(t("obj_store.create_bucket"))
             .resizable(false)
             .show(ui.ctx(), |ui| {
+                let _form = crate::keyboard::Form::connected(
+                    ui,
+                    "obj_store_2",
+                    true,
+                    app.obj_store_bucket_editor.connection_id,
+                );
                 egui::Grid::new("objstore_bucket_create_grid")
                     .num_columns(2)
                     .spacing([8.0, 4.0])
                     .show(ui, |ui| {
                         ui.label(t("obj_store.bucket_name"));
-                        ui.text_edit_singleline(&mut app.obj_store_bucket_editor.bucket);
+                        crate::keyboard::singleline(ui, &mut app.obj_store_bucket_editor.bucket);
                         ui.end_row();
 
                         ui.label(t("obj_store.max_bytes"));
-                        ui.text_edit_singleline(&mut app.obj_store_bucket_editor.max_bytes);
+                        crate::keyboard::singleline(ui, &mut app.obj_store_bucket_editor.max_bytes);
                         ui.end_row();
 
                         ui.label(t("common.storage_label"));
-                        egui::ComboBox::from_id_salt("objstore_bucket_storage")
-                            .selected_text(app.obj_store_bucket_editor.storage.label())
-                            .show_ui(ui, |ui| {
+                        crate::keyboard::combo_box(
+                            ui,
+                            egui::ComboBox::from_id_salt("objstore_bucket_storage")
+                                .selected_text(app.obj_store_bucket_editor.storage.label()),
+                            |ui| {
                                 ui.selectable_value(
                                     &mut app.obj_store_bucket_editor.storage,
                                     StorageSelection::File,
@@ -73,27 +84,31 @@ fn render_bucket_editor(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                                     StorageSelection::Memory,
                                     "Memory",
                                 );
-                            });
+                            },
+                        );
                         ui.end_row();
 
                         ui.label(t("common.replicas"));
-                        ui.text_edit_singleline(&mut app.obj_store_bucket_editor.num_replicas);
+                        crate::keyboard::singleline(
+                            ui,
+                            &mut app.obj_store_bucket_editor.num_replicas,
+                        );
                         ui.end_row();
 
                         ui.label(t("obj_store.description"));
-                        ui.text_edit_singleline(&mut app.obj_store_bucket_editor.description);
+                        crate::keyboard::singleline(
+                            ui,
+                            &mut app.obj_store_bucket_editor.description,
+                        );
                         ui.end_row();
                     });
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     let valid = !app.obj_store_bucket_editor.bucket.trim().is_empty();
-                    if ui
-                        .add_enabled(valid, egui::Button::new(t("common.save")))
-                        .clicked()
-                    {
+                    if crate::keyboard::primary_button(ui, valid, t("common.save")) {
                         save_requested = true;
                     }
-                    if ui.button(t("common.cancel")).clicked() {
+                    if crate::keyboard::cancel_button(ui) {
                         app.obj_store_bucket_editor.visible = false;
                     }
                 });

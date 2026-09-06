@@ -13,6 +13,12 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
         egui::Window::new(t("consumer.create"))
             .resizable(false)
             .show(ui.ctx(), |ui| {
+                let _form = crate::keyboard::Form::connected(
+                    ui,
+                    "consumer_1",
+                    true,
+                    app.consumer_editor.connection_id,
+                );
                 egui::Grid::new("consumer_create_grid")
                     .num_columns(2)
                     .spacing([8.0, 4.0])
@@ -22,7 +28,7 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                         ui.end_row();
 
                         ui.label(t("consumer.name"));
-                        ui.text_edit_singleline(&mut app.consumer_editor.name);
+                        crate::keyboard::singleline(ui, &mut app.consumer_editor.name);
                         ui.end_row();
 
                         ui.label(t("consumer.durable_mode"));
@@ -33,9 +39,11 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                         ui.end_row();
 
                         ui.label(t("consumer.deliver_policy"));
-                        egui::ComboBox::from_id_salt("consumer_deliver_policy")
-                            .selected_text(app.consumer_editor.deliver_policy.label())
-                            .show_ui(ui, |ui| {
+                        crate::keyboard::combo_box(
+                            ui,
+                            egui::ComboBox::from_id_salt("consumer_deliver_policy")
+                                .selected_text(app.consumer_editor.deliver_policy.label()),
+                            |ui| {
                                 for policy in DeliverPolicySelection::ALL {
                                     ui.selectable_value(
                                         &mut app.consumer_editor.deliver_policy,
@@ -43,7 +51,8 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                                         policy.label(),
                                     );
                                 }
-                            });
+                            },
+                        );
                         ui.end_row();
 
                         match app.consumer_editor.deliver_policy {
@@ -65,9 +74,11 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                         }
 
                         ui.label(t("consumer.ack_policy"));
-                        egui::ComboBox::from_id_salt("consumer_ack_policy")
-                            .selected_text(app.consumer_editor.ack_policy.label())
-                            .show_ui(ui, |ui| {
+                        crate::keyboard::combo_box(
+                            ui,
+                            egui::ComboBox::from_id_salt("consumer_ack_policy")
+                                .selected_text(app.consumer_editor.ack_policy.label()),
+                            |ui| {
                                 ui.selectable_value(
                                     &mut app.consumer_editor.ack_policy,
                                     AckPolicySelection::Explicit,
@@ -83,36 +94,34 @@ pub(crate) fn render(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                                     AckPolicySelection::None,
                                     AckPolicySelection::None.label(),
                                 );
-                            });
+                            },
+                        );
                         ui.end_row();
 
                         ui.label(t("consumer.filter_subject"));
-                        ui.text_edit_singleline(&mut app.consumer_editor.filter_subject);
+                        crate::keyboard::singleline(ui, &mut app.consumer_editor.filter_subject);
                         ui.end_row();
 
                         ui.label(t("consumer.max_deliver"));
-                        ui.text_edit_singleline(&mut app.consumer_editor.max_deliver);
+                        crate::keyboard::singleline(ui, &mut app.consumer_editor.max_deliver);
                         ui.end_row();
 
                         ui.label(t("consumer.max_ack_pending"));
-                        ui.text_edit_singleline(&mut app.consumer_editor.max_ack_pending);
+                        crate::keyboard::singleline(ui, &mut app.consumer_editor.max_ack_pending);
                         ui.end_row();
 
                         ui.label(t("consumer.description"));
-                        ui.text_edit_singleline(&mut app.consumer_editor.description);
+                        crate::keyboard::singleline(ui, &mut app.consumer_editor.description);
                         ui.end_row();
                     });
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
                     let valid = !app.consumer_editor.name.trim().is_empty()
                         && deliver_policy_input_valid(&app.consumer_editor);
-                    if ui
-                        .add_enabled(valid, egui::Button::new(t("common.save")))
-                        .clicked()
-                    {
+                    if crate::keyboard::primary_button(ui, valid, t("common.save")) {
                         save_requested = true;
                     }
-                    if ui.button(t("common.cancel")).clicked() {
+                    if crate::keyboard::cancel_button(ui) {
                         app.consumer_editor.visible = false;
                     }
                 });
@@ -139,6 +148,12 @@ pub(crate) fn render_edit(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
         egui::Window::new(t("consumer.edit_title"))
             .resizable(false)
             .show(ui.ctx(), |ui| {
+                let _form = crate::keyboard::Form::connected(
+                    ui,
+                    "consumer_2",
+                    true,
+                    app.consumer_edit_editor.connection_id,
+                );
                 egui::Grid::new("consumer_edit_grid")
                     .num_columns(2)
                     .spacing([8.0, 4.0])
@@ -152,23 +167,26 @@ pub(crate) fn render_edit(app: &mut EasyNatsApp, ui: &mut egui::Ui) {
                         ui.end_row();
 
                         ui.label(t("consumer.description"));
-                        ui.text_edit_singleline(&mut app.consumer_edit_editor.description);
+                        crate::keyboard::singleline(ui, &mut app.consumer_edit_editor.description);
                         ui.end_row();
 
                         ui.label(t("consumer.max_deliver"));
-                        ui.text_edit_singleline(&mut app.consumer_edit_editor.max_deliver);
+                        crate::keyboard::singleline(ui, &mut app.consumer_edit_editor.max_deliver);
                         ui.end_row();
 
                         ui.label(t("consumer.max_ack_pending"));
-                        ui.text_edit_singleline(&mut app.consumer_edit_editor.max_ack_pending);
+                        crate::keyboard::singleline(
+                            ui,
+                            &mut app.consumer_edit_editor.max_ack_pending,
+                        );
                         ui.end_row();
                     });
                 ui.add_space(8.0);
                 ui.horizontal(|ui| {
-                    if ui.button(t("common.save")).clicked() {
+                    if crate::keyboard::primary_button(ui, true, t("common.save")) {
                         save_requested = true;
                     }
-                    if ui.button(t("common.cancel")).clicked() {
+                    if crate::keyboard::cancel_button(ui) {
                         app.consumer_edit_editor.visible = false;
                     }
                 });
