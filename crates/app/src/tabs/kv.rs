@@ -402,7 +402,7 @@ fn render_detail_panel(
     ui.separator();
 
     // Value editor
-    ui.horizontal(|ui| {
+    ui.horizontal_wrapped(|ui| {
         ui.label(t("kv.value_editor"));
         ui.label(t("common.payload_input_format"));
         payload_input_format_selector(ui, "kv_value_input_fmt", &mut state.editor_input_format);
