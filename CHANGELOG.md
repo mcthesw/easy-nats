@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.1.35](https://github.com/mcthesw/easy-nats/compare/v0.1.34...v0.1.35) (2026-09-06)
+
+
+### Features
+
+* add searchable command palette and workspace shortcuts ([d070b4c](https://github.com/mcthesw/easy-nats/commit/d070b4cb2754e1167cca4e604b4f0131820eb6b1))
+* add searchable tabs and recent tab switcher ([a9091a9](https://github.com/mcthesw/easy-nats/commit/a9091a95b97dd69f731708acef69601f06c2b6c2))
+* group command palette and polish tab navigation ([93e943a](https://github.com/mcthesw/easy-nats/commit/93e943aefc9be173a6cfa4323f9bbfb8c1b9a183))
+* unify form keyboard handling and subject completion ([d0254bd](https://github.com/mcthesw/easy-nats/commit/d0254bd50d88601f0f2ab803713af370ce3bd315))
+
+
+### Bug Fixes
+
+* restore palette focus and polish keyboard workflows ([5f0bad9](https://github.com/mcthesw/easy-nats/commit/5f0bad9e9a2f28f6a8dd35adf54397522f870cb2))
+* scope navigation focus to the destination tab ([5cc0e2b](https://github.com/mcthesw/easy-nats/commit/5cc0e2b1f89f68d0408f767b29343bd132123461))
+* show command palette without translucent fade-in ([766adbb](https://github.com/mcthesw/easy-nats/commit/766adbbcca0ee2d9af3b46d54ede736b3d82cf45))
+
+
+### Code Refactoring
+
+* remove publisher and subscriber keyboard shortcuts ([eff3dd1](https://github.com/mcthesw/easy-nats/commit/eff3dd1812aaf0bf3196a9881783a5f85b056057))
+
 ## [0.1.34](https://github.com/mcthesw/easy-nats/compare/v0.1.33...v0.1.34) (2026-08-16)
 
 
