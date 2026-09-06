@@ -63,7 +63,7 @@ modifiers carried on Key/PointerButton events. The app dependencies were unchang
 
 ## Local verification notes (2026-09-06)
 
-The automated suite passed 218 tests. Linux desktop checks used egui MCP and
+The automated suite passed 226 tests. Linux desktop checks used egui MCP and
 real NATS traffic: connection entry, candidate acceptance, publish/request, KV
 byte verification, palette focus restoration, and safe deletion cancellation.
 Screenshots were captured at 1024×600; the compositor did not honor the requested
@@ -79,3 +79,25 @@ Presentation screenshots are kept outside the repository under
 `/tmp/easy-nats-47/showcase/`; intermediate captures and tool logs are in its
 parent directory. No test services or inspection port are enabled by a normal
 application launch.
+
+
+## Tab switcher follow-up (2026-09-06)
+
+- Searchable tabs span all splits and include connection names and subjects.
+  Verify typing a subject and Enter in one frame uses the new query; an empty
+  result must not activate an unrelated tab.
+- Ctrl+Tab snapshots the focused split in most-recently-used order. Keep Ctrl
+  held to cycle; Shift reverses. Releasing Ctrl commits. Escape (including while
+  Ctrl is held) and losing application focus cancel without changing the tab.
+- Verify two quick switches alternate between publisher and subscriber, mouse
+  tab selections update recency, and closed/moved tabs cannot become stale targets.
+- Palette groups are not selectable rows. Filter across groups and confirm the
+  first enabled action; scroll to Application to reach Settings, Logs and Schemas.
+- Native Linux X11 verification used the same egui MCP plus XTest key events
+  targeting the app window, with separate key-down/key-up events. This verifies
+  real modifier state, which the temporary egui 0.35-compatible MCP press_key
+  helper cannot hold by itself. Held Ctrl, release confirmation, repeated
+  publisher/subscriber switching and Escape cancellation were checked.
+- Updated Chinese/light and English/dark captures were visually inspected.
+  The rejected translucent palette captures have been deleted. Use the current
+  index in `/tmp/easy-nats-47/showcase/README.md` for presentation files.

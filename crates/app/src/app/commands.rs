@@ -15,11 +15,9 @@ enum Command {
     Logs,
     Schemas,
     Close,
-    Next,
-    Previous,
 }
 impl Command {
-    const ALL: [Self; 11] = [
+    const ALL: [Self; 9] = [
         Self::SwitchTab,
         Self::Search,
         Self::Connection,
@@ -29,8 +27,6 @@ impl Command {
         Self::Logs,
         Self::Schemas,
         Self::Close,
-        Self::Next,
-        Self::Previous,
     ];
     fn label(self) -> &'static str {
         t(match self {
@@ -43,8 +39,6 @@ impl Command {
             Self::Logs => "log_viewer.title",
             Self::Schemas => "message_schema.title",
             Self::Close => "keyboard.close_tab",
-            Self::Next => "keyboard.next_tab",
-            Self::Previous => "keyboard.previous_tab",
         })
     }
     fn keywords(self) -> &'static str {
@@ -58,12 +52,11 @@ impl Command {
             Self::Logs => "logs 日志",
             Self::Schemas => "message schemas 消息模式",
             Self::Close => "close tab 关闭标签",
-            Self::Next => "next tab 下一标签",
-            Self::Previous => "previous tab 上一标签",
         }
     }
     fn shortcut(self) -> Option<egui::KeyboardShortcut> {
         Some(match self {
+            Self::SwitchTab => egui::KeyboardShortcut::new(Modifiers::CTRL, Key::Tab),
             Self::Search => keyboard::shortcut(Key::F, true),
             Self::Connection => keyboard::shortcut(Key::N, false),
             Self::Publisher => keyboard::shortcut(Key::P, false),
@@ -113,6 +106,15 @@ enum Entry {
     Form(keyboard::FormAction),
 }
 impl Entry {
+    fn group(&self) -> u8 {
+        match self {
+            Self::Form(_) => 0,
+            Self::Workspace(
+                Command::Connection | Command::Settings | Command::Logs | Command::Schemas,
+            ) => 2,
+            Self::Workspace(_) => 1,
+        }
+    }
     fn label(&self) -> &str {
         match self {
             Self::Workspace(c) => c.label(),
@@ -188,9 +190,7 @@ impl EasyNatsApp {
             {
                 return Some(t("keyboard.no_closable_tab"));
             }
-            Command::SwitchTab | Command::Next | Command::Previous
-                if self.active_command_tab().is_none() =>
-            {
+            Command::SwitchTab if self.active_command_tab().is_none() => {
                 return Some(t("keyboard.no_active_tab"));
             }
             _ => {}
@@ -230,20 +230,6 @@ impl EasyNatsApp {
             Command::Close => {
                 if let Some(id) = self.active_command_tab().map(TabKind::tab_id) {
                     self.remove_tabs_matching(|tab| tab.tab_id() == id);
-                }
-            }
-            Command::Next | Command::Previous => {
-                if let Some(path) = self.command_leaf()
-                    && let egui_dock::Node::Leaf(leaf) =
-                        &mut self.dock_state[path.surface][path.node]
-                    && !leaf.tabs.is_empty()
-                {
-                    let delta = if command == Command::Next {
-                        1
-                    } else {
-                        leaf.tabs.len() - 1
-                    };
-                    leaf.active = egui_dock::TabIndex((leaf.active.0 + delta) % leaf.tabs.len());
                 }
             }
         }
@@ -287,6 +273,7 @@ impl EasyNatsApp {
             .map(Entry::Form)
             .collect();
         entries.extend(Command::ALL.into_iter().map(Entry::Workspace));
+        entries.sort_by_key(Entry::group);
         let reason = |entry: &Entry| match entry {
             Entry::Workspace(c) => self.disabled_reason(ctx, *c),
             Entry::Form(a) => (!a.enabled).then(|| t("keyboard.form_invalid")),
@@ -298,12 +285,16 @@ impl EasyNatsApp {
         let down = keyboard::take_key(ctx, Modifiers::NONE, Key::ArrowDown);
         // A keyboard launcher should be immediately readable, including its first frame.
         let palette_id = Id::new("command_palette");
-        let modal =
-            egui::Modal::new(palette_id).area(egui::Modal::default_area(palette_id).fade_in(false));
+        let modal = egui::Modal::new(palette_id).area(
+            egui::Modal::default_area(palette_id)
+                .fade_in(false)
+                .anchor(egui::Align2::CENTER_TOP, egui::vec2(0.0, 40.0)),
+        );
         let response = modal.show(ctx, |ui| {
             ui.set_width((ctx.content_rect().width() - 64.0).clamp(280.0, 540.0));
+            ui.visuals_mut().weak_text_alpha = 0.85;
             ui.horizontal(|ui| {
-                ui.weak(t("keyboard.commands"));
+                ui.strong(t("keyboard.commands"));
                 ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                     ui.weak("Esc");
                 });
@@ -339,13 +330,29 @@ impl EasyNatsApp {
             ui.add_space(6.0);
             ui.spacing_mut().scroll.floating = false;
             egui::ScrollArea::vertical()
-                .max_height((ctx.content_rect().height() - 150.0).clamp(180.0, 420.0))
+                .max_height((ctx.content_rect().height() - 190.0).clamp(140.0, 320.0))
                 .show(ui, |ui| {
                     if results.is_empty() {
                         ui.add_space(12.0);
                         ui.weak(t("keyboard.no_commands"));
                     }
+                    let mut last_group = None;
                     for (i, entry) in results.iter().enumerate() {
+                        let group = entry.group();
+                        if last_group != Some(group) {
+                            if last_group.is_some() {
+                                ui.add_space(4.0);
+                            }
+                            ui.label(
+                                egui::RichText::new(t(match group {
+                                    0 => "keyboard.group_page",
+                                    1 => "keyboard.group_navigation",
+                                    _ => "keyboard.group_application",
+                                }))
+                                .strong(),
+                            );
+                            last_group = Some(group);
+                        }
                         let disabled = reason(entry);
                         let text = if let Some(reason) = disabled {
                             format!("{}\n{reason}", entry.label())
@@ -361,7 +368,7 @@ impl EasyNatsApp {
                             egui::Button::new(text)
                                 .selected(i == p.selected && disabled.is_none())
                                 .shortcut_text(hint)
-                                .min_size(egui::vec2(ui.available_width(), 32.0))
+                                .min_size(egui::vec2(ui.available_width(), 28.0))
                                 .frame(i == p.selected && disabled.is_none()),
                         );
                         if (up || down || search.changed()) && i == p.selected {
@@ -394,7 +401,7 @@ impl EasyNatsApp {
                 }
             }
         }
-        p.just_opened = false;
+        p.just_opened = ctx.will_discard();
         save_palette(ctx, p);
     }
 }
@@ -425,7 +432,7 @@ mod tests {
     }
 
     #[test]
-    fn tab_shortcuts_stay_in_the_focused_split_and_keep_welcome() {
+    fn close_stays_in_the_focused_split_and_keeps_welcome() {
         let mut app = app();
         app.dock_state = egui_dock::DockState::new(vec![TabKind::Welcome, TabKind::Settings]);
         let [_, right] = app.dock_state.main_surface_mut().split_right(
@@ -439,7 +446,6 @@ mod tests {
                 right,
             ));
         let ctx = Context::default();
-        app.execute_command(&ctx, Command::Next);
         assert!(matches!(app.active_command_tab(), Some(TabKind::LogViewer)));
         app.execute_command(&ctx, Command::Close);
         assert_eq!(app.dock_state.iter_all_tabs().count(), 2);
