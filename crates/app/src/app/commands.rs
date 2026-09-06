@@ -287,7 +287,11 @@ impl EasyNatsApp {
         let enter = keyboard::take_key(ctx, Modifiers::NONE, Key::Enter);
         let up = keyboard::take_key(ctx, Modifiers::NONE, Key::ArrowUp);
         let down = keyboard::take_key(ctx, Modifiers::NONE, Key::ArrowDown);
-        let response = egui::Modal::new(Id::new("command_palette")).show(ctx, |ui| {
+        // A keyboard launcher should be immediately readable, including its first frame.
+        let palette_id = Id::new("command_palette");
+        let modal =
+            egui::Modal::new(palette_id).area(egui::Modal::default_area(palette_id).fade_in(false));
+        let response = modal.show(ctx, |ui| {
             ui.set_width((ctx.content_rect().width() - 64.0).clamp(280.0, 540.0));
             ui.horizontal(|ui| {
                 ui.weak(t("keyboard.commands"));
