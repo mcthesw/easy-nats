@@ -23,6 +23,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.1.36" date="2026-09-07">
+      <description>
+        <p>Adds commands to find and open saved connections by name from the command palette.</p>
+      </description>
+    </release>
     <release version="0.1.35" date="2026-09-06">
       <description>
         <p>Adds a searchable command palette, tab search, and recent-tab switching. Improves form keyboard navigation, subject completion, and focus handling across split panes.</p>

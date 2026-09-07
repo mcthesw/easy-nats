@@ -35,8 +35,10 @@ Read JSON, MsgPack, Protobuf without leaving the app.
 
 Open **Commands** with **Ctrl+Shift+P** (macOS: **Cmd+Shift+P**) or the ⌘ button
 beside Connections. Search in English or Chinese, use ↑/↓ to select, and press
-Enter to run. Commands are grouped into Current Page, Navigation, and Application;
+Enter to run. Commands are grouped into Current Page, Navigation, Application, and Connections;
 they show their shortcuts and explain when they are unavailable.
+Search a saved connection's name and run **Open Connection: name** to connect without
+using the sidebar. Connections already open or connecting are disabled.
 
 | Action | Windows / Linux | macOS |
 | --- | --- | --- |
