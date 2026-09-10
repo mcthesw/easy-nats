@@ -21,6 +21,10 @@ pub async fn run_worker(
     mut cmd_rx: mpsc::UnboundedReceiver<BackendCommand>,
     evt_tx: mpsc::Sender<BackendEvent>,
 ) {
+    // Reqwest's rustls-no-provider requires an installed provider before its
+    // client is built. This also makes async-nats independent of feature inference.
+    // An existing process default is retained if another worker already set it.
+    let _ = rustls::crypto::ring::default_provider().install_default();
     tracing::info!("Backend worker started");
     let mut state = WorkerState::default();
 
