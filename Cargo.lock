@@ -967,7 +967,7 @@ dependencies = [
 
 [[package]]
 name = "easy-nats"
-version = "0.1.35"
+version = "0.1.36"
 dependencies = [
  "base64",
  "eframe",
@@ -2473,7 +2473,7 @@ dependencies = [
 
 [[package]]
 name = "nats-backend"
-version = "0.1.35"
+version = "0.1.36"
 dependencies = [
  "async-nats",
  "base64",

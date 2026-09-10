@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.1.36](https://github.com/mcthesw/easy-nats/compare/v0.1.35...v0.1.36) (2026-09-10)
+
+
+### Features
+
+* open saved connections from the command palette ([ec5b2b3](https://github.com/mcthesw/easy-nats/commit/ec5b2b32755e9181e727691762e012d58d9c9c16))
+
+
+### Bug Fixes
+
+* initialize a shared TLS crypto provider ([3120216](https://github.com/mcthesw/easy-nats/commit/31202162fd86e5a220b1d15eafe46b9f5ad09163))
+
 ## [0.1.35](https://github.com/mcthesw/easy-nats/compare/v0.1.34...v0.1.35) (2026-09-06)
 
 
