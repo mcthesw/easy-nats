@@ -108,7 +108,7 @@ jobs:
         if: matrix.packager
         uses: taiki-e/install-action@v2
         with:
-          tool: cargo-packager
+          tool: cargo-packager@0.11.8
 
       - name: Build release binary
         run: cargo build --release --target ${{ matrix.target }} -p easy-nats
@@ -164,6 +164,18 @@ jobs:
             -s -k "${KEYCHAIN_PASSWORD}" build.keychain
           rm -f /tmp/cert.p12
 
+      - name: Prepare AppImage launcher
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tools_dir="${XDG_CACHE_HOME:-$HOME/.cache}/.cargo-packager/AppImage"
+          mkdir -p "${tools_dir}"
+          curl --fail --location --retry 3 \
+            https://github.com/tauri-apps/binary-releases/releases/download/apprun-old/AppRun-x86_64 \
+            --output "${tools_dir}/AppRun-x86_64"
+          chmod 0755 "${tools_dir}/AppRun-x86_64"
+
       - name: Run cargo-packager
         if: matrix.packager
         shell: bash
@@ -182,6 +194,30 @@ jobs:
           fi
           for fmt in ${{ matrix.formats }}; do
             cargo packager "${args[@]}" --formats "${fmt}"
+          done
+
+      - name: Verify AppImage executable permissions
+        if: matrix.platform == 'linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          images=(dist/*.AppImage)
+          if [[ ${#images[@]} -ne 1 ]]; then
+            echo "::error::Expected exactly one AppImage, found ${#images[@]}"
+            exit 1
+          fi
+          image="${GITHUB_WORKSPACE}/${images[0]}"
+          extract_dir="$(mktemp -d)"
+          trap 'rm -rf "${extract_dir}"' EXIT
+          cd "${extract_dir}"
+          "${image}" --appimage-extract >/dev/null
+          for path in squashfs-root/AppRun squashfs-root/usr/bin/easy-nats; do
+            mode="$(stat -Lc '%a' "${path}")"
+            if (( (8#${mode} & 8#555) != 8#555 )); then
+              echo "::error::${path} has mode ${mode}; all users need read and execute permissions"
+              exit 1
+            fi
           done
 
       - name: List dist directory
