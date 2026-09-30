@@ -102,7 +102,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y \
             libxcb-render0-dev libxcb-shape0-dev libxcb-xfixes0-dev \
-            libxkbcommon-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev
+            libxkbcommon-dev libxkbcommon-x11-dev libssl-dev libgtk-3-dev libayatana-appindicator3-dev
 
       - name: Install cargo-packager
         if: matrix.packager
@@ -196,7 +196,7 @@ jobs:
             cargo packager "${args[@]}" --formats "${fmt}"
           done
 
-      - name: Verify AppImage executable permissions
+      - name: Verify AppImage permissions and runtime libraries
         if: matrix.platform == 'linux'
         shell: bash
         run: |
@@ -207,18 +207,7 @@ jobs:
             echo "::error::Expected exactly one AppImage, found ${#images[@]}"
             exit 1
           fi
-          image="${GITHUB_WORKSPACE}/${images[0]}"
-          extract_dir="$(mktemp -d)"
-          trap 'rm -rf "${extract_dir}"' EXIT
-          cd "${extract_dir}"
-          "${image}" --appimage-extract >/dev/null
-          for path in squashfs-root/AppRun squashfs-root/usr/bin/easy-nats; do
-            mode="$(stat -Lc '%a' "${path}")"
-            if (( (8#${mode} & 8#555) != 8#555 )); then
-              echo "::error::${path} has mode ${mode}; all users need read and execute permissions"
-              exit 1
-            fi
-          done
+          python3 packaging/verify-appimage.py "${images[0]}"
 
       - name: List dist directory
         shell: bash
