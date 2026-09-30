@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.37](https://github.com/mcthesw/easy-nats/compare/v0.1.36...v0.1.37) (2026-09-30)
+
+
+### Bug Fixes
+
+* AppImage executable permissions ([287d8e5](https://github.com/mcthesw/easy-nats/commit/287d8e5da94886adb400ba77742eed389d003efe))
+
 ## [0.1.36](https://github.com/mcthesw/easy-nats/compare/v0.1.35...v0.1.36) (2026-09-10)
 
 
