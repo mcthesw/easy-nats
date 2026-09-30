@@ -88,6 +88,7 @@ depends = [
     "libc6",
     "libgcc-s1",
     "libxkbcommon0",
+    "libxkbcommon-x11-0",
     "libxcb1",
     "libxcb-render0",
     "libxcb-shape0",
@@ -101,7 +102,14 @@ depends = [
 "../../packaging/easy-nats.desktop" = "/usr/share/applications/easy-nats.desktop"
 
 [package.metadata.packager.appimage]
+# Loaded with dlopen by the X11 backend, so DT_NEEDED scanning misses them.
+# Include libxcb-xkb explicitly too: it is needed by libxkbcommon-x11.
+libs = ["libxkbcommon.so.0", "libxkbcommon-x11.so.0", "libxcb-xkb.so.1"]
 [package.metadata.packager.appimage.files]
+# Keep the bundled libraries' license notices in the AppImage.
+"/usr/share/doc/libxkbcommon0/copyright" = "usr/share/doc/libxkbcommon0/copyright"
+"/usr/share/doc/libxkbcommon-x11-0/copyright" = "usr/share/doc/libxkbcommon-x11-0/copyright"
+"/usr/share/doc/libxcb-xkb1/copyright" = "usr/share/doc/libxcb-xkb1/copyright"
 "../../packaging/easy-nats.desktop" = "usr/share/applications/easy-nats.desktop"
 
 [package.metadata.packager.macos]
