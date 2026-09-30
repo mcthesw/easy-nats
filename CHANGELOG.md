@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.38](https://github.com/mcthesw/easy-nats/compare/v0.1.37...v0.1.38) (2026-09-30)
+
+
+### Bug Fixes
+
+* bundle Linux keyboard runtime libraries ([7c235ee](https://github.com/mcthesw/easy-nats/commit/7c235eee51aea7d770b8386d70f04cd0a91afec6))
+
 ## [0.1.37](https://github.com/mcthesw/easy-nats/compare/v0.1.36...v0.1.37) (2026-09-30)
 
 
