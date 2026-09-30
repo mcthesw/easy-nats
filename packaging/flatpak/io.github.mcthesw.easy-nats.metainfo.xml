@@ -23,6 +23,16 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.1.38" date="2026-09-30">
+      <description>
+        <p>Bundles missing X11 keyboard libraries in Linux AppImages and adds the corresponding runtime dependency to Debian packages.</p>
+      </description>
+    </release>
+    <release version="0.1.37" date="2026-09-30">
+      <description>
+        <p>Fixes executable permissions for the launcher and application inside Linux AppImages.</p>
+      </description>
+    </release>
     <release version="0.1.36" date="2026-09-10">
       <description>
         <p>Adds commands to find and open saved connections by name from the command palette.</p>
