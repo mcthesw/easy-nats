@@ -23,6 +23,11 @@
     </screenshot>
   </screenshots>
   <releases>
+    <release version="0.1.39" date="2026-10-08">
+      <description>
+        <p>Fixes Homebrew installation on macOS and aligns macOS package metadata with the minimum supported version, macOS 11 Big Sur.</p>
+      </description>
+    </release>
     <release version="0.1.38" date="2026-09-30">
       <description>
         <p>Bundles missing X11 keyboard libraries in Linux AppImages and adds the corresponding runtime dependency to Debian packages.</p>
