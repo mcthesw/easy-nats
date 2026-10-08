@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.39](https://github.com/mcthesw/easy-nats/compare/v0.1.38...v0.1.39) (2026-10-08)
+
+
+### Bug Fixes
+
+* **homebrew:** remove disabled Catalina requirement ([75fb473](https://github.com/mcthesw/easy-nats/commit/75fb473da6b3d3552a6c2b4c0d34b6a302fbce8c))
+
 ## [0.1.38](https://github.com/mcthesw/easy-nats/compare/v0.1.37...v0.1.38) (2026-09-30)
 
 
