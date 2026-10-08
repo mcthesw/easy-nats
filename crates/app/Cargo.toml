@@ -113,7 +113,7 @@ libs = ["libxkbcommon.so.0", "libxkbcommon-x11.so.0", "libxcb-xkb.so.1"]
 "../../packaging/easy-nats.desktop" = "usr/share/applications/easy-nats.desktop"
 
 [package.metadata.packager.macos]
-minimum-system-version = "10.15"
+minimum-system-version = "11.0"
 
 [package.metadata.wasm-pack.profile.release]
 wasm-opt = false
