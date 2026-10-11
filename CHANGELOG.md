@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.40](https://github.com/mcthesw/easy-nats/compare/v0.1.39...v0.1.40) (2026-10-11)
+
+
+### Build System
+
+* **flatpak:** update Freedesktop runtime to 26.08 ([c9885c6](https://github.com/mcthesw/easy-nats/commit/c9885c67c04efb318123f7c7504f62e90a7f4ecf))
+
 ## [0.1.39](https://github.com/mcthesw/easy-nats/compare/v0.1.38...v0.1.39) (2026-10-08)
 
 
